@@ -8,6 +8,8 @@ from compliance import check_cis_compliance, check_pci_compliance, check_nist_co
 
 from ciscoconfparse import CiscoConfParse
 
+from paloalto import audit_paloalto
+
 from reporter import generate_report
 
 app = typer.Typer()
@@ -117,6 +119,30 @@ def audit(
         typer.echo(f"Total Issues:          {len(findings)}")
         typer.echo(f"---------------------")
     
+    elif vendor == "paloalto":
+        findings = audit_paloalto(file)
+
+        if findings:
+            for f in findings:
+                typer.echo(f)
+        else:
+            typer.echo("[PASS] No issues found")
+
+        if compliance:
+            typer.echo(f"\n--- {compliance.upper()} Compliance Checks ---")
+            from ciscoconfparse import CiscoConfParse
+            # Compliance checks for PA use same logic, different parser
+            if compliance == "cis":
+                cf = []  # PA CIS checks coming in next step
+            elif compliance == "pci":
+                cf = []
+            elif compliance == "nist":
+                cf = []
+            else:
+                cf = []
+            for f in cf:
+                typer.echo(f)
+            findings += cf
 
 if __name__ == "__main__":
     app()
