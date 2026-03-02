@@ -8,6 +8,8 @@ from compliance import check_cis_compliance, check_pci_compliance, check_nist_co
 
 from ciscoconfparse import CiscoConfParse
 
+from reporter import generate_report
+
 app = typer.Typer()
 
 def check_any_any(parse):
@@ -45,7 +47,8 @@ def check_redundant_rules(parse):
 def audit(
     file: str = typer.Option(None, "--file", "-f", help="Path to firewall config file"),
     vendor: str = typer.Option(None, "--vendor", "-v", help="Firewall vendor: paloalto, asa, pfsense"),
-    compliance: str = typer.Option(None, "--compliance", "-c", help="Compliance framework: cis, pci, nist")
+    compliance: str = typer.Option(None, "--compliance", "-c", help="Compliance framework: cis, pci, nist"),
+    report: bool = typer.Option(False, "--report", "-r", help="Export PDF report")
 ):
     """FWAudit - Firewall configuration auditing tool"""
 
@@ -85,14 +88,33 @@ def audit(
         for f in cf:
             typer.echo(f)
         findings += cf
-    
-        high = [f for f in findings if "[HIGH]" in f]
-        medium = [f for f in findings if "[MEDIUM]" in f]
+
+        if report:
+            output = generate_report(findings, file, vendor, compliance)
+            typer.echo(f"\n📄 Report saved to: {output}")
+
+        high = [f for f in findings if "[HIGH]" in f and "PCI" not in f and "CIS" not in f and "NIST" not in f]
+        medium = [f for f in findings if "[MEDIUM]" in f and "PCI" not in f and "CIS" not in f and "NIST" not in f]
+        pci_high = [f for f in findings if "PCI-HIGH" in f]
+        pci_medium = [f for f in findings if "PCI-MEDIUM" in f]
+        cis_high = [f for f in findings if "CIS-HIGH" in f]
+        cis_medium = [f for f in findings if "CIS-MEDIUM" in f]
+        nist_high = [f for f in findings if "NIST-HIGH" in f]
+        nist_medium = [f for f in findings if "NIST-MEDIUM" in f]
 
         typer.echo(f"\n--- Audit Summary ---")
-        typer.echo(f"High Severity:   {len(high)}")
-        typer.echo(f"Medium Severity: {len(medium)}")
-        typer.echo(f"Total Issues:    {len(findings)}")
+        typer.echo(f"High Severity:         {len(high)}")
+        typer.echo(f"Medium Severity:       {len(medium)}")
+        if pci_high or pci_medium:
+            typer.echo(f"PCI Compliance High:   {len(pci_high)}")
+            typer.echo(f"PCI Compliance Medium: {len(pci_medium)}")
+        if cis_high or cis_medium:
+            typer.echo(f"CIS Compliance High:   {len(cis_high)}")
+            typer.echo(f"CIS Compliance Medium: {len(cis_medium)}")
+        if nist_high or nist_medium:
+            typer.echo(f"NIST Compliance High:  {len(nist_high)}")
+            typer.echo(f"NIST Compliance Medium:{len(nist_medium)}")
+        typer.echo(f"Total Issues:          {len(findings)}")
         typer.echo(f"---------------------")
     
 
