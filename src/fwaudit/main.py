@@ -1,6 +1,8 @@
 import typer
 import logging
 
+from license import activate_license, check_license, deactivate_license
+
 from loguru import logger
 logger.disable("ciscoconfparse")
 
@@ -54,10 +56,23 @@ def audit(
     file: str = typer.Option(None, "--file", "-f", help="Path to firewall config file"),
     vendor: str = typer.Option(None, "--vendor", "-v", help="Firewall vendor: paloalto, asa, pfsense"),
     compliance: str = typer.Option(None, "--compliance", "-c", help="Compliance framework: cis, pci, nist"),
-    report: bool = typer.Option(False, "--report", "-r", help="Export PDF report")
+    report: bool = typer.Option(False, "--report", "-r", help="Export PDF report"),
+    activate: str = typer.Option(None, "--activate", help="Activate a license key"),
+    deactivate: bool = typer.Option(False, "--deactivate", help="Deactivate current license")
 ):
     """FWAudit - Firewall configuration auditing tool"""
+    
+    # Handle license activation
+    if activate:
+        success, message = activate_license(activate)
+        typer.echo(message)
+        raise typer.Exit()
 
+    if deactivate:
+        success, message = deactivate_license()
+        typer.echo(message)
+        raise typer.Exit()
+    
     if not file or not vendor:
         typer.echo("FWAudit v0.1")
         typer.echo("Usage: python3 src/fwaudit/main.py --file config.txt --vendor asa")
@@ -80,6 +95,11 @@ def audit(
             typer.echo("[PASS] No issues found")
         
         if compliance:
+            licensed, message = check_license()
+            if not licensed:
+                typer.echo(f"\n⚠️  Compliance checks require a valid license.")
+                typer.echo(f"   {message}")
+                raise typer.Exit()
             typer.echo(f"\n--- {compliance.upper()} Compliance Checks ---")
             if compliance == "cis":
                 cf = check_cis_compliance(parse)
@@ -133,6 +153,11 @@ def audit(
             typer.echo("[PASS] No issues found")
 
         if compliance:
+            licensed, message = check_license()
+            if not licensed:
+                typer.echo(f"\n⚠️  Compliance checks require a valid license.")
+                typer.echo(f"   {message}")
+                raise typer.Exit()
             typer.echo(f"\n--- {compliance.upper()} Compliance Checks ---")
             from paloalto import parse_paloalto
             from compliance import check_cis_compliance_pa, check_pci_compliance_pa, check_nist_compliance_pa
@@ -190,6 +215,11 @@ def audit(
             typer.echo("[PASS] No issues found")
 
         if compliance:
+            licensed, message = check_license()
+            if not licensed:
+                typer.echo(f"\n⚠️  Compliance checks require a valid license.")
+                typer.echo(f"   {message}")
+                raise typer.Exit()
             typer.echo(f"\n--- {compliance.upper()} Compliance Checks ---")
             if compliance == "cis":
                 cf = check_cis_compliance_forti(policies)
@@ -244,6 +274,11 @@ def audit(
             typer.echo("[PASS] No issues found")
 
         if compliance:
+            licensed, message = check_license()
+            if not licensed:
+                typer.echo(f"\n⚠️  Compliance checks require a valid license.")
+                typer.echo(f"   {message}")
+                raise typer.Exit()
             typer.echo(f"\n--- {compliance.upper()} Compliance Checks ---")
             if compliance == "cis":
                 cf = check_cis_compliance_pf(rules)
