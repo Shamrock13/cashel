@@ -6,7 +6,7 @@ from datetime import datetime
 # This is your secret salt - change this to something unique before publishing
 SECRET_SALT = os.environ.get("FWAUDIT_SECRET", "fallback-for-dev-only")
 
-LICENSE_FILE = os.path.expanduser("~/.fwaudit_license")
+LICENSE_FILE = os.path.expanduser("~/.flintlock_license")
 
 
 def generate_key(email: str) -> str:

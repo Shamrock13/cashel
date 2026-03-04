@@ -1,6 +1,6 @@
-# 🔒 FWAudit
+# 🔒 Flintlock
 
-**FWAudit** is an open-source CLI tool for auditing firewall configurations across multiple vendors. It detects common security misconfigurations, generates scored reports, and optionally checks against compliance frameworks like CIS, PCI-DSS, and NIST.
+**Flintlock** is an open-source CLI tool for auditing firewall configurations across multiple vendors. It detects common security misconfigurations, generates scored reports, and optionally checks against compliance frameworks like CIS, PCI-DSS, and NIST.
 
 ---
 
@@ -48,8 +48,8 @@
 
 ### Clone the repo
 
-    git clone https://github.com/Shamrock13/fwaudit.git
-    cd fwaudit
+    git clone https://github.com/Shamrock13/flintlock.git
+    cd flintlock
 
 ---
 
@@ -57,15 +57,15 @@
 
 ### Basic audit (free)
 
-    python3 src/fwaudit/main.py --file config.txt --vendor asa
+    python3 src/flintlock/main.py --file config.txt --vendor asa
 
 ### With compliance checks (license required)
 
-    python3 src/fwaudit/main.py --file config.txt --vendor asa --compliance pci
+    python3 src/flintlock/main.py --file config.txt --vendor asa --compliance pci
 
 ### Export PDF report
 
-    python3 src/fwaudit/main.py --file config.txt --vendor asa --compliance pci --report
+    python3 src/flintlock/main.py --file config.txt --vendor asa --compliance pci --report
 
 ### Supported vendors
 
@@ -86,17 +86,17 @@
 
 After purchasing a license, activate it with:
 
-    python3 src/fwaudit/main.py --activate YOUR-LICENSE-KEY
+    python3 src/flintlock/main.py --activate YOUR-LICENSE-KEY
 
 To deactivate:
 
-    python3 src/fwaudit/main.py --deactivate
+    python3 src/flintlock/main.py --deactivate
 
 ---
 
 ## Example Output
 
-    FWAudit v0.1 — Starting audit of firewall.xml (paloalto)
+    Flintlock v0.1 — Starting audit of firewall.xml (paloalto)
 
     [HIGH] Overly permissive rule 'Allow-Any-Any': source=any destination=any
     [MEDIUM] Permit rule 'Allow-Any-Any' missing logging

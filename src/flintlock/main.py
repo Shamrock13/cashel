@@ -1,10 +1,6 @@
 import typer
-import logging
 
 from license import activate_license, check_license, deactivate_license
-
-from loguru import logger
-logger.disable("ciscoconfparse")
 
 from compliance import check_cis_compliance, check_pci_compliance, check_nist_compliance
 
@@ -54,13 +50,12 @@ def check_redundant_rules(parse):
 @app.command()
 def audit(
     file: str = typer.Option(None, "--file", "-f", help="Path to firewall config file"),
-    vendor: str = typer.Option(None, "--vendor", "-v", help="Firewall vendor: paloalto, asa, pfsense"),
-    compliance: str = typer.Option(None, "--compliance", "-c", help="Compliance framework: cis, pci, nist"),
+    vendor: str = typer.Option(None, "--vendor", "-v", help="Firewall vendor: asa, paloalto, fortinet, pfsense"),    compliance: str = typer.Option(None, "--compliance", "-c", help="Compliance framework: cis, pci, nist"),
     report: bool = typer.Option(False, "--report", "-r", help="Export PDF report"),
     activate: str = typer.Option(None, "--activate", help="Activate a license key"),
     deactivate: bool = typer.Option(False, "--deactivate", help="Deactivate current license")
 ):
-    """FWAudit - Firewall configuration auditing tool"""
+    """Flintlock - Firewall configuration auditing tool"""
     
     # Handle license activation
     if activate:
@@ -74,11 +69,11 @@ def audit(
         raise typer.Exit()
     
     if not file or not vendor:
-        typer.echo("FWAudit v0.1")
-        typer.echo("Usage: python3 src/fwaudit/main.py --file config.txt --vendor asa")
+        typer.echo("Flintlock v0.1")
+        typer.echo("Usage: python3 src/flintlock/main.py --file config.txt --vendor asa")
         raise typer.Exit()
 
-    typer.echo(f"\nFWAudit v0.1 — Starting audit of {file} ({vendor})\n")
+    typer.echo(f"\nFlintlock v0.1 — Starting audit of {file} ({vendor})\n")
 
     if vendor == "asa":
         parse = CiscoConfParse(file, ignore_blank_lines=False)
@@ -111,9 +106,9 @@ def audit(
                 cf = []
                 typer.echo(f"Unknown framework: {compliance}. Use cis, pci, or nist")
 
-        for f in cf:
-            typer.echo(f)
-        findings += cf
+            for f in cf:
+                typer.echo(f)
+            findings += cf
 
         if report:
             output = generate_report(findings, file, vendor, compliance)
