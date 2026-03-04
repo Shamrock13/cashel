@@ -48,7 +48,7 @@
 
 ### Clone the repo
 
-    git clone https://github.com/YOURUSERNAME/fwaudit.git
+    git clone https://github.com/Shamrock13/fwaudit.git
     cd fwaudit
 
 ---
