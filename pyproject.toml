@@ -1,18 +1,26 @@
 [project]
-name = "fwaudit"
-version = "0.1.0"
-description = ""
+name = "flintlock"
+version = "1.0.0"
+description = "Firewall configuration auditing tool"
 authors = [
-    {name = "Your Name",email = "you@example.com"}
+    {name = "Your Name", email = "you@example.com"}
 ]
 readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [
+    "typer>=0.12",
+    "ciscoconfparse>=1.9",
+    "fpdf2>=2.7",
+    "flask>=3.0",
 ]
 
 [tool.poetry]
-packages = [{include = "fwaudit", from = "src"}]
+packages = [{include = "flintlock", from = "src"}]
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[project.scripts]
+flintlock = "flintlock.main:app"
+flintlock-web = "flintlock.web:main"

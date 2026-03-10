@@ -1,18 +1,18 @@
 import typer
 
-from license import activate_license, check_license, deactivate_license
+from .license import activate_license, check_license, deactivate_license
 
-from compliance import check_cis_compliance, check_pci_compliance, check_nist_compliance
+from .compliance import check_cis_compliance, check_pci_compliance, check_nist_compliance
 
 from ciscoconfparse import CiscoConfParse
 
-from paloalto import audit_paloalto
+from .paloalto import audit_paloalto
 
-from reporter import generate_report
+from .reporter import generate_report
 
-from fortinet import audit_fortinet
+from .fortinet import audit_fortinet
 
-from pfsense import audit_pfsense
+from .pfsense import audit_pfsense
 
 app = typer.Typer()
 
@@ -154,8 +154,8 @@ def audit(
                 typer.echo(f"   {message}")
                 raise typer.Exit()
             typer.echo(f"\n--- {compliance.upper()} Compliance Checks ---")
-            from paloalto import parse_paloalto
-            from compliance import check_cis_compliance_pa, check_pci_compliance_pa, check_nist_compliance_pa
+            from .paloalto import parse_paloalto
+            from .compliance import check_cis_compliance_pa, check_pci_compliance_pa, check_nist_compliance_pa
             rules, _ = parse_paloalto(file)
             if compliance == "cis":
                 cf = check_cis_compliance_pa(rules)
@@ -199,7 +199,7 @@ def audit(
         typer.echo(f"---------------------")
 
     elif vendor == "fortinet":
-        from compliance import check_cis_compliance_forti, check_pci_compliance_forti, check_nist_compliance_forti
+        from .compliance import check_cis_compliance_forti, check_pci_compliance_forti, check_nist_compliance_forti
 
         findings, policies = audit_fortinet(file)
 
@@ -258,7 +258,7 @@ def audit(
         typer.echo(f"---------------------")
 
     elif vendor == "pfsense":
-        from compliance import check_cis_compliance_pf, check_pci_compliance_pf, check_nist_compliance_pf
+        from .compliance import check_cis_compliance_pf, check_pci_compliance_pf, check_nist_compliance_pf
 
         findings, rules = audit_pfsense(file)
 

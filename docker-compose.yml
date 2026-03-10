@@ -1,0 +1,15 @@
+services:
+  flintlock:
+    build: .
+    ports:
+      - "8080:5000"
+    volumes:
+      - flintlock_data:/data
+    environment:
+      # Change this to a strong secret before deploying to production
+      - FWAUDIT_SECRET=${FWAUDIT_SECRET:-change-me-in-production}
+    restart: unless-stopped
+
+volumes:
+  flintlock_data:
+    driver: local
