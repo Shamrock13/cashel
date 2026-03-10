@@ -6,8 +6,8 @@ html { overflow-y: scroll; }
 
 /* ===== Light Mode (default) ===== */
 :root {
-  --header-bg:   #1A1A2E;
-  --header-border: #0F3460;
+  --header-bg:   #1E4080;
+  --header-border: #163264;
 
   --bg:          #F4F6FB;
   --card-bg:     #FFFFFF;
@@ -530,6 +530,18 @@ select:focus, input[type="text"]:focus {
   padding: 0.75rem 1.25rem;
   border-radius: 8px;
   min-width: 90px;
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.12s, box-shadow 0.12s;
+}
+
+.summary-box:hover {
+  transform: translateY(-2px);
+}
+
+.summary-box.filter-active {
+  box-shadow: 0 0 0 2px currentColor, 0 2px 8px rgba(0,0,0,0.15);
+  transform: translateY(-2px);
 }
 
 .summary-val { font-size: 1.8rem; font-weight: 700; line-height: 1; }

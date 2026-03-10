@@ -86,9 +86,9 @@
             <label for="vendor">Vendor</label>
             <select id="vendor" name="vendor">
               <option value="auto" selected>Auto-detect (recommended)</option>
-              <option value="asa">Cisco ASA</option>
-              <option value="paloalto">Palo Alto</option>
-              <option value="fortinet">Fortinet FortiGate</option>
+              <option value="asa">Cisco</option>
+              <option value="paloalto">Palo Alto Networks</option>
+              <option value="fortinet">Fortinet</option>
               <option value="pfsense">pfSense</option>
             </select>
           </div>
@@ -229,8 +229,46 @@
     }
 
     const VENDOR_LABELS = {
-      asa: "Cisco ASA", paloalto: "Palo Alto", fortinet: "Fortinet", pfsense: "pfSense"
+      asa: "Cisco", paloalto: "Palo Alto Networks", fortinet: "Fortinet", pfsense: "pfSense"
     };
+
+    // ── Filter state ──────────────────────────────────────────────
+    let activeFilter = null;
+
+    document.getElementById("summaryGrid").addEventListener("click", function (e) {
+      const box = e.target.closest(".summary-box[data-filter]");
+      if (!box) return;
+      const filter = box.dataset.filter;
+
+      if (activeFilter === filter && filter !== "all") {
+        // Second click on same box → reset to show all
+        activeFilter = null;
+        applyFindingFilter(null);
+        document.querySelectorAll(".summary-box").forEach(b => b.classList.remove("filter-active"));
+      } else {
+        activeFilter = filter === "all" ? null : filter;
+        applyFindingFilter(activeFilter);
+        document.querySelectorAll(".summary-box").forEach(b =>
+          b.classList.toggle("filter-active", b === box)
+        );
+      }
+    });
+
+    function applyFindingFilter(filter) {
+      document.querySelectorAll(".finding").forEach(f => {
+        if (!filter) {
+          f.style.display = "";
+          return;
+        }
+        const show =
+          filter === "high"       ? f.classList.contains("finding-high") :
+          filter === "medium"     ? f.classList.contains("finding-medium") :
+          filter === "compliance" ? (f.classList.contains("finding-compliance-high") ||
+                                     f.classList.contains("finding-compliance-medium")) :
+          true;
+        f.style.display = show ? "" : "none";
+      });
+    }
 
     function renderResults(data) {
       const section = document.getElementById("resultsSection");
@@ -255,27 +293,31 @@
         warn.classList.add("hidden");
       }
 
+      // Reset filter state on new results
+      activeFilter = null;
+      applyFindingFilter(null);
+
       // Summary boxes
       const s = data.summary;
       const summaryItems = [
-        { label: "High",   value: s.high,   cls: "sev-high" },
-        { label: "Medium", value: s.medium, cls: "sev-medium" },
-        { label: "Total",  value: s.total,  cls: "sev-total" },
+        { label: "High",   value: s.high,   cls: "sev-high",   filter: "high" },
+        { label: "Medium", value: s.medium, cls: "sev-medium", filter: "medium" },
+        { label: "Total",  value: s.total,  cls: "sev-total",  filter: "all" },
       ];
       if (s.pci_high || s.pci_medium) {
-        summaryItems.push({ label: "PCI High",   value: s.pci_high,   cls: "sev-compliance" });
-        summaryItems.push({ label: "PCI Medium", value: s.pci_medium, cls: "sev-compliance" });
+        summaryItems.push({ label: "PCI High",   value: s.pci_high,   cls: "sev-compliance", filter: "compliance" });
+        summaryItems.push({ label: "PCI Medium", value: s.pci_medium, cls: "sev-compliance", filter: "compliance" });
       }
       if (s.cis_high || s.cis_medium) {
-        summaryItems.push({ label: "CIS High",   value: s.cis_high,   cls: "sev-compliance" });
-        summaryItems.push({ label: "CIS Medium", value: s.cis_medium, cls: "sev-compliance" });
+        summaryItems.push({ label: "CIS High",   value: s.cis_high,   cls: "sev-compliance", filter: "compliance" });
+        summaryItems.push({ label: "CIS Medium", value: s.cis_medium, cls: "sev-compliance", filter: "compliance" });
       }
       if (s.nist_high || s.nist_medium) {
-        summaryItems.push({ label: "NIST High",   value: s.nist_high,   cls: "sev-compliance" });
-        summaryItems.push({ label: "NIST Medium", value: s.nist_medium, cls: "sev-compliance" });
+        summaryItems.push({ label: "NIST High",   value: s.nist_high,   cls: "sev-compliance", filter: "compliance" });
+        summaryItems.push({ label: "NIST Medium", value: s.nist_medium, cls: "sev-compliance", filter: "compliance" });
       }
       document.getElementById("summaryGrid").innerHTML = summaryItems
-        .map(i => `<div class="summary-box ${i.cls}"><span class="summary-val">${i.value}</span><span class="summary-lbl">${i.label}</span></div>`)
+        .map(i => `<div class="summary-box ${i.cls}" data-filter="${i.filter}" title="Click to filter"><span class="summary-val">${i.value}</span><span class="summary-lbl">${i.label}</span></div>`)
         .join("");
 
       // Findings

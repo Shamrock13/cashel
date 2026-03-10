@@ -26,7 +26,15 @@ app = Flask(__name__, template_folder="templates", static_folder="static")
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10 MB upload limit
 
 
-# --- Vendor auto-detection ---
+VENDOR_DISPLAY = {
+    "asa":       "Cisco",
+    "paloalto":  "Palo Alto Networks",
+    "fortinet":  "Fortinet",
+    "pfsense":   "pfSense",
+}
+
+
+# --- Vendor auto-detection and validation ---
 
 def detect_vendor(content: str, filename: str) -> str | None:
     """Infer firewall vendor from file content and filename."""
@@ -52,6 +60,55 @@ def detect_vendor(content: str, filename: str) -> str | None:
         return "asa"
 
     return None
+
+
+def validate_vendor_format(content: str, filename: str, vendor: str) -> tuple[bool, str]:
+    """Return (is_valid, error_message). Ensures the file actually matches the vendor format."""
+    content_lower = content.lower()
+    is_xml = content.strip().startswith("<") or filename.lower().endswith(".xml")
+
+    if vendor == "asa":
+        if is_xml:
+            return False, "Cisco configs are text-based, but this file appears to be XML."
+        if "access-list" not in content_lower:
+            return False, "No Cisco access-list statements found. Check vendor selection."
+
+    elif vendor == "paloalto":
+        if not is_xml:
+            return False, "Palo Alto Networks configs are XML-based, but this file is not XML."
+        pa_markers = ("<devices>", "<vsys>", "<security>", "<rulebase>")
+        if not any(m in content_lower for m in pa_markers):
+            return False, "This XML does not contain Palo Alto Networks configuration markers."
+
+    elif vendor == "fortinet":
+        if is_xml:
+            return False, "Fortinet configs are text-based, but this file appears to be XML."
+        forti_markers = ("config firewall policy", "set srcintf", "set dstintf")
+        if not any(m in content_lower for m in forti_markers):
+            return False, "No Fortinet firewall policy statements found. Check vendor selection."
+
+    elif vendor == "pfsense":
+        if not is_xml:
+            return False, "pfSense configs are XML-based, but this file is not XML."
+        if "<pfsense>" not in content_lower:
+            return False, "pfSense root element <pfsense> not found in this XML file."
+
+    else:
+        return False, f"Unknown vendor: {vendor}"
+
+    return True, ""
+
+
+def _sort_findings(findings: list) -> list:
+    """Sort findings: base HIGH → base MEDIUM → compliance HIGH → compliance MEDIUM → other."""
+    def priority(f):
+        is_comp = any(x in f for x in ("PCI-", "CIS-", "NIST-"))
+        if "[HIGH]"   in f and not is_comp: return 0
+        if "[MEDIUM]" in f and not is_comp: return 1
+        if "HIGH"     in f and is_comp:     return 2
+        if "MEDIUM"   in f and is_comp:     return 3
+        return 4
+    return sorted(findings, key=priority)
 
 
 # --- ASA audit helpers (mirrors main.py logic) ---
@@ -139,26 +196,34 @@ def run_audit():
     compliance = request.form.get("compliance", "").strip().lower() or None
     generate_pdf = request.form.get("report") == "1"
 
-    # Save upload to temp file first (needed for detection)
+    # Save upload to temp file first (needed for detection/validation)
     upload = request.files["config"]
     suffix = Path(upload.filename).suffix or ".txt"
     temp_name = f"{uuid.uuid4()}{suffix}"
     temp_path = os.path.join(UPLOAD_FOLDER, temp_name)
     upload.save(temp_path)
 
+    # Read a sample for detection and validation (one read, used for both)
+    try:
+        with open(temp_path, "r", errors="ignore") as f:
+            sample = f.read(16384)
+    except Exception:
+        sample = ""
+
     # Auto-detect vendor from file contents
     if vendor == "auto":
-        try:
-            with open(temp_path, "r", errors="ignore") as f:
-                sample = f.read(16384)
-            vendor = detect_vendor(sample, upload.filename) or ""
-        except Exception:
-            vendor = ""
+        vendor = detect_vendor(sample, upload.filename) or ""
 
     if vendor not in ("asa", "paloalto", "fortinet", "pfsense"):
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
+        os.remove(temp_path)
         return jsonify({"error": "Could not determine vendor. Please select one manually."}), 400
+
+    # Validate the file actually matches the chosen vendor's format
+    is_valid, validation_msg = validate_vendor_format(sample, upload.filename, vendor)
+    if not is_valid:
+        os.remove(temp_path)
+        vendor_name = VENDOR_DISPLAY.get(vendor, vendor)
+        return jsonify({"error": f"Wrong vendor selected ({vendor_name}): {validation_msg}"}), 400
 
     try:
         # Run audit
@@ -213,6 +278,7 @@ def run_audit():
             generate_report(findings, upload.filename, vendor, compliance, output_path=report_path)
             report_filename = report_name
 
+        findings = _sort_findings(findings)
         summary = _build_summary(findings)
 
         return jsonify({
