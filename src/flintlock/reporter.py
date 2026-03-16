@@ -180,6 +180,11 @@ def _findings_group(pdf, title, findings, bar_color, bg_color, text_color):
 
 
 def generate_report(findings, filename, vendor, compliance=None, output_path="report.pdf"):
+    # Normalize: accept both string findings and dict findings
+    def _msg(f):
+        return f["message"] if isinstance(f, dict) else f
+    findings = [_msg(f) for f in findings]
+
     high    = [f for f in findings if "[HIGH]"   in f and not any(x in f for x in ("PCI-", "CIS-", "NIST-"))]
     medium  = [f for f in findings if "[MEDIUM]" in f and not any(x in f for x in ("PCI-", "CIS-", "NIST-"))]
     pci_h   = [f for f in findings if "PCI-HIGH"   in f]

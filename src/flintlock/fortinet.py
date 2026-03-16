@@ -2,6 +2,13 @@
 # Services considered insecure if allowed to broad destinations
 _INSECURE_SERVICES = {"TELNET", "HTTP", "FTP", "TFTP", "SNMP"}
 
+_WAN_INTFS = {"wan", "wan1", "wan2", "internet", "outside", "untrust"}
+
+
+def _f(severity, category, message, remediation=""):
+    """Build a structured finding dict."""
+    return {"severity": severity, "category": category, "message": message, "remediation": remediation}
+
 
 def parse_fortinet(filepath):
     """Parse a FortiGate config and return firewall policies."""
@@ -28,7 +35,8 @@ def parse_fortinet(filepath):
                 "service":    [],
                 "action":     "",
                 "logtraffic": "",
-                "status":     "enable",   # default is enabled
+                "status":     "enable",
+                "utm-status": "",
             }
 
         elif current_policy is not None:
@@ -50,6 +58,8 @@ def parse_fortinet(filepath):
                 current_policy["logtraffic"] = line.split("set logtraffic ")[1].strip().strip('"')
             elif line.startswith("set status "):
                 current_policy["status"] = line.split("set status ")[1].strip().strip('"')
+            elif line.startswith("set utm-status "):
+                current_policy["utm-status"] = line.split("set utm-status ")[1].strip().strip('"')
             elif line == "next":
                 policies.append(current_policy)
                 current_policy = None
@@ -57,7 +67,7 @@ def parse_fortinet(filepath):
     return policies, None
 
 
-# ── Core checks (v1) ─────────────────────────────────────────────────────────
+# ── Core checks ───────────────────────────────────────────────────────────────
 
 def check_any_any_forti(policies):
     findings = []
@@ -67,9 +77,13 @@ def check_any_any_forti(policies):
         name   = p.get("name") or f"Policy ID {p.get('id')}"
         src    = p.get("srcaddr", [])
         dst    = p.get("dstaddr", [])
-        action = p.get("action", "")
-        if action == "accept" and "all" in src and "all" in dst:
-            findings.append(f"[HIGH] Overly permissive rule '{name}': source=all destination=all")
+        if p.get("action") == "accept" and "all" in src and "all" in dst:
+            findings.append(_f(
+                "HIGH", "exposure",
+                f"[HIGH] Overly permissive rule '{name}': source=all destination=all",
+                "Restrict source and destination to specific, required address objects. "
+                "Any-to-any accept rules expose every service to every network segment."
+            ))
     return findings
 
 
@@ -78,11 +92,16 @@ def check_missing_logging_forti(policies):
     for p in policies:
         if p.get("status") == "disable":
             continue
-        name      = p.get("name") or f"Policy ID {p.get('id')}"
-        action    = p.get("action", "")
-        logtraffic= p.get("logtraffic", "")
+        name       = p.get("name") or f"Policy ID {p.get('id')}"
+        action     = p.get("action", "")
+        logtraffic = p.get("logtraffic", "")
         if action == "accept" and logtraffic not in ["all", "utm"]:
-            findings.append(f"[MEDIUM] Permit rule '{name}' missing logging")
+            findings.append(_f(
+                "MEDIUM", "logging",
+                f"[MEDIUM] Permit rule '{name}' missing logging",
+                "Set 'set logtraffic all' or 'set logtraffic utm' on all accept policies "
+                "to maintain a complete audit trail for incident response and compliance."
+            ))
     return findings
 
 
@@ -91,7 +110,14 @@ def check_deny_all_forti(policies):
         p.get("action") == "deny" and "all" in p.get("srcaddr", []) and "all" in p.get("dstaddr", [])
         for p in policies
     )
-    return [] if has_deny_all else ["[HIGH] No explicit deny-all rule found"]
+    if has_deny_all:
+        return []
+    return [_f(
+        "HIGH", "hygiene",
+        "[HIGH] No explicit deny-all rule found",
+        "Add a deny-all policy at the bottom of the policy list. FortiGate's implicit deny "
+        "produces no log entries — an explicit deny rule ensures unmatched traffic is logged."
+    )]
 
 
 def check_redundant_rules_forti(policies):
@@ -106,29 +132,34 @@ def check_redundant_rules_forti(policies):
             p.get("action", ""),
         )
         if sig in seen:
-            findings.append(f"[MEDIUM] Redundant rule detected: '{name}'")
+            findings.append(_f(
+                "MEDIUM", "redundancy",
+                f"[MEDIUM] Redundant rule detected: '{name}'",
+                "Review and remove duplicate policies. Redundant rules create ambiguity, "
+                "complicate audits, and may indicate a configuration drift or error."
+            ))
         else:
             seen.append(sig)
     return findings
 
 
-# ── v2 enhanced checks ────────────────────────────────────────────────────────
+# ── Enhanced checks ───────────────────────────────────────────────────────────
 
 def check_disabled_policies_forti(policies):
-    """Flag disabled policies — they add confusion and should be removed if unused."""
     findings = []
     for p in policies:
         if p.get("status") == "disable":
             name = p.get("name") or f"Policy ID {p.get('id')}"
-            findings.append(
-                f"[MEDIUM] Policy '{name}' is disabled — "
-                f"review and remove if no longer needed"
-            )
+            findings.append(_f(
+                "MEDIUM", "hygiene",
+                f"[MEDIUM] Policy '{name}' is disabled — review and remove if no longer needed",
+                "Remove disabled policies that are no longer required. Stale policies obscure "
+                "the effective policy set and make audits and reviews harder."
+            ))
     return findings
 
 
 def check_any_service_forti(policies):
-    """Flag accept policies that allow ALL services (service=ALL)."""
     findings = []
     for p in policies:
         if p.get("status") == "disable":
@@ -139,15 +170,16 @@ def check_any_service_forti(policies):
         if action == "accept" and "ALL" in [s.upper() for s in service]:
             src = ",".join(p.get("srcaddr", []))
             dst = ",".join(p.get("dstaddr", []))
-            findings.append(
-                f"[HIGH] Policy '{name}' allows ALL services: {src} → {dst} — "
-                f"restrict to required services only"
-            )
+            findings.append(_f(
+                "HIGH", "protocol",
+                f"[HIGH] Policy '{name}' allows ALL services: {src} \u2192 {dst}",
+                "Replace the ALL service with an enumerated list of required services only. "
+                "Allowing all services expands the attack surface to every protocol and port number."
+            ))
     return findings
 
 
 def check_insecure_services_forti(policies):
-    """Flag accept policies that allow known-insecure services (Telnet, HTTP, FTP, TFTP, SNMP)."""
     findings = []
     for p in policies:
         if p.get("status") == "disable":
@@ -157,22 +189,47 @@ def check_insecure_services_forti(policies):
         service = {s.upper() for s in p.get("service", [])}
         bad     = service & _INSECURE_SERVICES
         if action == "accept" and bad:
-            findings.append(
-                f"[MEDIUM] Policy '{name}' allows insecure service(s): "
-                f"{', '.join(sorted(bad))} — use encrypted alternatives"
-            )
+            findings.append(_f(
+                "MEDIUM", "protocol",
+                f"[MEDIUM] Policy '{name}' allows insecure service(s): {', '.join(sorted(bad))}",
+                "Replace cleartext protocols with encrypted alternatives: "
+                "SSH instead of Telnet, HTTPS instead of HTTP, SFTP/SCP instead of FTP."
+            ))
     return findings
 
 
 def check_missing_names_forti(policies):
-    """Flag policies with no human-readable name set."""
     findings = []
     for p in policies:
         if not p.get("name"):
-            findings.append(
-                f"[MEDIUM] Policy ID {p.get('id')} has no name set — "
-                f"add a descriptive name for auditability"
-            )
+            findings.append(_f(
+                "MEDIUM", "hygiene",
+                f"[MEDIUM] Policy ID {p.get('id')} has no name set",
+                "Add a descriptive name to every policy that documents its purpose, owner, "
+                "and associated change ticket. Unnamed policies are difficult to audit and manage."
+            ))
+    return findings
+
+
+def check_missing_utm_forti(policies):
+    """Flag internet-facing accept policies with no UTM security profile."""
+    findings = []
+    for p in policies:
+        if p.get("status") == "disable" or p.get("action") != "accept":
+            continue
+        dstintf = {i.lower() for i in p.get("dstintf", [])}
+        srcintf = {i.lower() for i in p.get("srcintf", [])}
+        is_internet_facing = bool(_WAN_INTFS & dstintf) or bool(_WAN_INTFS & srcintf)
+        if not is_internet_facing:
+            continue
+        if p.get("utm-status") != "enable":
+            name = p.get("name") or f"Policy ID {p.get('id')}"
+            findings.append(_f(
+                "MEDIUM", "hygiene",
+                f"[MEDIUM] Internet-facing policy '{name}' has no UTM/security profile enabled",
+                "Enable UTM features (antivirus, IPS, application control, web filtering) "
+                "on all policies handling internet-facing traffic."
+            ))
     return findings
 
 
@@ -181,17 +238,16 @@ def check_missing_names_forti(policies):
 def audit_fortinet(filepath):
     policies, error = parse_fortinet(filepath)
     if error:
-        return [f"[ERROR] {error}"], []
+        return [_f("HIGH", "hygiene", f"[ERROR] {error}", "")], []
 
     findings = []
-    # v1 core checks
     findings += check_any_any_forti(policies)
     findings += check_missing_logging_forti(policies)
     findings += check_deny_all_forti(policies)
     findings += check_redundant_rules_forti(policies)
-    # v2 enhanced checks
     findings += check_disabled_policies_forti(policies)
     findings += check_any_service_forti(policies)
     findings += check_insecure_services_forti(policies)
     findings += check_missing_names_forti(policies)
+    findings += check_missing_utm_forti(policies)
     return findings, policies

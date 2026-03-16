@@ -48,6 +48,29 @@ VENDOR_DISPLAY = {
 ALL_VENDORS = set(VENDOR_DISPLAY)
 
 
+def _f(severity, category, message, remediation=""):
+    """Build a structured finding dict."""
+    return {"severity": severity, "category": category, "message": message, "remediation": remediation}
+
+
+def _finding_msg(f):
+    """Extract the message string from a finding (dict or legacy string)."""
+    return f["message"] if isinstance(f, dict) else f
+
+
+def _findings_to_strings(findings):
+    """Convert findings list (dicts or strings) to plain strings for storage/PDF."""
+    return [_finding_msg(f) for f in findings]
+
+
+def _wrap_compliance(s):
+    """Wrap a compliance string finding as a minimal dict."""
+    if isinstance(s, dict):
+        return s
+    sev = "HIGH" if any(x in s for x in ("-HIGH", "[HIGH]")) else "MEDIUM"
+    return {"severity": sev, "category": "compliance", "message": s, "remediation": None}
+
+
 # ── Vendor auto-detection ─────────────────────────────────────────────────────
 
 def detect_vendor(content: str, filename: str) -> str | None:
@@ -145,11 +168,12 @@ def validate_vendor_format(content: str, filename: str, vendor: str) -> tuple[bo
 
 def _sort_findings(findings: list) -> list:
     def priority(f):
-        is_comp = any(x in f for x in ("PCI-", "CIS-", "NIST-"))
-        if "[HIGH]"   in f and not is_comp: return 0
-        if "[MEDIUM]" in f and not is_comp: return 1
-        if "HIGH"     in f and is_comp:     return 2
-        if "MEDIUM"   in f and is_comp:     return 3
+        msg = _finding_msg(f)
+        is_comp = any(x in msg for x in ("PCI-", "CIS-", "NIST-"))
+        if "[HIGH]"   in msg and not is_comp: return 0
+        if "[MEDIUM]" in msg and not is_comp: return 1
+        if "HIGH"     in msg and is_comp:     return 2
+        if "MEDIUM"   in msg and is_comp:     return 3
         return 4
     return sorted(findings, key=priority)
 
@@ -157,19 +181,34 @@ def _sort_findings(findings: list) -> list:
 # ── ASA audit helpers ─────────────────────────────────────────────────────────
 
 def _check_any_any(parse):
-    return [f"[HIGH] Overly permissive rule found: {r.text}"
-            for r in parse.find_objects(r"access-list.*permit.*any any")]
+    return [
+        _f("HIGH", "exposure",
+           f"[HIGH] Overly permissive rule found: {r.text.strip()}",
+           "Restrict source and destination to specific IP ranges. "
+           "Remove or scope down any/any permit rules to enforce least-privilege access.")
+        for r in parse.find_objects(r"access-list.*permit.*any any")
+    ]
 
 
 def _check_missing_logging(parse):
-    return [f"[MEDIUM] Permit rule missing logging: {r.text}"
-            for r in parse.find_objects(r"access-list.*permit") if "log" not in r.text]
+    return [
+        _f("MEDIUM", "logging",
+           f"[MEDIUM] Permit rule missing logging: {r.text.strip()}",
+           "Add the 'log' keyword to all permit rules. "
+           "Without logging, permitted traffic produces no syslog entries for monitoring.")
+        for r in parse.find_objects(r"access-list.*permit") if "log" not in r.text
+    ]
 
 
 def _check_deny_all(parse):
-    return [] if parse.find_objects(r"access-list.*deny ip any any") else [
-        "[HIGH] No explicit deny-all rule found at end of ACL"
-    ]
+    if parse.find_objects(r"access-list.*deny ip any any"):
+        return []
+    return [_f(
+        "HIGH", "hygiene",
+        "[HIGH] No explicit deny-all rule found at end of ACL",
+        "Add an explicit 'access-list <name> deny ip any any log' at the end of each ACL. "
+        "Relying on implicit deny produces no log entries and is not auditable."
+    )]
 
 
 def _check_redundant_rules(parse):
@@ -177,10 +216,37 @@ def _check_redundant_rules(parse):
     for rule in parse.find_objects(r"access-list.*permit"):
         text_clean = rule.text.strip().lower().replace(" log", "").strip()
         if text_clean in seen:
-            findings.append(f"[MEDIUM] Redundant rule detected: {rule.text}")
+            findings.append(_f(
+                "MEDIUM", "redundancy",
+                f"[MEDIUM] Redundant rule detected: {rule.text.strip()}",
+                "Remove duplicate ACL entries to keep the access-list clean and auditable. "
+                "Redundant rules indicate configuration drift and complicate change management."
+            ))
         else:
             seen.append(text_clean)
     return findings
+
+
+def _check_telnet_asa(parse):
+    """Flag Telnet management access configured on the ASA."""
+    return [
+        _f("MEDIUM", "protocol",
+           f"[MEDIUM] Telnet management access configured: {r.text.strip()}",
+           "Disable Telnet management (no telnet ...) and enforce SSH. "
+           "Telnet transmits all data including credentials in cleartext.")
+        for r in parse.find_objects(r"^telnet\s")
+    ]
+
+
+def _check_icmp_any_asa(parse):
+    """Flag ACL entries that allow unrestricted ICMP."""
+    return [
+        _f("MEDIUM", "exposure",
+           f"[MEDIUM] Unrestricted ICMP permit rule: {r.text.strip()}",
+           "Restrict ICMP to specific source ranges or permit only echo-reply, "
+           "unreachable, and time-exceeded message types needed for diagnostics.")
+        for r in parse.find_objects(r"access-list.*permit icmp any any")
+    ]
 
 
 def _audit_asa(filepath):
@@ -190,15 +256,18 @@ def _audit_asa(filepath):
         + _check_missing_logging(parse)
         + _check_deny_all(parse)
         + _check_redundant_rules(parse)
+        + _check_telnet_asa(parse)
+        + _check_icmp_any_asa(parse)
     )
     return findings, parse
 
 
 def _build_summary(findings):
     def _count(tag):
-        return len([f for f in findings if tag in f])
-    high   = [f for f in findings if "[HIGH]"   in f and not any(x in f for x in ["PCI-", "CIS-", "NIST-"])]
-    medium = [f for f in findings if "[MEDIUM]" in f and not any(x in f for x in ["PCI-", "CIS-", "NIST-"])]
+        return len([f for f in findings if tag in _finding_msg(f)])
+    high   = [f for f in findings if "[HIGH]"   in _finding_msg(f) and not any(x in _finding_msg(f) for x in ["PCI-", "CIS-", "NIST-"])]
+    medium = [f for f in findings if "[MEDIUM]" in _finding_msg(f) and not any(x in _finding_msg(f) for x in ["PCI-", "CIS-", "NIST-"])]
+    score  = max(0, 100 - len(high) * 10 - len(medium) * 3)
     return {
         "high":        len(high),
         "medium":      len(medium),
@@ -209,6 +278,7 @@ def _build_summary(findings):
         "nist_high":   _count("NIST-HIGH"),
         "nist_medium": _count("NIST-MEDIUM"),
         "total":       len(findings),
+        "score":       score,
     }
 
 
@@ -289,38 +359,40 @@ def run_audit():
                     fn_map = {"cis": check_cis_compliance, "pci": check_pci_compliance, "nist": check_nist_compliance}
                     fn = fn_map.get(compliance)
                     if fn:
-                        findings += fn(parse)
+                        findings += [_wrap_compliance(c) for c in fn(parse)]
                 elif vendor == "paloalto":
                     rules, _ = parse_paloalto(temp_path)
                     fn_map = {"cis": check_cis_compliance_pa, "pci": check_pci_compliance_pa, "nist": check_nist_compliance_pa}
                     fn = fn_map.get(compliance)
                     if fn:
-                        findings += fn(rules)
+                        findings += [_wrap_compliance(c) for c in fn(rules)]
                 elif vendor == "fortinet":
                     fn_map = {"cis": check_cis_compliance_forti, "pci": check_pci_compliance_forti, "nist": check_nist_compliance_forti}
                     fn = fn_map.get(compliance)
                     if fn and extra_data is not None:
-                        findings += fn(extra_data)
+                        findings += [_wrap_compliance(c) for c in fn(extra_data)]
                 elif vendor == "pfsense":
                     fn_map = {"cis": check_cis_compliance_pf, "pci": check_pci_compliance_pf, "nist": check_nist_compliance_pf}
                     fn = fn_map.get(compliance)
                     if fn and extra_data is not None:
-                        findings += fn(extra_data)
+                        findings += [_wrap_compliance(c) for c in fn(extra_data)]
+
+        findings = _sort_findings(findings)
+        summary  = _build_summary(findings)
 
         report_filename = None
         if generate_pdf:
             report_name = f"flintlock_report_{uuid.uuid4().hex[:8]}.pdf"
             report_path = os.path.join(REPORTS_FOLDER, report_name)
-            generate_report(findings, upload.filename, vendor, compliance, output_path=report_path)
+            generate_report(_findings_to_strings(findings), upload.filename, vendor, compliance, output_path=report_path)
             report_filename = report_name
 
-        findings = _sort_findings(findings)
-        summary  = _build_summary(findings)
-
-        # Optional archive save
+        # Optional archive save (store plain strings)
         archive_id = None
         if archive_it:
-            archive_id, _ = save_audit(upload.filename, vendor, findings, summary, config_path=temp_path)
+            archive_id, _ = save_audit(
+                upload.filename, vendor, _findings_to_strings(findings), summary, config_path=temp_path
+            )
 
         # Always log activity
         log_activity(
@@ -330,12 +402,13 @@ def run_audit():
         )
 
         return jsonify({
-            "findings":        findings,
-            "summary":         summary,
-            "report":          report_filename,
-            "license_warning": license_warning,
-            "detected_vendor": vendor,
-            "archive_id":      archive_id,
+            "findings":          _findings_to_strings(findings),
+            "enriched_findings": findings,
+            "summary":           summary,
+            "report":            report_filename,
+            "license_warning":   license_warning,
+            "detected_vendor":   vendor,
+            "archive_id":        archive_id,
         })
 
     except Exception as e:
@@ -453,24 +526,24 @@ def live_connect():
                     fn_map = {"cis": check_cis_compliance, "pci": check_pci_compliance, "nist": check_nist_compliance}
                     fn = fn_map.get(compliance)
                     if fn:
-                        findings += fn(parse)
+                        findings += [_wrap_compliance(c) for c in fn(parse)]
                 elif vendor == "paloalto":
                     rules, _ = parse_paloalto(temp_path)
                     fn_map = {"cis": check_cis_compliance_pa, "pci": check_pci_compliance_pa, "nist": check_nist_compliance_pa}
                     fn = fn_map.get(compliance)
                     if fn:
-                        findings += fn(rules)
+                        findings += [_wrap_compliance(c) for c in fn(rules)]
                 elif vendor == "fortinet":
                     fn_map = {"cis": check_cis_compliance_forti, "pci": check_pci_compliance_forti, "nist": check_nist_compliance_forti}
                     fn = fn_map.get(compliance)
                     if fn and extra_data is not None:
-                        findings += fn(extra_data)
+                        findings += [_wrap_compliance(c) for c in fn(extra_data)]
 
         findings = _sort_findings(findings)
         summary  = _build_summary(findings)
 
-        # Save successful SSH audits to Audit History
-        archive_id, _ = save_audit(label, vendor, findings, summary, config_path=temp_path)
+        # Save successful SSH audits to Audit History (store plain strings)
+        archive_id, _ = save_audit(label, vendor, _findings_to_strings(findings), summary, config_path=temp_path)
 
         # Log successful activity
         log_activity(ACTION_SSH_CONNECT, label, vendor=vendor, success=True,
@@ -478,11 +551,12 @@ def live_connect():
                               "total": summary.get("total", 0), "high": summary.get("high", 0)})
 
         return jsonify({
-            "findings":        findings,
-            "summary":         summary,
-            "detected_vendor": vendor,
-            "host":            host,
-            "archive_id":      archive_id,
+            "findings":          _findings_to_strings(findings),
+            "enriched_findings": findings,
+            "summary":           summary,
+            "detected_vendor":   vendor,
+            "host":              host,
+            "archive_id":        archive_id,
         })
 
     except Exception as e:
@@ -527,6 +601,27 @@ def archive_get(entry_id):
 def archive_delete(entry_id):
     deleted = delete_entry(entry_id)
     return jsonify({"deleted": deleted})
+
+
+@app.route("/archive/trends", methods=["GET"])
+def archive_trends():
+    """Return time-series data for score/finding trends grouped by filename."""
+    entries = list_archive()
+    series = []
+    for e in entries:
+        s = e.get("summary", {})
+        series.append({
+            "id":        e["id"],
+            "filename":  e["filename"],
+            "vendor":    e.get("vendor", ""),
+            "timestamp": e.get("timestamp", ""),
+            "score":     s.get("score"),
+            "high":      s.get("high", 0),
+            "medium":    s.get("medium", 0),
+            "total":     s.get("total", 0),
+        })
+    series.sort(key=lambda x: x["timestamp"])
+    return jsonify(series)
 
 
 @app.route("/archive/compare", methods=["POST"])

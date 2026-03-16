@@ -913,6 +913,56 @@ select:focus, input[type="text"]:focus {
   color: var(--text);
 }
 
+/* ===== Score summary box variants ===== */
+.sev-score-good { background: var(--finding-pass-bg);    border: 1px solid var(--pass);      color: var(--pass);      cursor: default; }
+.sev-score-warn { background: var(--finding-medium-bg);  border: 1px solid var(--medium);    color: var(--medium);    cursor: default; }
+.sev-score-bad  { background: var(--finding-high-bg);    border: 1px solid var(--high);      color: var(--high);      cursor: default; }
+
+/* ===== Enriched finding layout ===== */
+.finding { display: flex; flex-direction: column; gap: 0.3rem; }
+
+.finding-msg {
+  font-size: 0.85rem;
+  font-family: "Consolas", "Menlo", monospace;
+  word-break: break-all;
+}
+
+.finding-remediation {
+  font-size: 0.78rem;
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  color: var(--text-muted);
+  line-height: 1.45;
+  padding-left: 0.15rem;
+  word-break: break-word;
+}
+
+/* ===== Category badges ===== */
+.finding-cat-badge {
+  display: inline-block;
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 0.1rem 0.45rem;
+  border-radius: 3px;
+  align-self: flex-start;
+  white-space: nowrap;
+}
+
+.cat-exposure   { background: rgba(204,34,0,0.12);     color: var(--high);        border: 1px solid rgba(204,34,0,0.3); }
+.cat-logging    { background: rgba(153,102,0,0.12);    color: var(--medium);      border: 1px solid rgba(153,102,0,0.3); }
+.cat-protocol   { background: rgba(170,68,255,0.1);    color: #AA44FF;            border: 1px solid rgba(170,68,255,0.3); }
+.cat-hygiene    { background: rgba(68,136,255,0.1);    color: var(--compliance);  border: 1px solid rgba(68,136,255,0.3); }
+.cat-redundancy { background: rgba(0,0,0,0.06);        color: var(--text-muted);  border: 1px solid var(--border); }
+.cat-compliance { background: rgba(26,85,204,0.1);     color: var(--compliance);  border: 1px solid rgba(26,85,204,0.3); }
+
+[data-theme="dark"] .cat-exposure   { background: rgba(255,104,104,0.12); color: #FF9999; border-color: rgba(255,104,104,0.3); }
+[data-theme="dark"] .cat-logging    { background: rgba(255,170,0,0.10);   color: #FFCC66; border-color: rgba(255,170,0,0.3); }
+[data-theme="dark"] .cat-protocol   { background: rgba(170,68,255,0.12);  color: #CC88FF; border-color: rgba(170,68,255,0.3); }
+[data-theme="dark"] .cat-hygiene    { background: rgba(68,136,255,0.12);  color: #88AAFF; border-color: rgba(68,136,255,0.3); }
+[data-theme="dark"] .cat-redundancy { background: rgba(255,255,255,0.05); color: #9999BB; border-color: rgba(255,255,255,0.15); }
+[data-theme="dark"] .cat-compliance { background: rgba(68,136,255,0.12);  color: #88AAFF; border-color: rgba(68,136,255,0.3); }
+
 /* ===== Activity Log ===== */
 .activity-entry {
   display: flex;
