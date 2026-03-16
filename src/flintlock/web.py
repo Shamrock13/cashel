@@ -299,6 +299,7 @@ def run_audit():
     compliance   = request.form.get("compliance", "").strip().lower() or None
     generate_pdf = request.form.get("report") == "1"
     archive_it   = request.form.get("archive") == "1"
+    tag          = request.form.get("tag", "").strip() or None
 
     upload = request.files["config"]
     suffix = Path(upload.filename).suffix or ".txt"
@@ -384,14 +385,14 @@ def run_audit():
         if generate_pdf:
             report_name = f"flintlock_report_{uuid.uuid4().hex[:8]}.pdf"
             report_path = os.path.join(REPORTS_FOLDER, report_name)
-            generate_report(_findings_to_strings(findings), upload.filename, vendor, compliance, output_path=report_path)
+            generate_report(_findings_to_strings(findings), upload.filename, vendor, compliance, output_path=report_path, summary=summary)
             report_filename = report_name
 
         # Optional archive save (store plain strings)
         archive_id = None
         if archive_it:
             archive_id, _ = save_audit(
-                upload.filename, vendor, _findings_to_strings(findings), summary, config_path=temp_path
+                upload.filename, vendor, _findings_to_strings(findings), summary, config_path=temp_path, tag=tag
             )
 
         # Always log activity
@@ -450,9 +451,6 @@ def run_diff():
         if vendor not in ALL_VENDORS:
             return jsonify({"error": "Could not determine vendor. Please select one manually."}), 400
 
-        if vendor in ("aws", "azure"):
-            return jsonify({"error": "Config diff is not supported for cloud vendors (AWS/Azure). Use the audit tool separately."}), 400
-
         result = diff_configs(vendor, path_a, path_b)
         result["vendor"]     = vendor
         result["filename_a"] = upload_a.filename
@@ -487,6 +485,7 @@ def live_connect():
     password   = request.form.get("password", "")
     vendor     = request.form.get("vendor", "").strip().lower()
     compliance = request.form.get("compliance", "").strip().lower() or None
+    tag        = request.form.get("tag", "").strip() or None
 
     if not host or not username or not vendor:
         return jsonify({"error": "host, username, and vendor are required"}), 400
@@ -543,7 +542,7 @@ def live_connect():
         summary  = _build_summary(findings)
 
         # Save successful SSH audits to Audit History (store plain strings)
-        archive_id, _ = save_audit(label, vendor, _findings_to_strings(findings), summary, config_path=temp_path)
+        archive_id, _ = save_audit(label, vendor, _findings_to_strings(findings), summary, config_path=temp_path, tag=tag)
 
         # Log successful activity
         log_activity(ACTION_SSH_CONNECT, label, vendor=vendor, success=True,
@@ -583,9 +582,10 @@ def archive_save():
     vendor   = data.get("vendor", "unknown")
     findings = data.get("findings", [])
     summary  = data.get("summary", {})
+    tag      = data.get("tag")
     if not findings and not summary:
         return jsonify({"error": "No audit data to save"}), 400
-    entry_id, entry = save_audit(filename, vendor, findings, summary)
+    entry_id, entry = save_audit(filename, vendor, findings, summary, tag=tag)
     return jsonify({"id": entry_id, "entry": entry})
 
 
@@ -619,6 +619,8 @@ def archive_trends():
             "high":      s.get("high", 0),
             "medium":    s.get("medium", 0),
             "total":     s.get("total", 0),
+            "tag":       e.get("tag"),
+            "version":   e.get("version", 1),
         })
     series.sort(key=lambda x: x["timestamp"])
     return jsonify(series)

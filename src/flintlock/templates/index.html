@@ -8,7 +8,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script>
     (function () {
-      const t = localStorage.getItem("flintlock-theme") || "light";
+      const t = localStorage.getItem("flintlock-theme") || "auto";
       document.documentElement.setAttribute("data-theme", t);
     })();
   </script>
@@ -24,7 +24,7 @@
         <span class="logo-sub">Firewall Security Auditor</span>
       </div>
       <div class="header-actions">
-        <button class="theme-toggle" id="themeToggle" title="Toggle light / dark mode" aria-label="Toggle theme">
+        <button class="theme-toggle" id="themeToggle" title="Theme: Light / Dark / Auto" aria-label="Toggle theme">
           <span id="themeIcon">&#9788;</span>
         </button>
         <button class="badge-btn" id="licenseBadgeBtn" title="Manage license">
@@ -121,6 +121,10 @@
                 <span>Save to Audit History</span>
               </label>
             </div>
+            <div class="form-group" style="grid-column:1/-1">
+              <label for="deviceTag">Device Tag <span class="optional">(optional)</span></label>
+              <input type="text" id="deviceTag" name="tag" placeholder="e.g. ASA01, FortiGate-HQ&hellip;" autocomplete="off" maxlength="64" />
+            </div>
           </div>
           <button type="submit" class="btn-primary" id="submitBtn">
             <span id="submitText">Run Audit</span>
@@ -178,6 +182,8 @@
                 <option value="paloalto">Palo Alto Networks</option>
                 <option value="fortinet">Fortinet</option>
                 <option value="pfsense">pfSense</option>
+                <option value="aws">AWS Security Group</option>
+                <option value="azure">Azure NSG</option>
               </select>
             </div>
           </div>
@@ -243,6 +249,10 @@
                 <option value="pci">PCI-DSS</option>
                 <option value="nist">NIST SP 800-41</option>
               </select>
+            </div>
+            <div class="form-group" style="grid-column:1/-1">
+              <label for="connDeviceTag">Device Tag <span class="optional">(optional)</span></label>
+              <input type="text" id="connDeviceTag" name="tag" placeholder="e.g. ASA01, FortiGate-HQ&hellip;" autocomplete="off" maxlength="64" />
             </div>
           </div>
           <button type="submit" class="btn-primary" id="connectBtn">
@@ -315,6 +325,20 @@
           <button class="btn-secondary" id="refreshTrendsBtn" style="font-size:0.8rem;padding:0.3rem 0.75rem">&#8635; Refresh</button>
         </div>
         <p class="card-desc">Security score over time per device. Score = 100 &minus; (HIGH &times; 10) &minus; (MEDIUM &times; 3), min 0.</p>
+        <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1rem;" id="trendsFilters">
+          <div class="history-filter-group">
+            <label class="filter-label">Vendor</label>
+            <select id="trendsVendorFilter">
+              <option value="">All vendors</option>
+            </select>
+          </div>
+          <div class="history-filter-group">
+            <label class="filter-label">Device Tag</label>
+            <select id="trendsDeviceFilter">
+              <option value="">All devices</option>
+            </select>
+          </div>
+        </div>
         <div id="trendsEmpty" class="hidden"><p class="text-muted">No trend data yet. Save two or more audits for the same device to see trends.</p></div>
         <div id="trendsChartWrap" style="position:relative;max-height:320px;">
           <canvas id="trendsChart"></canvas>
@@ -357,13 +381,14 @@
   const themeIcon = document.getElementById("themeIcon");
   function applyTheme(theme) {
     html.setAttribute("data-theme", theme);
-    themeIcon.innerHTML = theme === "dark" ? "&#9790;" : "&#9788;";
+    themeIcon.innerHTML = theme === "dark" ? "&#9790;" : theme === "auto" ? "&#9681;" : "&#9788;";
     localStorage.setItem("flintlock-theme", theme);
   }
-  applyTheme(html.getAttribute("data-theme") || "light");
-  document.getElementById("themeToggle").addEventListener("click", () =>
-    applyTheme(html.getAttribute("data-theme") === "dark" ? "light" : "dark")
-  );
+  applyTheme(html.getAttribute("data-theme") || "auto");
+  document.getElementById("themeToggle").addEventListener("click", () => {
+    const cur = html.getAttribute("data-theme") || "auto";
+    applyTheme(cur === "light" ? "dark" : cur === "dark" ? "auto" : "light");
+  });
 
   // ═══════════════════════════════════════════════════════ LICENSE MODAL ══
   const modal = document.getElementById("licenseModal");
@@ -463,6 +488,7 @@
 
   // ═══════════════════════════════════════════════ TRENDS CHART ══
   let trendsChartInstance = null;
+  let trendsData = [];
 
   const CHART_COLORS = [
     "#4488FF","#FF6868","#44BB88","#FFAA00","#AA44FF","#FF8844","#44CCFF","#FF44AA"
@@ -471,14 +497,34 @@
   async function loadTrends() {
     try {
       const res  = await fetch("/archive/trends");
-      const data = await res.json();
-      renderTrends(data);
+      trendsData = await res.json();
+      renderTrends(trendsData);
     } catch (_) {}
   }
 
   function renderTrends(data) {
-    // Only show entries that have a score
-    const scored = data.filter(e => e.score !== null && e.score !== undefined);
+    // Populate vendor dropdown from full trendsData
+    const vendorSel  = document.getElementById("trendsVendorFilter");
+    const deviceSel  = document.getElementById("trendsDeviceFilter");
+    const selVendor  = vendorSel.value;
+    const selDevice  = deviceSel.value;
+
+    const allVendors = [...new Set(trendsData.map(e => e.vendor).filter(Boolean))].sort();
+    vendorSel.innerHTML = `<option value="">All vendors</option>` +
+      allVendors.map(v => `<option value="${escHtml(v)}" ${v === selVendor ? "selected" : ""}>${escHtml(VENDOR_LABELS[v] || v)}</option>`).join("");
+
+    // Populate device dropdown (filtered by vendor if selected)
+    const deviceSource = selVendor ? trendsData.filter(e => e.vendor === selVendor) : trendsData;
+    const allDevices = [...new Set(deviceSource.map(e => e.tag || e.filename).filter(Boolean))].sort();
+    deviceSel.innerHTML = `<option value="">All devices</option>` +
+      allDevices.map(d => `<option value="${escHtml(d)}" ${d === selDevice ? "selected" : ""}>${escHtml(d)}</option>`).join("");
+
+    // Apply filters
+    let scored = data.filter(e => e.score !== null && e.score !== undefined);
+    if (selVendor) scored = scored.filter(e => e.vendor === selVendor);
+    const effectiveDevice = allDevices.includes(selDevice) ? selDevice : "";
+    if (effectiveDevice) scored = scored.filter(e => (e.tag || e.filename) === effectiveDevice);
+
     const empty  = document.getElementById("trendsEmpty");
     const wrap   = document.getElementById("trendsChartWrap");
 
@@ -490,10 +536,10 @@
     empty.classList.add("hidden");
     wrap.style.display = "";
 
-    // Group by filename
+    // Group by device key (tag || filename)
     const byDevice = {};
     scored.forEach(e => {
-      const key = e.filename;
+      const key = e.tag || e.filename;
       if (!byDevice[key]) byDevice[key] = [];
       byDevice[key].push(e);
     });
@@ -557,6 +603,12 @@
   }
 
   document.getElementById("refreshTrendsBtn").addEventListener("click", loadTrends);
+  document.getElementById("trendsVendorFilter").addEventListener("change", () => {
+    // Reset device filter when vendor changes, then re-render
+    document.getElementById("trendsDeviceFilter").value = "";
+    renderTrends(trendsData);
+  });
+  document.getElementById("trendsDeviceFilter").addEventListener("change", () => renderTrends(trendsData));
 
   document.getElementById("auditForm").addEventListener("submit", async function (e) {
     e.preventDefault();
@@ -584,7 +636,6 @@
 
   function renderResults(data) {
     document.getElementById("resultsSection").classList.remove("hidden");
-    document.getElementById("resultsSection").scrollIntoView({ behavior: "smooth" });
 
     const tag = document.getElementById("detectedVendorTag");
     if (data.detected_vendor) {
@@ -645,7 +696,6 @@
 
   function renderDiff(data) {
     document.getElementById("diffResults").classList.remove("hidden");
-    document.getElementById("diffResults").scrollIntoView({ behavior: "smooth" });
 
     const tag = document.getElementById("diffVendorTag");
     tag.textContent = "Vendor: " + (VENDOR_LABELS[data.vendor] || data.vendor);
@@ -699,7 +749,6 @@
 
   function renderConnectResults(data) {
     document.getElementById("connectResults").classList.remove("hidden");
-    document.getElementById("connectResults").scrollIntoView({ behavior: "smooth" });
     const tag = document.getElementById("connVendorTag");
     tag.textContent = (VENDOR_LABELS[data.detected_vendor] || data.detected_vendor) + " @ " + data.host;
     tag.classList.remove("hidden");
@@ -738,7 +787,7 @@
 
     let entries = historyData.slice();
     if (vendorFilter) entries = entries.filter(e => e.vendor === vendorFilter);
-    if (search)       entries = entries.filter(e => (e.filename || "").toLowerCase().includes(search));
+    if (search)       entries = entries.filter(e => (e.filename || "").toLowerCase().includes(search) || (e.tag || "").toLowerCase().includes(search));
 
     if (sortMode === "newest")  entries.sort((a, b) => (b.timestamp || "").localeCompare(a.timestamp || ""));
     if (sortMode === "oldest")  entries.sort((a, b) => (a.timestamp || "").localeCompare(b.timestamp || ""));
@@ -763,14 +812,16 @@
       const ts     = e.timestamp ? new Date(e.timestamp).toLocaleString() : "—";
       const vendor = VENDOR_LABELS[e.vendor] || e.vendor;
       const hi = e.summary?.high || 0, med = e.summary?.medium || 0, tot = e.summary?.total || 0;
+      const primaryName = e.tag ? escHtml(e.tag) + " <span style='font-weight:400;color:var(--text-muted)'>v" + (e.version || 1) + "</span>" : escHtml(e.filename);
+      const secondaryMeta = e.tag ? escHtml(e.filename) + " &bull; " + escHtml(vendor) + " &bull; " + escHtml(ts) : escHtml(vendor) + " &bull; " + escHtml(ts);
       return `<div class="history-entry" data-id="${escHtml(e.id)}">
         <div class="history-entry-left">
           <label class="history-check-wrap" title="Select to compare">
             <input type="checkbox" class="history-check" data-id="${escHtml(e.id)}" />
           </label>
           <div class="history-entry-info">
-            <span class="history-filename">${escHtml(e.filename)}</span>
-            <span class="history-meta">${escHtml(vendor)} &bull; ${escHtml(ts)}</span>
+            <span class="history-filename">${primaryName}</span>
+            <span class="history-meta">${secondaryMeta}</span>
           </div>
         </div>
         <div class="history-entry-right">
@@ -825,6 +876,16 @@
     if (compareSelections.length < 2) return;
     // Always put the older entry as baseline (id_a) regardless of selection order
     const entries = compareSelections.map(id => historyData.find(e => e.id === id)).filter(Boolean);
+
+    // Block cross-vendor comparisons
+    if (entries[0].vendor !== entries[1].vendor) {
+      const section = document.getElementById("compareResults");
+      section.classList.remove("hidden");
+      document.getElementById("compareContent").innerHTML =
+        `<div class="alert alert-error">Cannot compare audits from different vendors. Both entries must be the same vendor.</div>`;
+      return;
+    }
+
     entries.sort((a, b) => (a.timestamp || "").localeCompare(b.timestamp || ""));
     const id_a = entries[0].id;
     const id_b = entries[1].id;
@@ -844,7 +905,6 @@
   function renderComparison(data) {
     const section = document.getElementById("compareResults");
     section.classList.remove("hidden");
-    section.scrollIntoView({ behavior: "smooth" });
 
     const ea = data.entry_a, eb = data.entry_b, d = data.delta;
     const tsA = ea.timestamp ? new Date(ea.timestamp).toLocaleString() : "—";

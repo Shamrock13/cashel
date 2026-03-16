@@ -631,7 +631,7 @@ select:focus, input[type="text"]:focus {
   gap: 0.25rem;
   border-bottom: 2px solid var(--border);
   margin-bottom: 0;
-  overflow-x: auto;
+  flex-wrap: wrap;
 }
 .tab-btn {
   background: none;
@@ -1013,4 +1013,64 @@ select:focus, input[type="text"]:focus {
   color: var(--high);
   margin-top: 0.15rem;
   word-break: break-all;
+}
+
+/* ===== Auto theme — follows system preference ===== */
+@media (prefers-color-scheme: dark) {
+  [data-theme="auto"] {
+    --header-bg:     #0A1628;
+    --header-border: #152238;
+    --bg:          #0D0D1A;
+    --card-bg:     #12122A;
+    --border:      #2A2A4A;
+    --input-bg:    #16213E;
+    --text:        #E8E8F0;
+    --text-muted:  #9999BB;
+    --btn-primary-bg:    #0F3460;
+    --btn-primary-hover: #1A4A8A;
+    --btn-secondary-bg:  #16213E;
+    --btn-secondary-text:#E8E8F0;
+    --high:        #FF6868;
+    --medium:      #FFAA00;
+    --compliance:  #4488FF;
+    --pass:        #44BB88;
+    --finding-high-bg:        rgba(255,104,104,0.08);
+    --finding-high-border:    #FF6868;
+    --finding-high-text:      #FFAAAA;
+    --finding-medium-bg:      rgba(255,170,0,0.07);
+    --finding-medium-border:  #FFAA00;
+    --finding-medium-text:    #FFCC66;
+    --finding-comp-bg:        rgba(68,136,255,0.08);
+    --finding-comp-border:    #4488FF;
+    --finding-comp-text:      #88AAFF;
+    --finding-pass-bg:        rgba(68,187,136,0.08);
+    --finding-pass-border:    #44BB88;
+    --finding-pass-text:      #88DDBB;
+    --sev-total-bg:    rgba(255,255,255,0.05);
+    --sev-total-border:var(--border);
+    --modal-overlay: rgba(0,0,0,0.65);
+    --modal-bg:      #12122A;
+    --alert-warn-bg:   rgba(255,170,0,0.10);
+    --alert-warn-border:#FFAA00;
+    --alert-warn-text: #FFCC66;
+    --alert-err-bg:    rgba(255,68,68,0.10);
+    --alert-err-border:#FF6868;
+    --alert-err-text:  #FF9999;
+    --msg-ok-bg:    rgba(68,187,136,0.10);
+    --msg-ok-border:#44BB88;
+    --msg-ok-text:  #88DDBB;
+    --msg-err-bg:   rgba(255,68,68,0.10);
+    --msg-err-border:#FF6868;
+    --msg-err-text: #FFAAAA;
+  }
+}
+
+/* Category badges in auto-dark mode */
+@media (prefers-color-scheme: dark) {
+  [data-theme="auto"] .cat-exposure   { background: rgba(255,104,104,0.12); color: #FF9999; border-color: rgba(255,104,104,0.3); }
+  [data-theme="auto"] .cat-logging    { background: rgba(255,170,0,0.10);   color: #FFCC66; border-color: rgba(255,170,0,0.3); }
+  [data-theme="auto"] .cat-protocol   { background: rgba(170,68,255,0.12);  color: #CC88FF; border-color: rgba(170,68,255,0.3); }
+  [data-theme="auto"] .cat-hygiene    { background: rgba(68,136,255,0.12);  color: #88AAFF; border-color: rgba(68,136,255,0.3); }
+  [data-theme="auto"] .cat-redundancy { background: rgba(255,255,255,0.05); color: #9999BB; border-color: rgba(255,255,255,0.15); }
+  [data-theme="auto"] .cat-compliance { background: rgba(68,136,255,0.12);  color: #88AAFF; border-color: rgba(68,136,255,0.3); }
 }

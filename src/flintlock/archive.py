@@ -20,13 +20,22 @@ def _fingerprint(filepath):
 
 # ── Persistence ───────────────────────────────────────────────────────────────
 
-def save_audit(filename, vendor, findings, summary, config_path=None):
+def save_audit(filename, vendor, findings, summary, config_path=None, tag=None):
     """
     Save an audit result to the archive.
     Returns (entry_id, entry_dict).
     """
     entry_id = uuid.uuid4().hex[:12]
     fingerprint = _fingerprint(config_path) if config_path and os.path.exists(config_path) else None
+
+    # Auto-version: find max version for same tag+vendor, increment
+    version = 1
+    if tag:
+        existing = list_archive()
+        prior = [e for e in existing if e.get("tag") == tag and e.get("vendor") == vendor]
+        if prior:
+            version = max(e.get("version", 1) for e in prior) + 1
+
     entry = {
         "id":          entry_id,
         "filename":    filename,
@@ -35,6 +44,8 @@ def save_audit(filename, vendor, findings, summary, config_path=None):
         "fingerprint": fingerprint,
         "summary":     summary,
         "findings":    findings,
+        "tag":         tag or None,
+        "version":     version,
     }
     path = os.path.join(ARCHIVE_FOLDER, f"{entry_id}.json")
     with open(path, "w") as f:
@@ -97,6 +108,9 @@ def compare_entries(id_a, id_b):
     entry_b = get_entry(id_b)
     if not entry_a or not entry_b:
         return None, "One or both archive entries not found."
+
+    if entry_a.get("vendor") != entry_b.get("vendor"):
+        return None, "Cannot compare audits from different vendors. Both entries must be the same vendor."
 
     s_a, s_b = entry_a["summary"], entry_b["summary"]
     set_a = set(entry_a.get("findings", []))

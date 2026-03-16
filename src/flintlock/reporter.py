@@ -24,6 +24,8 @@ VENDOR_DISPLAY = {
     "paloalto": "Palo Alto Networks",
     "fortinet": "Fortinet",
     "pfsense":  "pfSense",
+    "aws":      "AWS Security Group",
+    "azure":    "Azure NSG",
 }
 
 
@@ -85,15 +87,36 @@ def _draw_meta(pdf, filename, vendor, compliance):
     pdf.set_y(y + 13)
 
 
-def _draw_summary_boxes(pdf, high, medium, total):
-    """Three bordered summary boxes side by side."""
-    box_w, box_h = 58, 24
-    positions = [10, 76, 142]
-    styles = [
-        (_HIGH_BG,   _HIGH,   _HIGH,   str(high),   "High Severity"),
-        (_MEDIUM_BG, _MEDIUM, _MEDIUM, str(medium), "Medium Severity"),
-        (_LIGHT_BG,  _BORDER, _NAVY,   str(total),  "Total Issues"),
-    ]
+def _draw_summary_boxes(pdf, high, medium, total, score=None):
+    """Four bordered summary boxes side by side (3 + optional score)."""
+    # Determine score color
+    _SCORE_GREEN  = (26, 128, 85)
+    _SCORE_GREEN_BG = (235, 250, 244)
+    _SCORE_AMBER  = (153, 102, 0)
+    _SCORE_AMBER_BG = (255, 248, 230)
+    _SCORE_RED    = (204, 34, 0)
+    _SCORE_RED_BG = (255, 240, 238)
+
+    if score is not None:
+        sc, sb = (_SCORE_GREEN, _SCORE_GREEN_BG) if score >= 80 else \
+                 (_SCORE_AMBER, _SCORE_AMBER_BG) if score >= 50 else \
+                 (_SCORE_RED,   _SCORE_RED_BG)
+        box_w, box_h = 43, 24
+        positions = [10, 57, 104, 151]
+        styles = [
+            (_HIGH_BG,   _HIGH,   _HIGH,   str(high),         "High Severity"),
+            (_MEDIUM_BG, _MEDIUM, _MEDIUM, str(medium),       "Medium Severity"),
+            (_LIGHT_BG,  _BORDER, _NAVY,   str(total),        "Total Issues"),
+            (sb,         sc,      sc,      str(score) + "/100", "Score"),
+        ]
+    else:
+        box_w, box_h = 58, 24
+        positions = [10, 76, 142]
+        styles = [
+            (_HIGH_BG,   _HIGH,   _HIGH,   str(high),   "High Severity"),
+            (_MEDIUM_BG, _MEDIUM, _MEDIUM, str(medium), "Medium Severity"),
+            (_LIGHT_BG,  _BORDER, _NAVY,   str(total),  "Total Issues"),
+        ]
     y = pdf.get_y()
 
     for (x, (fill, draw, text, val, lbl)) in zip(positions, styles):
@@ -103,7 +126,7 @@ def _draw_summary_boxes(pdf, high, medium, total):
         pdf.rect(x, y, box_w, box_h, "FD")
 
         pdf.set_text_color(*text)
-        pdf.set_font("Helvetica", "B", 20)
+        pdf.set_font("Helvetica", "B", 16 if score is not None else 20)
         pdf.set_xy(x, y + 3)
         pdf.cell(box_w, 10, val, align="C")
 
@@ -128,27 +151,34 @@ def _section_header(pdf, title, color):
     pdf.ln(9)
 
 
-def _draw_finding(pdf, finding, bar_color, bg_color, text_color):
-    """Single finding row with colored left bar."""
+_CATEGORY_COLORS = {
+    "exposure":   (204,  34,   0),
+    "logging":    (153, 102,   0),
+    "protocol":   (170,  68, 255),
+    "hygiene":    ( 26,  85, 204),
+    "redundancy": (107, 107, 138),
+    "compliance": ( 26,  85, 204),
+}
+
+
+def _draw_finding(pdf, finding, bar_color, bg_color, text_color, category=None, remediation=None):
+    """Single finding row with colored left bar, optional category prefix and remediation."""
     x, w = 10, 190
     bar_w = 3
-    y = pdf.get_y()
+    inner_w = w - bar_w - 4
 
-    # Check if we need a page break (estimate ~10mm per row)
-    if y > 265:
-        pdf.add_page()
-        y = pdf.get_y()
-
-    # Measure text height via a dry-run multi_cell trick:
-    # We use the current cursor and let multi_cell advance it, then measure.
+    # Estimate heights
     pdf.set_font("Courier", "", 7.5)
-    # Calculate lines needed (approximate — 1 line ≈ 5mm)
-    text_w = w - bar_w - 4
-    char_per_line = int(text_w / 2.3)  # rough chars/line at 7.5pt Courier
-    lines = max(1, (len(finding) + char_per_line - 1) // char_per_line)
+    char_per_line = int(inner_w / 2.3)
+    msg_text = finding if isinstance(finding, str) else str(finding)
+    lines = max(1, (len(msg_text) + char_per_line - 1) // char_per_line)
     row_h = max(9, lines * 4.5 + 3)
+    if remediation:
+        rem_chars = int(inner_w / 2.0)
+        rem_lines = max(1, (len(remediation) + rem_chars - 1) // rem_chars)
+        row_h += rem_lines * 3.8 + 2
 
-    # Re-check page break with actual height
+    y = pdf.get_y()
     if y + row_h > 272:
         pdf.add_page()
         y = pdf.get_y()
@@ -161,11 +191,31 @@ def _draw_finding(pdf, finding, bar_color, bg_color, text_color):
     pdf.set_fill_color(*bg_color)
     pdf.rect(x + bar_w, y, w - bar_w, row_h, "F")
 
-    # Finding text
+    cur_y = y + 1.5
+
+    # Category label (colored text prefix)
+    if category:
+        cat_color = _CATEGORY_COLORS.get(category, text_color)
+        pdf.set_text_color(*cat_color)
+        pdf.set_font("Helvetica", "B", 6.5)
+        cat_label = "[" + category.upper() + "]  "
+        pdf.set_xy(x + bar_w + 2, cur_y)
+        pdf.cell(inner_w, 4, cat_label)
+        cur_y += 4
+
+    # Finding message
     pdf.set_text_color(*text_color)
     pdf.set_font("Courier", "", 7.5)
-    pdf.set_xy(x + bar_w + 2, y + 1.5)
-    pdf.multi_cell(w - bar_w - 4, 4.5, finding)
+    pdf.set_xy(x + bar_w + 2, cur_y)
+    pdf.multi_cell(inner_w, 4.5, msg_text)
+    cur_y = pdf.get_y()
+
+    # Remediation text (indented, smaller, muted)
+    if remediation:
+        pdf.set_text_color(*_MUTED)
+        pdf.set_font("Helvetica", "", 6.5)
+        pdf.set_xy(x + bar_w + 6, cur_y + 0.5)
+        pdf.multi_cell(inner_w - 4, 3.8, "\u2192 " + remediation)
 
     pdf.set_y(y + row_h + 1)
 
@@ -175,34 +225,43 @@ def _findings_group(pdf, title, findings, bar_color, bg_color, text_color):
         return
     _section_header(pdf, title, bar_color)
     for f in findings:
-        _draw_finding(pdf, f, bar_color, bg_color, text_color)
+        if isinstance(f, dict):
+            _draw_finding(pdf, f["message"], bar_color, bg_color, text_color,
+                          category=f.get("category"), remediation=f.get("remediation"))
+        else:
+            _draw_finding(pdf, f, bar_color, bg_color, text_color)
     pdf.ln(4)
 
 
-def generate_report(findings, filename, vendor, compliance=None, output_path="report.pdf"):
-    # Normalize: accept both string findings and dict findings
+def generate_report(findings, filename, vendor, compliance=None, output_path="report.pdf", summary=None):
+    # Normalize: accept both string findings and dict findings; keep dicts for display
     def _msg(f):
         return f["message"] if isinstance(f, dict) else f
-    findings = [_msg(f) for f in findings]
 
-    high    = [f for f in findings if "[HIGH]"   in f and not any(x in f for x in ("PCI-", "CIS-", "NIST-"))]
-    medium  = [f for f in findings if "[MEDIUM]" in f and not any(x in f for x in ("PCI-", "CIS-", "NIST-"))]
-    pci_h   = [f for f in findings if "PCI-HIGH"   in f]
-    pci_m   = [f for f in findings if "PCI-MEDIUM" in f]
-    cis_h   = [f for f in findings if "CIS-HIGH"   in f]
-    cis_m   = [f for f in findings if "CIS-MEDIUM" in f]
-    nist_h  = [f for f in findings if "NIST-HIGH"  in f]
-    nist_m  = [f for f in findings if "NIST-MEDIUM" in f]
+    # Build grouped lists — preserve dicts so category/remediation info is available
+    def _contains(f, tag):
+        return tag in _msg(f)
+
+    high    = [f for f in findings if _contains(f, "[HIGH]")   and not any(_contains(f, x) for x in ("PCI-", "CIS-", "NIST-"))]
+    medium  = [f for f in findings if _contains(f, "[MEDIUM]") and not any(_contains(f, x) for x in ("PCI-", "CIS-", "NIST-"))]
+    pci_h   = [f for f in findings if _contains(f, "PCI-HIGH")]
+    pci_m   = [f for f in findings if _contains(f, "PCI-MEDIUM")]
+    cis_h   = [f for f in findings if _contains(f, "CIS-HIGH")]
+    cis_m   = [f for f in findings if _contains(f, "CIS-MEDIUM")]
+    nist_h  = [f for f in findings if _contains(f, "NIST-HIGH")]
+    nist_m  = [f for f in findings if _contains(f, "NIST-MEDIUM")]
 
     total_high   = len(high)   + len(pci_h) + len(cis_h) + len(nist_h)
     total_medium = len(medium) + len(pci_m) + len(cis_m) + len(nist_m)
+
+    score = summary.get("score") if isinstance(summary, dict) else None
 
     pdf = FlintlockReport()
     pdf.set_auto_page_break(auto=True, margin=18)
     pdf.add_page()
 
     _draw_meta(pdf, filename, vendor, compliance)
-    _draw_summary_boxes(pdf, total_high, total_medium, len(findings))
+    _draw_summary_boxes(pdf, total_high, total_medium, len(findings), score=score)
 
     # Divider
     pdf.set_draw_color(*_BORDER)

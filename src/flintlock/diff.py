@@ -5,6 +5,8 @@ from ciscoconfparse import CiscoConfParse
 from .paloalto import parse_paloalto
 from .fortinet import parse_fortinet
 from .pfsense import parse_pfsense
+from .aws import parse_aws_sg
+from .azure import parse_azure_nsg, _props
 
 
 # ── ASA ──────────────────────────────────────────────────────────────────────
@@ -131,6 +133,86 @@ def diff_pfsense(path_a, path_b):
     return {"added": added, "removed": removed, "unchanged": unchanged}
 
 
+# ── AWS ───────────────────────────────────────────────────────────────────────
+
+def _flatten_aws_rules(groups):
+    """Yield display strings for all inbound rules across all SGs."""
+    tuples = []
+    for sg in (groups or []):
+        sg_name = sg.get("GroupName") or sg.get("GroupId", "unknown-sg")
+        for rule in sg.get("IpPermissions", []):
+            proto = (rule.get("IpProtocol") or "all").lower()
+            from_port = rule.get("FromPort", "*")
+            to_port   = rule.get("ToPort",   "*")
+            # IPv4 ranges
+            for r4 in rule.get("IpRanges", []):
+                cidr = r4.get("CidrIp", "?")
+                tuples.append(f"[{sg_name}] {proto} {from_port}-{to_port} from {cidr}")
+            # IPv6 ranges
+            for r6 in rule.get("Ipv6Ranges", []):
+                cidr = r6.get("CidrIpv6", "?")
+                tuples.append(f"[{sg_name}] {proto} {from_port}-{to_port} from {cidr}")
+            # If no ranges (e.g. SG ref), record a generic entry
+            if not rule.get("IpRanges") and not rule.get("Ipv6Ranges"):
+                tuples.append(f"[{sg_name}] {proto} {from_port}-{to_port} from <sg-ref>")
+    return tuples
+
+
+def diff_aws(path_a, path_b):
+    groups_a, _ = parse_aws_sg(path_a)
+    groups_b, _ = parse_aws_sg(path_b)
+    rules_a = Counter(_flatten_aws_rules(groups_a or []))
+    rules_b = Counter(_flatten_aws_rules(groups_b or []))
+    added, removed, unchanged = [], [], []
+    for sig in set(rules_a) | set(rules_b):
+        a, b = rules_a[sig], rules_b[sig]
+        keep    = min(a, b)
+        extra_a = a - keep
+        extra_b = b - keep
+        for _ in range(keep):
+            unchanged.append(sig)
+        for _ in range(extra_a):
+            removed.append(sig)
+        for _ in range(extra_b):
+            added.append(sig)
+    return {"added": added, "removed": removed, "unchanged": unchanged}
+
+
+# ── Azure ──────────────────────────────────────────────────────────────────────
+
+def _flatten_azure_rules(nsgs):
+    """Yield display strings for all security rules across all NSGs."""
+    results = []
+    for nsg in (nsgs or []):
+        nsg_name = nsg.get("name", "unknown-nsg")
+        for rule in nsg.get("securityRules", []):
+            rule_name = rule.get("name", "?")
+            props     = _props(rule)
+            direction = props.get("direction", "")
+            access    = props.get("access", "")
+            src       = props.get("sourceAddressPrefix") or props.get("sourceAddressPrefixes") or "*"
+            if isinstance(src, list):
+                src = ",".join(src)
+            # Destination ports
+            port = props.get("destinationPortRange") or ",".join(props.get("destinationPortRanges", [])) or "*"
+            display = f"[{nsg_name}] {rule_name}: {direction} {access} {src} \u2192 {port}"
+            results.append(display)
+    return results
+
+
+def diff_azure(path_a, path_b):
+    nsgs_a, _ = parse_azure_nsg(path_a)
+    nsgs_b, _ = parse_azure_nsg(path_b)
+    rules_a = {r.split("] ", 1)[1].split(":")[0] if "] " in r else r: r
+               for r in _flatten_azure_rules(nsgs_a or [])}
+    rules_b = {r.split("] ", 1)[1].split(":")[0] if "] " in r else r: r
+               for r in _flatten_azure_rules(nsgs_b or [])}
+    added     = [rules_b[k] for k in rules_b if k not in rules_a]
+    removed   = [rules_a[k] for k in rules_a if k not in rules_b]
+    unchanged = [rules_a[k] for k in rules_a if k in rules_b]
+    return {"added": added, "removed": removed, "unchanged": unchanged}
+
+
 # ── Main entrypoint ───────────────────────────────────────────────────────────
 
 def diff_configs(vendor, path_a, path_b):
@@ -143,4 +225,8 @@ def diff_configs(vendor, path_a, path_b):
         return diff_paloalto(path_a, path_b)
     if vendor == "pfsense":
         return diff_pfsense(path_a, path_b)
+    if vendor == "aws":
+        return diff_aws(path_a, path_b)
+    if vendor == "azure":
+        return diff_azure(path_a, path_b)
     raise ValueError(f"Unsupported vendor for diff: {vendor}")
