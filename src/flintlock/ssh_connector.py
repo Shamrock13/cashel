@@ -106,11 +106,20 @@ def _pull_paloalto(host, port, username, password, timeout):
         client.close()
 
 
+# ── Cisco FTD ─────────────────────────────────────────────────────────────────
+# FTD LINA CLI accepts the same commands as ASA for pulling the running config.
+
+def _pull_ftd(host, port, username, password, timeout):
+    """Pull FTD running config via LINA CLI (same as ASA)."""
+    return _pull_asa(host, port, username, password, timeout)
+
+
 # ── Main entrypoint ───────────────────────────────────────────────────────────
 
-_SUFFIXES = {"asa": ".txt", "fortinet": ".txt", "paloalto": ".xml"}
+_SUFFIXES = {"asa": ".txt", "ftd": ".txt", "fortinet": ".txt", "paloalto": ".xml"}
 _PULLERS  = {
     "asa":      _pull_asa,
+    "ftd":      _pull_ftd,
     "fortinet": _pull_fortinet,
     "paloalto": _pull_paloalto,
 }

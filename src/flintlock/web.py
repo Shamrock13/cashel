@@ -1,27 +1,34 @@
+import atexit
+import json
 import os
+import re
 import uuid
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from flask import Flask, render_template, request, jsonify, send_file
-from ciscoconfparse import CiscoConfParse
 
 from .license import check_license, activate_license, deactivate_license
-from .compliance import (
-    check_cis_compliance, check_pci_compliance, check_nist_compliance,
-    check_cis_compliance_pa, check_pci_compliance_pa, check_nist_compliance_pa,
-    check_cis_compliance_forti, check_pci_compliance_forti, check_nist_compliance_forti,
-    check_cis_compliance_pf, check_pci_compliance_pf, check_nist_compliance_pf,
-)
-from .paloalto import audit_paloalto, parse_paloalto
-from .fortinet import audit_fortinet
-from .pfsense import audit_pfsense
-from .aws import audit_aws_sg
-from .azure import audit_azure_nsg
+from .ftd import is_ftd_config
 from .reporter import generate_report
+from .audit_engine import (
+    _findings_to_strings, _wrap_compliance,
+    _sort_findings, _build_summary,
+    run_vendor_audit, run_compliance_checks,
+)
 from .diff import diff_configs
 from .archive import save_audit, list_archive, get_entry, delete_entry, compare_entries
 from .activity_log import (
     log_activity, list_activity, delete_activity_entry, clear_activity,
     ACTION_FILE_AUDIT, ACTION_SSH_CONNECT, ACTION_CONFIG_DIFF,
+)
+from .settings import get_settings, save_settings
+from .schedule_store import (
+    list_schedules, get_schedule, create_schedule,
+    update_schedule, delete_schedule,
+)
+from .scheduler_runner import (
+    start_scheduler, stop_scheduler, reload_job,
+    run_now as scheduler_run_now, scheduler_available,
 )
 
 UPLOAD_FOLDER    = os.environ.get("UPLOAD_FOLDER",    "/tmp/flintlock_uploads")
@@ -32,12 +39,15 @@ ACTIVITY_FOLDER  = os.environ.get("ACTIVITY_FOLDER",  "/tmp/flintlock_activity")
 for _d in (UPLOAD_FOLDER, REPORTS_FOLDER, ARCHIVE_FOLDER, ACTIVITY_FOLDER):
     os.makedirs(_d, exist_ok=True)
 
+# Settings folder is created lazily by settings.py on first save
+
 app = Flask(__name__, template_folder="templates", static_folder="static")
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10 MB upload limit
 
 
 VENDOR_DISPLAY = {
     "asa":      "Cisco",
+    "ftd":      "Cisco",
     "paloalto": "Palo Alto Networks",
     "fortinet": "Fortinet",
     "pfsense":  "pfSense",
@@ -46,29 +56,6 @@ VENDOR_DISPLAY = {
 }
 
 ALL_VENDORS = set(VENDOR_DISPLAY)
-
-
-def _f(severity, category, message, remediation=""):
-    """Build a structured finding dict."""
-    return {"severity": severity, "category": category, "message": message, "remediation": remediation}
-
-
-def _finding_msg(f):
-    """Extract the message string from a finding (dict or legacy string)."""
-    return f["message"] if isinstance(f, dict) else f
-
-
-def _findings_to_strings(findings):
-    """Convert findings list (dicts or strings) to plain strings for storage/PDF."""
-    return [_finding_msg(f) for f in findings]
-
-
-def _wrap_compliance(s):
-    """Wrap a compliance string finding as a minimal dict."""
-    if isinstance(s, dict):
-        return s
-    sev = "HIGH" if any(x in s for x in ("-HIGH", "[HIGH]")) else "MEDIUM"
-    return {"severity": sev, "category": "compliance", "message": s, "remediation": None}
 
 
 # ── Vendor auto-detection ─────────────────────────────────────────────────────
@@ -82,7 +69,6 @@ def detect_vendor(content: str, filename: str) -> str | None:
     # JSON-based: AWS or Azure
     if stripped.startswith("{") or stripped.startswith("[") or filename_lower.endswith(".json"):
         try:
-            import json
             data = json.loads(content[:8192])  # partial parse for detection
             if isinstance(data, dict):
                 if "SecurityGroups" in data or "GroupId" in data or "IpPermissions" in data:
@@ -115,6 +101,11 @@ def detect_vendor(content: str, filename: str) -> str | None:
     ):
         return "fortinet"
 
+    # Text-based: Cisco FTD (check before ASA — FTD has ASA-style ACLs too)
+    if any(k in content_lower for k in ("access-control-policy", "firepower threat defense",
+                                         "firepower-module", "intrusion-policy")):
+        return "ftd"
+
     # Text-based: Cisco ASA
     if "access-list" in content_lower and any(k in content_lower for k in ("permit", "deny")):
         return "asa"
@@ -128,9 +119,21 @@ def validate_vendor_format(content: str, filename: str, vendor: str) -> tuple[bo
     is_xml  = content.strip().startswith("<") or filename.lower().endswith(".xml")
     is_json = content.strip().startswith(("{", "[")) or filename.lower().endswith(".json")
 
-    if vendor == "asa":
+    if vendor == "ftd":
+        if is_xml or is_json:
+            return False, "Cisco FTD LINA configs are text-based, but this file appears to be XML or JSON."
+        # FTD configs may or may not have access-list; require at least some Cisco CLI content
+        if not any(k in content_lower for k in ("access-list", "access-control-policy",
+                                                  "threat-detection", "intrusion-policy",
+                                                  "interface", "firepower")):
+            return False, "No recognizable Cisco FTD configuration markers found. Check vendor selection."
+
+    elif vendor == "asa":
         if is_xml or is_json:
             return False, "Cisco configs are text-based, but this file appears to be XML or JSON."
+        # If the file actually looks like FTD, upgrade silently
+        if is_ftd_config(content):
+            return True, ""  # will be re-routed to ftd in run_audit
         if "access-list" not in content_lower:
             return False, "No Cisco access-list statements found. Check vendor selection."
 
@@ -166,124 +169,50 @@ def validate_vendor_format(content: str, filename: str, vendor: str) -> tuple[bo
     return True, ""
 
 
-def _sort_findings(findings: list) -> list:
-    def priority(f):
-        msg = _finding_msg(f)
-        is_comp = any(x in msg for x in ("PCI-", "CIS-", "NIST-"))
-        if "[HIGH]"   in msg and not is_comp:
-            return 0
-        if "[MEDIUM]" in msg and not is_comp:
-            return 1
-        if "HIGH"     in msg and is_comp:
-            return 2
-        if "MEDIUM"   in msg and is_comp:
-            return 3
-        return 4
-    return sorted(findings, key=priority)
+# ── Hostname extraction ───────────────────────────────────────────────────────
 
+def extract_hostname(vendor: str, content: str) -> str | None:
+    """Try to extract the device hostname from a config file."""
+    try:
+        if vendor in ("asa", "ftd"):
+            m = re.search(r"^hostname\s+(\S+)", content, re.MULTILINE)
+            return m.group(1) if m else None
 
-# ── ASA audit helpers ─────────────────────────────────────────────────────────
+        if vendor == "paloalto":
+            root = ET.fromstring(content)
+            el = root.find(".//devices/entry/deviceconfig/system/hostname")
+            return el.text.strip() if el is not None and el.text else None
 
-def _check_any_any(parse):
-    return [
-        _f("HIGH", "exposure",
-           f"[HIGH] Overly permissive rule found: {r.text.strip()}",
-           "Restrict source and destination to specific IP ranges. "
-           "Remove or scope down any/any permit rules to enforce least-privilege access.")
-        for r in parse.find_objects(r"access-list.*permit.*any any")
-    ]
+        if vendor == "fortinet":
+            block = re.search(r"config system global(.*?)end", content, re.DOTALL)
+            if block:
+                m = re.search(r'set hostname\s+"?([^"\n]+)"?', block.group(1))
+                return m.group(1).strip().strip('"') if m else None
+            return None
 
+        if vendor == "pfsense":
+            root = ET.fromstring(content)
+            el = root.find("system/hostname")
+            return el.text.strip() if el is not None and el.text else None
 
-def _check_missing_logging(parse):
-    return [
-        _f("MEDIUM", "logging",
-           f"[MEDIUM] Permit rule missing logging: {r.text.strip()}",
-           "Add the 'log' keyword to all permit rules. "
-           "Without logging, permitted traffic produces no syslog entries for monitoring.")
-        for r in parse.find_objects(r"access-list.*permit") if "log" not in r.text
-    ]
+        if vendor == "aws":
+            data = json.loads(content)
+            groups = data if isinstance(data, list) else data.get("SecurityGroups", [data])
+            if groups:
+                for t in groups[0].get("Tags", []):
+                    if t.get("Key") == "Name":
+                        return t["Value"]
+                return groups[0].get("GroupName")
 
+        if vendor == "azure":
+            data = json.loads(content)
+            items = data.get("value", [data]) if isinstance(data, dict) else data
+            if items:
+                return items[0].get("name")
 
-def _check_deny_all(parse):
-    if parse.find_objects(r"access-list.*deny ip any any"):
-        return []
-    return [_f(
-        "HIGH", "hygiene",
-        "[HIGH] No explicit deny-all rule found at end of ACL",
-        "Add an explicit 'access-list <name> deny ip any any log' at the end of each ACL. "
-        "Relying on implicit deny produces no log entries and is not auditable."
-    )]
-
-
-def _check_redundant_rules(parse):
-    findings, seen = [], []
-    for rule in parse.find_objects(r"access-list.*permit"):
-        text_clean = rule.text.strip().lower().replace(" log", "").strip()
-        if text_clean in seen:
-            findings.append(_f(
-                "MEDIUM", "redundancy",
-                f"[MEDIUM] Redundant rule detected: {rule.text.strip()}",
-                "Remove duplicate ACL entries to keep the access-list clean and auditable. "
-                "Redundant rules indicate configuration drift and complicate change management."
-            ))
-        else:
-            seen.append(text_clean)
-    return findings
-
-
-def _check_telnet_asa(parse):
-    """Flag Telnet management access configured on the ASA."""
-    return [
-        _f("MEDIUM", "protocol",
-           f"[MEDIUM] Telnet management access configured: {r.text.strip()}",
-           "Disable Telnet management (no telnet ...) and enforce SSH. "
-           "Telnet transmits all data including credentials in cleartext.")
-        for r in parse.find_objects(r"^telnet\s")
-    ]
-
-
-def _check_icmp_any_asa(parse):
-    """Flag ACL entries that allow unrestricted ICMP."""
-    return [
-        _f("MEDIUM", "exposure",
-           f"[MEDIUM] Unrestricted ICMP permit rule: {r.text.strip()}",
-           "Restrict ICMP to specific source ranges or permit only echo-reply, "
-           "unreachable, and time-exceeded message types needed for diagnostics.")
-        for r in parse.find_objects(r"access-list.*permit icmp any any")
-    ]
-
-
-def _audit_asa(filepath):
-    parse = CiscoConfParse(filepath, ignore_blank_lines=False)
-    findings = (
-        _check_any_any(parse)
-        + _check_missing_logging(parse)
-        + _check_deny_all(parse)
-        + _check_redundant_rules(parse)
-        + _check_telnet_asa(parse)
-        + _check_icmp_any_asa(parse)
-    )
-    return findings, parse
-
-
-def _build_summary(findings):
-    def _count(tag):
-        return len([f for f in findings if tag in _finding_msg(f)])
-    high   = [f for f in findings if "[HIGH]"   in _finding_msg(f) and not any(x in _finding_msg(f) for x in ["PCI-", "CIS-", "NIST-"])]
-    medium = [f for f in findings if "[MEDIUM]" in _finding_msg(f) and not any(x in _finding_msg(f) for x in ["PCI-", "CIS-", "NIST-"])]
-    score  = max(0, 100 - len(high) * 10 - len(medium) * 3)
-    return {
-        "high":        len(high),
-        "medium":      len(medium),
-        "pci_high":    _count("PCI-HIGH"),
-        "pci_medium":  _count("PCI-MEDIUM"),
-        "cis_high":    _count("CIS-HIGH"),
-        "cis_medium":  _count("CIS-MEDIUM"),
-        "nist_high":   _count("NIST-HIGH"),
-        "nist_medium": _count("NIST-MEDIUM"),
-        "total":       len(findings),
-        "score":       score,
-    }
+    except Exception:
+        pass
+    return None
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -324,28 +253,19 @@ def run_audit():
         os.remove(temp_path)
         return jsonify({"error": "Could not determine vendor. Please select one manually."}), 400
 
+    # When user selects "Cisco" (asa) manually, check if file is actually FTD
+    if vendor == "asa" and is_ftd_config(sample):
+        vendor = "ftd"
+
+    detected_hostname = extract_hostname(vendor, sample)
+
     is_valid, validation_msg = validate_vendor_format(sample, upload.filename, vendor)
     if not is_valid:
         os.remove(temp_path)
         return jsonify({"error": f"Wrong vendor selected ({VENDOR_DISPLAY.get(vendor, vendor)}): {validation_msg}"}), 400
 
     try:
-        findings    = []
-        extra_data  = None
-        parse       = None
-
-        if vendor == "asa":
-            findings, parse = _audit_asa(temp_path)
-        elif vendor == "paloalto":
-            findings = audit_paloalto(temp_path)
-        elif vendor == "fortinet":
-            findings, extra_data = audit_fortinet(temp_path)
-        elif vendor == "pfsense":
-            findings, extra_data = audit_pfsense(temp_path)
-        elif vendor == "aws":
-            findings, extra_data = audit_aws_sg(temp_path)
-        elif vendor == "azure":
-            findings, extra_data = audit_azure_nsg(temp_path)
+        findings, parse, extra_data = run_vendor_audit(vendor, temp_path)
 
         # Compliance checks (license-gated; not applicable for AWS/Azure)
         license_warning = None
@@ -359,28 +279,8 @@ def run_audit():
                     "Once purchased, enter your key using the Licensed/Unlicensed badge in the top-right corner."
                 )
             else:
-                fn_map = {}
-                if vendor == "asa":
-                    fn_map = {"cis": check_cis_compliance, "pci": check_pci_compliance, "nist": check_nist_compliance}
-                    fn = fn_map.get(compliance)
-                    if fn:
-                        findings += [_wrap_compliance(c) for c in fn(parse)]
-                elif vendor == "paloalto":
-                    rules, _ = parse_paloalto(temp_path)
-                    fn_map = {"cis": check_cis_compliance_pa, "pci": check_pci_compliance_pa, "nist": check_nist_compliance_pa}
-                    fn = fn_map.get(compliance)
-                    if fn:
-                        findings += [_wrap_compliance(c) for c in fn(rules)]
-                elif vendor == "fortinet":
-                    fn_map = {"cis": check_cis_compliance_forti, "pci": check_pci_compliance_forti, "nist": check_nist_compliance_forti}
-                    fn = fn_map.get(compliance)
-                    if fn and extra_data is not None:
-                        findings += [_wrap_compliance(c) for c in fn(extra_data)]
-                elif vendor == "pfsense":
-                    fn_map = {"cis": check_cis_compliance_pf, "pci": check_pci_compliance_pf, "nist": check_nist_compliance_pf}
-                    fn = fn_map.get(compliance)
-                    if fn and extra_data is not None:
-                        findings += [_wrap_compliance(c) for c in fn(extra_data)]
+                raw = run_compliance_checks(vendor, compliance, parse, extra_data)
+                findings += [_wrap_compliance(c) for c in raw]
 
         findings = _sort_findings(findings)
         summary  = _build_summary(findings)
@@ -407,13 +307,14 @@ def run_audit():
         )
 
         return jsonify({
-            "findings":          _findings_to_strings(findings),
-            "enriched_findings": findings,
-            "summary":           summary,
-            "report":            report_filename,
-            "license_warning":   license_warning,
-            "detected_vendor":   vendor,
-            "archive_id":        archive_id,
+            "findings":           _findings_to_strings(findings),
+            "enriched_findings":  findings,
+            "summary":            summary,
+            "report":             report_filename,
+            "license_warning":    license_warning,
+            "detected_vendor":    vendor,
+            "detected_hostname":  detected_hostname,
+            "archive_id":         archive_id,
         })
 
     except Exception as e:
@@ -493,8 +394,8 @@ def live_connect():
 
     if not host or not username or not vendor:
         return jsonify({"error": "host, username, and vendor are required"}), 400
-    if vendor not in ("asa", "fortinet", "paloalto"):
-        return jsonify({"error": f"Live SSH not supported for vendor '{vendor}'. Supported: asa, fortinet, paloalto"}), 400
+    if vendor not in ("asa", "ftd", "fortinet", "paloalto"):
+        return jsonify({"error": f"Live SSH not supported for vendor '{vendor}'. Supported: Cisco (ASA/FTD), Fortinet, Palo Alto Networks"}), 400
 
     label = f"{vendor.upper()}@{host}"
 
@@ -511,36 +412,13 @@ def live_connect():
         return jsonify({"error": f"Connection failed: {e}"}), 500
 
     try:
-        findings   = []
-        extra_data = None
-        parse      = None
+        findings, parse, extra_data = run_vendor_audit(vendor, temp_path)
 
-        if vendor == "asa":
-            findings, parse = _audit_asa(temp_path)
-        elif vendor == "paloalto":
-            findings = audit_paloalto(temp_path)
-        elif vendor == "fortinet":
-            findings, extra_data = audit_fortinet(temp_path)
-
-        if compliance and vendor not in ("aws", "azure"):
+        if compliance:
             licensed, _ = check_license()
             if licensed:
-                if vendor == "asa":
-                    fn_map = {"cis": check_cis_compliance, "pci": check_pci_compliance, "nist": check_nist_compliance}
-                    fn = fn_map.get(compliance)
-                    if fn:
-                        findings += [_wrap_compliance(c) for c in fn(parse)]
-                elif vendor == "paloalto":
-                    rules, _ = parse_paloalto(temp_path)
-                    fn_map = {"cis": check_cis_compliance_pa, "pci": check_pci_compliance_pa, "nist": check_nist_compliance_pa}
-                    fn = fn_map.get(compliance)
-                    if fn:
-                        findings += [_wrap_compliance(c) for c in fn(rules)]
-                elif vendor == "fortinet":
-                    fn_map = {"cis": check_cis_compliance_forti, "pci": check_pci_compliance_forti, "nist": check_nist_compliance_forti}
-                    fn = fn_map.get(compliance)
-                    if fn and extra_data is not None:
-                        findings += [_wrap_compliance(c) for c in fn(extra_data)]
+                raw = run_compliance_checks(vendor, compliance, parse, extra_data)
+                findings += [_wrap_compliance(c) for c in raw]
 
         findings = _sort_findings(findings)
         summary  = _build_summary(findings)
@@ -663,7 +541,182 @@ def activity_clear():
     return jsonify({"cleared": count})
 
 
+# ── Bulk audit ────────────────────────────────────────────────────────────────
+
+@app.route("/bulk_audit", methods=["POST"])
+def bulk_audit():
+    """Audit multiple config files in one request.
+
+    Accepts: multipart/form-data with repeated field ``configs[]``.
+    Optional shared fields: vendor (default auto), compliance, archive (1/0), tag.
+    Returns: JSON list of per-file result objects.
+    """
+    uploads = request.files.getlist("configs[]")
+    if not uploads or all(u.filename == "" for u in uploads):
+        return jsonify({"error": "No config files uploaded"}), 400
+
+    vendor_override = request.form.get("vendor", "auto").strip().lower()
+    compliance      = request.form.get("compliance", "").strip().lower() or None
+    archive_it      = request.form.get("archive") == "1"
+    tag_prefix      = request.form.get("tag", "").strip() or None
+
+    results = []
+
+    for upload in uploads:
+        if upload.filename == "":
+            continue
+
+        suffix    = Path(upload.filename).suffix or ".txt"
+        temp_name = f"{uuid.uuid4()}{suffix}"
+        temp_path = os.path.join(UPLOAD_FOLDER, temp_name)
+        upload.save(temp_path)
+
+        result_entry = {"filename": upload.filename, "status": "error", "findings": [],
+                        "summary": {}, "vendor": None, "archive_id": None, "error": None}
+
+        try:
+            with open(temp_path, "r", errors="ignore") as f:
+                sample = f.read(16384)
+
+            vendor = vendor_override
+            if vendor == "auto":
+                vendor = detect_vendor(sample, upload.filename) or ""
+
+            if vendor not in ALL_VENDORS:
+                result_entry["error"] = "Could not determine vendor"
+                results.append(result_entry)
+                continue
+
+            if vendor == "asa" and is_ftd_config(sample):
+                vendor = "ftd"
+
+            is_valid, validation_msg = validate_vendor_format(sample, upload.filename, vendor)
+            if not is_valid:
+                result_entry["error"] = validation_msg
+                results.append(result_entry)
+                continue
+
+            findings, parse, extra_data = run_vendor_audit(vendor, temp_path)
+
+            if compliance and vendor not in ("aws", "azure"):
+                licensed, _ = check_license()
+                if licensed:
+                    raw = run_compliance_checks(vendor, compliance, parse, extra_data)
+                    findings += [_wrap_compliance(c) for c in raw]
+
+            findings = _sort_findings(findings)
+            summary  = _build_summary(findings)
+
+            archive_id = None
+            if archive_it:
+                tag = f"{tag_prefix}/{upload.filename}" if tag_prefix else upload.filename
+                archive_id, _ = save_audit(
+                    upload.filename, vendor, _findings_to_strings(findings),
+                    summary, config_path=temp_path, tag=tag,
+                )
+
+            log_activity(
+                ACTION_FILE_AUDIT, upload.filename, vendor=vendor, success=True,
+                details={"bulk": True, "total": summary.get("total", 0),
+                         "high": summary.get("high", 0), "archived": archive_id is not None},
+            )
+
+            result_entry.update({
+                "status":          "ok",
+                "vendor":          vendor,
+                "findings":        _findings_to_strings(findings),
+                "enriched_findings": findings,
+                "summary":         summary,
+                "archive_id":      archive_id,
+            })
+
+        except Exception as e:
+            result_entry["error"] = str(e)
+            log_activity(ACTION_FILE_AUDIT, upload.filename, vendor=vendor_override,
+                         success=False, error=str(e), details={"bulk": True})
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+
+        results.append(result_entry)
+
+    return jsonify(results)
+
+
+# ── Scheduled audits API ───────────────────────────────────────────────────────
+
+@app.route("/schedules", methods=["GET"])
+def schedules_list():
+    return jsonify(list_schedules())
+
+
+@app.route("/schedules", methods=["POST"])
+def schedules_create():
+    data = request.get_json(silent=True) or {}
+    if not data.get("host") or not data.get("username"):
+        return jsonify({"error": "host and username are required"}), 400
+    schedule = create_schedule(data)
+    reload_job(schedule["id"], get_schedule(schedule["id"], include_password=True))
+    return jsonify(schedule), 201
+
+
+@app.route("/schedules/<schedule_id>", methods=["GET"])
+def schedules_get(schedule_id):
+    schedule = get_schedule(schedule_id)
+    if not schedule:
+        return jsonify({"error": "Not found"}), 404
+    return jsonify(schedule)
+
+
+@app.route("/schedules/<schedule_id>", methods=["PUT"])
+def schedules_update(schedule_id):
+    data = request.get_json(silent=True) or {}
+    schedule = update_schedule(schedule_id, data)
+    if not schedule:
+        return jsonify({"error": "Not found"}), 404
+    reload_job(schedule_id, get_schedule(schedule_id, include_password=True))
+    return jsonify(schedule)
+
+
+@app.route("/schedules/<schedule_id>", methods=["DELETE"])
+def schedules_delete(schedule_id):
+    deleted = delete_schedule(schedule_id)
+    if deleted:
+        reload_job(schedule_id, None)  # removes the job from the scheduler
+    return jsonify({"deleted": deleted})
+
+
+@app.route("/schedules/<schedule_id>/run", methods=["POST"])
+def schedules_run_now(schedule_id):
+    """Trigger an immediate on-demand run of a scheduled audit."""
+    schedule = get_schedule(schedule_id)
+    if not schedule:
+        return jsonify({"error": "Not found"}), 404
+    scheduler_run_now(schedule_id)
+    return jsonify({"queued": True, "id": schedule_id})
+
+
+@app.route("/schedules/status", methods=["GET"])
+def schedules_status():
+    return jsonify({"scheduler_available": scheduler_available()})
+
+
 # ── Reports / License ─────────────────────────────────────────────────────────
+
+@app.route("/reports", methods=["GET"])
+def reports_list():
+    """List all saved PDF reports."""
+    reports = []
+    for fname in sorted(os.listdir(REPORTS_FOLDER), reverse=True):
+        if fname.endswith(".pdf"):
+            path = os.path.join(REPORTS_FOLDER, fname)
+            reports.append({
+                "filename": fname,
+                "size":     os.path.getsize(path),
+                "mtime":    os.path.getmtime(path),
+            })
+    return jsonify(reports)
+
 
 @app.route("/reports/<filename>")
 def download_report(filename):
@@ -673,6 +726,17 @@ def download_report(filename):
     if not os.path.exists(path):
         return "Report not found", 404
     return send_file(path, as_attachment=True, download_name=filename)
+
+
+@app.route("/reports/<filename>/view")
+def view_report(filename):
+    """Serve PDF inline for in-browser viewing."""
+    if ".." in filename or "/" in filename:
+        return "Not found", 404
+    path = os.path.join(REPORTS_FOLDER, filename)
+    if not os.path.exists(path):
+        return "Report not found", 404
+    return send_file(path, as_attachment=False, mimetype="application/pdf")
 
 
 @app.route("/license/activate", methods=["POST"])
@@ -694,9 +758,30 @@ def license_status():
     return jsonify({"licensed": licensed, "info": info})
 
 
+# ── Settings API ──────────────────────────────────────────────────────────────
+
+@app.route("/settings", methods=["GET"])
+def settings_get():
+    return jsonify(get_settings())
+
+
+@app.route("/settings", methods=["POST"])
+def settings_save():
+    data = request.get_json(silent=True) or {}
+    saved = save_settings(data)
+    return jsonify(saved)
+
+
 def main():
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
+
+# Start scheduler on import — covers both WSGI servers (gunicorn/uwsgi)
+# and direct `flintlock-web` invocation. The scheduler has an internal
+# guard that prevents double-start if this module is reloaded.
+start_scheduler()
+atexit.register(stop_scheduler)
 
 
 if __name__ == "__main__":

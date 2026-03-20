@@ -70,15 +70,25 @@
 
     <!-- Tab nav -->
     <nav class="tab-nav" role="tablist">
-      <button class="tab-btn tab-active" data-tab="audit"    role="tab">&#128196; File Audit</button>
-      <button class="tab-btn"            data-tab="diff"     role="tab">&#8646; Compare Configs</button>
-      <button class="tab-btn"            data-tab="connect"  role="tab">&#128246; Live Connect</button>
-      <button class="tab-btn"            data-tab="history"  role="tab">&#128337; Audit History</button>
-      <button class="tab-btn"            data-tab="activity" role="tab">&#128203; Activity Log</button>
+      <button class="tab-btn tab-active" data-tab="audit"     role="tab">&#128196; Audit</button>
+      <button class="tab-btn"            data-tab="diff"      role="tab">&#8646; Compare</button>
+      <button class="tab-btn"            data-tab="connect"   role="tab">&#128246; Live Connect</button>
+      <button class="tab-btn"            data-tab="schedules" role="tab">&#128336; Schedules</button>
+      <button class="tab-btn"            data-tab="history"   role="tab">&#128337; History</button>
+      <button class="tab-btn"            data-tab="settings"  role="tab">&#9881; Settings</button>
     </nav>
 
-    <!-- ══════════════════════════════════════════════ FILE AUDIT ══ -->
+    <!-- ══════════════════════════════════════════════ AUDIT ══ -->
     <section class="tab-panel" id="tab-audit">
+
+      <!-- Audit mode toggle: Single File / Bulk -->
+      <div class="audit-mode-bar">
+        <button class="mode-btn mode-active" data-mode="single">Single File</button>
+        <button class="mode-btn" data-mode="bulk">Bulk</button>
+      </div>
+
+      <!-- ── Single File mode ── -->
+      <div id="audit-mode-single">
       <div class="card">
         <h2 class="card-title">Run Audit</h2>
         <form id="auditForm" enctype="multipart/form-data">
@@ -113,6 +123,7 @@
                 <option value="cis">CIS Benchmark</option>
                 <option value="pci">PCI-DSS</option>
                 <option value="nist">NIST SP 800-41</option>
+                <option value="hipaa">HIPAA Security Rule</option>
               </select>
             </div>
             <div class="form-group form-group-check">
@@ -143,7 +154,8 @@
         <div class="summary-grid" id="summaryGrid"></div>
         <div id="findingsList"></div>
         <div class="pdf-row hidden" id="pdfRow">
-          <a id="pdfLink" class="btn-download" href="#" download>&#8681; Download PDF Report</a>
+          <a id="pdfLink" class="btn-download" href="#" download>&#8681; Download PDF</a>
+          <a id="pdfViewLink" class="btn-secondary" href="#" target="_blank" rel="noopener">&#128196; View PDF</a>
         </div>
         <div class="archive-row hidden" id="archiveRow">
           <span class="archive-saved-msg">&#10003; Saved to Audit History &mdash;
@@ -151,6 +163,64 @@
           </span>
         </div>
       </div>
+      </div><!-- /audit-mode-single -->
+
+      <!-- ── Bulk mode ── -->
+      <div id="audit-mode-bulk" class="hidden">
+      <div class="card">
+        <h2 class="card-title">Bulk Audit</h2>
+        <p class="card-desc">Upload multiple firewall configs at once. Each file is audited independently and results are shown side-by-side.</p>
+        <form id="bulkForm" enctype="multipart/form-data">
+          <div class="form-grid">
+            <div class="form-group" style="grid-column:1/-1">
+              <label for="bulkConfigs">Config Files</label>
+              <div class="file-input-wrapper">
+                <input type="file" id="bulkConfigs" name="configs[]" multiple required />
+                <span class="file-label" id="bulkFileLabel">Choose one or more files&hellip;</span>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="bulkVendor">Vendor</label>
+              <select id="bulkVendor" name="vendor">
+                <option value="auto" selected>Auto-detect (recommended)</option>
+                <option value="aws">AWS Security Group</option>
+                <option value="azure">Azure NSG</option>
+                <option value="asa">Cisco</option>
+                <option value="fortinet">Fortinet</option>
+                <option value="paloalto">Palo Alto Networks</option>
+                <option value="pfsense">pfSense</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="bulkCompliance">Compliance Framework <span class="optional">(licensed)</span></label>
+              <select id="bulkCompliance" name="compliance">
+                <option value="">None</option>
+                <option value="cis">CIS Benchmark</option>
+                <option value="pci">PCI-DSS</option>
+                <option value="nist">NIST SP 800-41</option>
+                <option value="hipaa">HIPAA Security Rule</option>
+              </select>
+            </div>
+            <div class="form-group form-group-check">
+              <label class="checkbox-label">
+                <input type="checkbox" id="bulkArchive" name="archive" value="1" />
+                <span>Save all to Audit History</span>
+              </label>
+            </div>
+          </div>
+          <button type="submit" class="btn-primary" id="bulkBtn">
+            <span id="bulkText">Run Bulk Audit</span>
+            <span id="bulkSpinner" class="spinner hidden"></span>
+          </button>
+        </form>
+      </div>
+
+      <div class="card hidden" id="bulkResults">
+        <h2 class="card-title">Bulk Results</h2>
+        <div id="bulkResultsList"></div>
+      </div>
+      </div><!-- /audit-mode-bulk -->
+
     </section>
 
     <!-- ═════════════════════════════════════════ COMPARE CONFIGS ══ -->
@@ -252,6 +322,7 @@
                 <option value="cis">CIS Benchmark</option>
                 <option value="pci">PCI-DSS</option>
                 <option value="nist">NIST SP 800-41</option>
+                <option value="hipaa">HIPAA Security Rule</option>
               </select>
             </div>
           </div>
@@ -277,8 +348,17 @@
       </div>
     </section>
 
-    <!-- ═════════════════════════════════════════ AUDIT HISTORY ══════ -->
+    <!-- ═══════════════════════════════════════════════ HISTORY ══════ -->
     <section class="tab-panel hidden" id="tab-history">
+
+      <!-- History sub-tabs: Audit History / Activity Log -->
+      <div class="sub-tab-nav">
+        <button class="sub-tab-btn sub-tab-active" data-subtab="audits">&#128337; Audit History</button>
+        <button class="sub-tab-btn" data-subtab="activity">&#128203; Activity Log</button>
+      </div>
+
+      <!-- ── Audit History sub-tab ── -->
+      <div id="sub-audits">
       <div class="card">
         <div class="results-header">
           <h2 class="card-title" style="margin-bottom:0">Audit History</h2>
@@ -350,10 +430,10 @@
         <h2 class="card-title">Comparison</h2>
         <div id="compareContent"></div>
       </div>
-    </section>
+      </div><!-- /sub-audits -->
 
-    <!-- ══════════════════════════════════════════ ACTIVITY LOG ══════ -->
-    <section class="tab-panel hidden" id="tab-activity">
+      <!-- ── Activity Log sub-tab ── -->
+      <div id="sub-activity" class="hidden">
       <div class="card">
         <div class="results-header">
           <h2 class="card-title" style="margin-bottom:0">Activity Log</h2>
@@ -367,12 +447,174 @@
           <p class="text-muted">Loading&hellip;</p>
         </div>
       </div>
+      </div><!-- /sub-activity -->
+
+    </section>
+
+    <!-- ═══════════════════════════════════════════════ SCHEDULES ══════ -->
+    <section class="tab-panel hidden" id="tab-schedules">
+      <div class="card">
+        <div class="results-header">
+          <h2 class="card-title" style="margin-bottom:0">Scheduled Audits</h2>
+          <button class="btn-secondary" id="refreshSchedulesBtn" style="font-size:0.8rem;padding:0.3rem 0.75rem">&#8635; Refresh</button>
+        </div>
+        <p class="card-desc">Automatically run SSH audits on a recurring schedule. Results are saved to Audit History.</p>
+        <div id="schedulesList" class="schedules-list">
+          <p class="text-muted">Loading&hellip;</p>
+        </div>
+      </div>
+
+      <!-- New / Edit Schedule Form -->
+      <div class="card" id="scheduleFormCard">
+        <h2 class="card-title" id="scheduleFormTitle">New Schedule</h2>
+        <form id="scheduleForm">
+          <input type="hidden" id="scheduleId" value="" />
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="schedName">Name</label>
+              <input type="text" id="schedName" name="name" placeholder="My ASA01 daily audit" maxlength="80" autocomplete="off" required />
+            </div>
+            <div class="form-group">
+              <label for="schedVendor">Vendor</label>
+              <select id="schedVendor" name="vendor">
+                <option value="asa">Cisco</option>
+                <option value="fortinet">Fortinet</option>
+                <option value="paloalto">Palo Alto Networks</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="schedHost">Host / IP</label>
+              <input type="text" id="schedHost" name="host" placeholder="192.168.1.1" autocomplete="off" required />
+            </div>
+            <div class="form-group">
+              <label for="schedPort">SSH Port</label>
+              <input type="text" id="schedPort" name="port" value="22" placeholder="22" autocomplete="off" />
+            </div>
+            <div class="form-group">
+              <label for="schedUser">Username</label>
+              <input type="text" id="schedUser" name="username" placeholder="admin" autocomplete="off" required />
+            </div>
+            <div class="form-group">
+              <label for="schedPass">Password</label>
+              <input type="password" id="schedPass" name="password" placeholder="leave blank to keep existing" autocomplete="new-password" />
+            </div>
+            <div class="form-group">
+              <label for="schedTag">Device Tag</label>
+              <input type="text" id="schedTag" name="tag" placeholder="ASA01" maxlength="64" autocomplete="off" />
+            </div>
+            <div class="form-group">
+              <label for="schedCompliance">Compliance <span class="optional">(licensed)</span></label>
+              <select id="schedCompliance" name="compliance">
+                <option value="">None</option>
+                <option value="cis">CIS Benchmark</option>
+                <option value="pci">PCI-DSS</option>
+                <option value="nist">NIST SP 800-41</option>
+                <option value="hipaa">HIPAA Security Rule</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="schedFrequency">Frequency</label>
+              <select id="schedFrequency" name="frequency">
+                <option value="hourly">Hourly</option>
+                <option value="daily" selected>Daily</option>
+                <option value="weekly">Weekly</option>
+              </select>
+            </div>
+            <div class="form-group" id="schedHourGroup">
+              <label for="schedHour">Hour (UTC, 0&ndash;23)</label>
+              <input type="number" id="schedHour" name="hour" value="2" min="0" max="23" />
+            </div>
+            <div class="form-group">
+              <label for="schedMinute">Minute (0&ndash;59)</label>
+              <input type="number" id="schedMinute" name="minute" value="0" min="0" max="59" />
+            </div>
+            <div class="form-group" id="schedDowGroup" style="display:none">
+              <label for="schedDow">Day of Week</label>
+              <select id="schedDow" name="day_of_week">
+                <option value="mon" selected>Monday</option>
+                <option value="tue">Tuesday</option>
+                <option value="wed">Wednesday</option>
+                <option value="thu">Thursday</option>
+                <option value="fri">Friday</option>
+                <option value="sat">Saturday</option>
+                <option value="sun">Sunday</option>
+              </select>
+            </div>
+            <div class="form-group form-group-check">
+              <label class="checkbox-label">
+                <input type="checkbox" id="schedEnabled" name="enabled" checked />
+                <span>Enabled</span>
+              </label>
+            </div>
+          </div>
+          <div style="display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap">
+            <button type="submit" class="btn-primary" id="schedSaveBtn">Save Schedule</button>
+            <button type="button" class="btn-secondary" id="schedCancelBtn">Cancel</button>
+            <span class="settings-saved-msg hidden" id="schedSavedMsg">&#10003; Saved</span>
+            <span class="alert-inline hidden" id="schedErrorMsg"></span>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- ════════════════════════════════════════════════ SETTINGS ══════ -->
+    <section class="tab-panel hidden" id="tab-settings">
+      <div class="card">
+        <h2 class="card-title">Settings</h2>
+        <p class="card-desc">Global defaults applied to every audit. Individual audit options always override these defaults.</p>
+
+        <div class="settings-group">
+          <h3 class="settings-group-title">File Audit Defaults</h3>
+          <label class="settings-row">
+            <div class="settings-row-info">
+              <span class="settings-row-label">Always generate PDF report</span>
+              <span class="settings-row-desc">Pre-check &ldquo;Generate PDF Report&rdquo; on every file audit.</span>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="setting-auto-pdf" />
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            </label>
+          </label>
+          <label class="settings-row">
+            <div class="settings-row-info">
+              <span class="settings-row-label">Always save to Audit History</span>
+              <span class="settings-row-desc">Pre-check &ldquo;Save to Audit History&rdquo; on every file audit.</span>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="setting-auto-archive" />
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            </label>
+          </label>
+        </div>
+
+        <div class="settings-group">
+          <h3 class="settings-group-title">Compliance Default</h3>
+          <label class="settings-row">
+            <div class="settings-row-info">
+              <span class="settings-row-label">Default compliance framework</span>
+              <span class="settings-row-desc">Pre-select a framework on the File Audit and Live Connect forms.</span>
+            </div>
+            <select id="setting-default-compliance" class="settings-select">
+              <option value="">None</option>
+              <option value="cis">CIS Benchmark</option>
+              <option value="pci">PCI-DSS</option>
+              <option value="nist">NIST SP 800-41</option>
+              <option value="hipaa">HIPAA Security Rule</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="settings-actions">
+          <button class="btn-primary" id="saveSettingsBtn">Save Settings</button>
+          <span class="settings-saved-msg hidden" id="settingsSavedMsg">&#10003; Saved</span>
+        </div>
+      </div>
     </section>
 
   </main>
 
   <footer class="footer">
-    <p>Flintlock v1.1 &mdash; Firewall Security Auditor</p>
+    <p>Flintlock v1.2 &mdash; Firewall Security Auditor</p>
   </footer>
 
   <script>
@@ -440,14 +682,36 @@
   function switchTab(tabId) {
     tabBtns.forEach(b => b.classList.toggle("tab-active", b.dataset.tab === tabId));
     tabPanels.forEach(p => p.classList.toggle("hidden", p.id !== "tab-" + tabId));
-    if (tabId === "history")  { loadHistory(); loadTrends(); }
-    if (tabId === "activity") loadActivity();
+    if (tabId === "history")   { loadHistory(); loadTrends(); }
+    if (tabId === "settings")  applySettingsToUI();
+    if (tabId === "schedules") loadSchedules();
   }
   tabBtns.forEach(btn => btn.addEventListener("click", () => switchTab(btn.dataset.tab)));
 
+  // ════════════════════════════════════════ AUDIT MODE TOGGLE (single/bulk) ══
+  function switchAuditMode(mode) {
+    document.querySelectorAll(".mode-btn").forEach(b => b.classList.toggle("mode-active", b.dataset.mode === mode));
+    document.getElementById("audit-mode-single").classList.toggle("hidden", mode !== "single");
+    document.getElementById("audit-mode-bulk").classList.toggle("hidden", mode !== "bulk");
+  }
+  document.querySelectorAll(".mode-btn").forEach(btn =>
+    btn.addEventListener("click", () => switchAuditMode(btn.dataset.mode))
+  );
+
+  // ═══════════════════════════════════════ HISTORY SUB-TABS (audits/activity) ══
+  function switchHistorySubTab(subtab) {
+    document.querySelectorAll(".sub-tab-btn").forEach(b => b.classList.toggle("sub-tab-active", b.dataset.subtab === subtab));
+    document.getElementById("sub-audits").classList.toggle("hidden", subtab !== "audits");
+    document.getElementById("sub-activity").classList.toggle("hidden", subtab !== "activity");
+    if (subtab === "activity") loadActivity();
+  }
+  document.querySelectorAll(".sub-tab-btn").forEach(btn =>
+    btn.addEventListener("click", () => switchHistorySubTab(btn.dataset.subtab))
+  );
+
   // ═════════════════════════════════════════════════════ FILE AUDIT ══════
   const VENDOR_LABELS = {
-    asa: "Cisco", paloalto: "Palo Alto Networks", fortinet: "Fortinet",
+    asa: "Cisco", ftd: "Cisco", paloalto: "Palo Alto Networks", fortinet: "Fortinet",
     pfsense: "pfSense", aws: "AWS Security Group", azure: "Azure NSG"
   };
 
@@ -643,6 +907,12 @@
       tag.classList.remove("hidden");
     } else { tag.classList.add("hidden"); }
 
+    // Auto-fill device tag from config hostname if the field is still empty
+    if (data.detected_hostname) {
+      const tagField = document.getElementById("deviceTag");
+      if (!tagField.value.trim()) tagField.value = data.detected_hostname;
+    }
+
     const warn = document.getElementById("licenseWarning");
     if (data.license_warning) { warn.innerHTML = data.license_warning; warn.classList.remove("hidden"); }
     else { warn.classList.add("hidden"); }
@@ -656,8 +926,11 @@
       : `<div class="finding finding-pass">[PASS] No issues found</div>`;
 
     const pdfRow = document.getElementById("pdfRow");
-    if (data.report) { document.getElementById("pdfLink").href = "/reports/" + data.report; pdfRow.classList.remove("hidden"); }
-    else { pdfRow.classList.add("hidden"); }
+    if (data.report) {
+      document.getElementById("pdfLink").href     = "/reports/" + data.report;
+      document.getElementById("pdfViewLink").href = "/reports/" + data.report + "/view";
+      pdfRow.classList.remove("hidden");
+    } else { pdfRow.classList.add("hidden"); }
 
     if (data.archive_id) { document.getElementById("archiveRow").classList.remove("hidden"); }
     else { document.getElementById("archiveRow").classList.add("hidden"); }
@@ -1032,9 +1305,10 @@
       { label: "Medium", value: s.medium, cls: "sev-medium", filter: "medium" },
       { label: "Total",  value: s.total,  cls: "sev-total",  filter: "all" },
     ];
-    if (s.pci_high  || s.pci_medium)  { items.push({ label:"PCI High",   value:s.pci_high,   cls:"sev-compliance",filter:"compliance"}); items.push({ label:"PCI Med",    value:s.pci_medium, cls:"sev-compliance",filter:"compliance"}); }
-    if (s.cis_high  || s.cis_medium)  { items.push({ label:"CIS High",   value:s.cis_high,   cls:"sev-compliance",filter:"compliance"}); items.push({ label:"CIS Med",    value:s.cis_medium, cls:"sev-compliance",filter:"compliance"}); }
-    if (s.nist_high || s.nist_medium) { items.push({ label:"NIST High",  value:s.nist_high,  cls:"sev-compliance",filter:"compliance"}); items.push({ label:"NIST Med",   value:s.nist_medium,cls:"sev-compliance",filter:"compliance"}); }
+    if (s.pci_high   || s.pci_medium)   { items.push({ label:"PCI High",   value:s.pci_high,    cls:"sev-compliance",filter:"compliance"}); items.push({ label:"PCI Med",    value:s.pci_medium,  cls:"sev-compliance",filter:"compliance"}); }
+    if (s.cis_high   || s.cis_medium)   { items.push({ label:"CIS High",   value:s.cis_high,    cls:"sev-compliance",filter:"compliance"}); items.push({ label:"CIS Med",    value:s.cis_medium,  cls:"sev-compliance",filter:"compliance"}); }
+    if (s.nist_high  || s.nist_medium)  { items.push({ label:"NIST High",  value:s.nist_high,   cls:"sev-compliance",filter:"compliance"}); items.push({ label:"NIST Med",   value:s.nist_medium, cls:"sev-compliance",filter:"compliance"}); }
+    if (s.hipaa_high || s.hipaa_medium) { items.push({ label:"HIPAA High", value:s.hipaa_high,  cls:"sev-compliance",filter:"compliance"}); items.push({ label:"HIPAA Med",  value:s.hipaa_medium,cls:"sev-compliance",filter:"compliance"}); }
     let html = items.map(i =>
       `<div class="summary-box ${i.cls}" data-filter="${i.filter}" title="Click to filter">
          <span class="summary-val">${i.value}</span><span class="summary-lbl">${i.label}</span>
@@ -1051,10 +1325,10 @@
 
   function findingClass(f) {
     const msg = typeof f === "object" ? f.message : f;
-    if (msg.includes("[HIGH]")   && !msg.match(/PCI-|CIS-|NIST-/)) return "finding-high";
-    if (msg.includes("[MEDIUM]") && !msg.match(/PCI-|CIS-|NIST-/)) return "finding-medium";
-    if (msg.match(/PCI-HIGH|CIS-HIGH|NIST-HIGH/))                   return "finding-compliance-high";
-    if (msg.match(/PCI-MEDIUM|CIS-MEDIUM|NIST-MEDIUM/))             return "finding-compliance-medium";
+    if (msg.includes("[HIGH]")   && !msg.match(/PCI-|CIS-|NIST-|HIPAA-/)) return "finding-high";
+    if (msg.includes("[MEDIUM]") && !msg.match(/PCI-|CIS-|NIST-|HIPAA-/)) return "finding-medium";
+    if (msg.match(/PCI-HIGH|CIS-HIGH|NIST-HIGH|HIPAA-HIGH/))               return "finding-compliance-high";
+    if (msg.match(/PCI-MEDIUM|CIS-MEDIUM|NIST-MEDIUM|HIPAA-MEDIUM/))       return "finding-compliance-medium";
     return "finding-info";
   }
 
@@ -1086,7 +1360,7 @@
     document.getElementById(textId).textContent = loading ? label : label.replace(/\u2026$/, "").trim();
     document.getElementById(spinnerId).classList.toggle("hidden", !loading);
     if (!loading) {
-      const origLabels = { submitBtn:"Run Audit", diffBtn:"Compare", connectBtn:"Connect & Audit" };
+      const origLabels = { submitBtn:"Run Audit", bulkBtn:"Run Bulk Audit", diffBtn:"Compare", connectBtn:"Connect & Audit" };
       document.getElementById(textId).textContent = origLabels[btnId] || label;
     }
   }
@@ -1094,6 +1368,298 @@
   function escHtml(s) {
     return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
   }
+
+  // ══════════════════════════════════════════════════════ BULK AUDIT ══
+  document.getElementById("bulkConfigs").addEventListener("change", function () {
+    const n = this.files.length;
+    document.getElementById("bulkFileLabel").textContent =
+      n === 0 ? "Choose one or more files\u2026" :
+      n === 1 ? this.files[0].name : n + " files selected";
+  });
+
+  document.getElementById("bulkForm").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    setLoading("bulkBtn", "bulkText", "bulkSpinner", "Running\u2026", true);
+    document.getElementById("bulkResults").classList.add("hidden");
+    try {
+      const res  = await fetch("/bulk_audit", { method: "POST", body: new FormData(this) });
+      const data = await res.json();
+      if (data.error) {
+        document.getElementById("bulkResults").classList.remove("hidden");
+        document.getElementById("bulkResultsList").innerHTML =
+          `<div class="alert alert-error">${escHtml(data.error)}</div>`;
+        return;
+      }
+      renderBulkResults(data);
+    } catch (err) {
+      document.getElementById("bulkResults").classList.remove("hidden");
+      document.getElementById("bulkResultsList").innerHTML =
+        `<div class="alert alert-error">Unexpected error: ${escHtml(err.message)}</div>`;
+    } finally {
+      setLoading("bulkBtn", "bulkText", "bulkSpinner", "Run Bulk Audit", false);
+    }
+  });
+
+  function renderBulkResults(results) {
+    const el = document.getElementById("bulkResultsList");
+    if (!results.length) { el.innerHTML = `<p class="text-muted">No files processed.</p>`; return; }
+    el.innerHTML = results.map(r => {
+      const vendor = VENDOR_LABELS[r.vendor] || r.vendor || "Unknown";
+      const s = r.summary || {};
+      if (r.status === "error") {
+        return `<div class="bulk-result-row bulk-result-error">
+          <div class="bulk-result-header">
+            <span class="bulk-filename">${escHtml(r.filename)}</span>
+            <span class="bulk-status-badge badge-fail">&#10007; Error</span>
+          </div>
+          <div class="alert alert-error" style="margin:0.5rem 0 0">${escHtml(r.error || "Unknown error")}</div>
+        </div>`;
+      }
+      const scoreVal = s.score !== undefined ? s.score : "—";
+      const scoreCls = s.score >= 80 ? "score-good" : s.score >= 50 ? "score-warn" : "score-bad";
+      return `<div class="bulk-result-row">
+        <div class="bulk-result-header">
+          <span class="bulk-filename">${escHtml(r.filename)}</span>
+          <span class="bulk-vendor-tag">${escHtml(vendor)}</span>
+          <span class="bulk-score ${scoreCls}">${scoreVal}/100</span>
+          <span class="bulk-status-badge badge-ok">&#10003; OK</span>
+        </div>
+        <div class="bulk-summary-row">
+          <span class="history-badge sev-high" title="High">${s.high||0} H</span>
+          <span class="history-badge sev-medium" title="Medium">${s.medium||0} M</span>
+          <span class="history-badge sev-total" title="Total">${s.total||0} Total</span>
+          ${r.archive_id ? `<span class="bulk-archived">&#10003; Saved to History</span>` : ""}
+        </div>
+        <details class="bulk-findings-toggle">
+          <summary>${(r.enriched_findings||r.findings||[]).length} finding(s) &mdash; click to expand</summary>
+          <div class="bulk-findings-list">${(r.enriched_findings||[]).length
+            ? (r.enriched_findings).map(f => buildFindingHTML(f)).join("")
+            : (r.findings||[]).map(f => `<div class="finding finding-info">${escHtml(f)}</div>`).join("")
+            || `<div class="finding finding-pass">[PASS] No issues found</div>`}
+          </div>
+        </details>
+      </div>`;
+    }).join("");
+    document.getElementById("bulkResults").classList.remove("hidden");
+  }
+
+  // ══════════════════════════════════════════════════════ SCHEDULES ══
+  let schedulesData = [];
+
+  async function loadSchedules() {
+    document.getElementById("schedulesList").innerHTML = `<p class="text-muted">Loading\u2026</p>`;
+    try {
+      const res = await fetch("/schedules");
+      schedulesData = await res.json();
+      renderSchedules(schedulesData);
+    } catch (err) {
+      document.getElementById("schedulesList").innerHTML =
+        `<div class="alert alert-error">Failed to load schedules: ${escHtml(err.message)}</div>`;
+    }
+  }
+
+  const FREQ_LABELS = { hourly: "Hourly", daily: "Daily", weekly: "Weekly" };
+  const DOW_LABELS  = { mon:"Mon", tue:"Tue", wed:"Wed", thu:"Thu", fri:"Fri", sat:"Sat", sun:"Sun" };
+  const COMP_LABELS = { cis:"CIS", pci:"PCI-DSS", nist:"NIST", hipaa:"HIPAA", "":"—" };
+
+  function renderSchedules(list) {
+    const el = document.getElementById("schedulesList");
+    if (!list.length) {
+      el.innerHTML = `<p class="text-muted">No scheduled audits yet. Fill in the form below to create one.</p>`;
+      return;
+    }
+    el.innerHTML = list.map(s => {
+      const freq    = FREQ_LABELS[s.frequency] || s.frequency;
+      const vendor  = VENDOR_LABELS[s.vendor]  || s.vendor;
+      const comp    = COMP_LABELS[s.compliance||""] || s.compliance || "—";
+      const lastRun = s.last_run ? new Date(s.last_run).toLocaleString() : "Never";
+      const lastSt  = s.last_status === "ok"    ? `<span class="activity-ok">&#10003; OK</span>` :
+                      s.last_status === "error"  ? `<span class="activity-fail">&#10007; Error</span>` : "—";
+      const timing  = s.frequency === "weekly"
+        ? `${DOW_LABELS[s.day_of_week]||s.day_of_week} ${String(s.hour).padStart(2,"0")}:${String(s.minute).padStart(2,"0")} UTC`
+        : s.frequency === "hourly"
+        ? `Every hour at :${String(s.minute).padStart(2,"0")}`
+        : `${String(s.hour).padStart(2,"0")}:${String(s.minute).padStart(2,"0")} UTC`;
+      return `<div class="schedule-entry ${s.enabled ? "" : "schedule-disabled"}">
+        <div class="schedule-entry-left">
+          <div class="schedule-entry-info">
+            <span class="schedule-name">${escHtml(s.name)}</span>
+            <span class="history-meta">${escHtml(vendor)} &bull; ${escHtml(s.host)} &bull; ${freq} @ ${timing} &bull; Compliance: ${escHtml(comp)}</span>
+            <span class="history-meta">Last run: ${escHtml(lastRun)} ${lastSt}${s.last_error ? ` &mdash; <span class="activity-error">${escHtml(s.last_error)}</span>` : ""}</span>
+          </div>
+        </div>
+        <div class="schedule-entry-right">
+          <span class="schedule-status-pill ${s.enabled ? "pill-enabled" : "pill-disabled"}">${s.enabled ? "Enabled" : "Disabled"}</span>
+          <button class="btn-secondary btn-sm" data-sched-run="${escHtml(s.id)}" title="Run now">&#9654; Run Now</button>
+          <button class="btn-secondary btn-sm" data-sched-edit="${escHtml(s.id)}" title="Edit">&#9998; Edit</button>
+          <button class="btn-danger btn-sm"    data-sched-del="${escHtml(s.id)}"  title="Delete">&#128465;</button>
+        </div>
+      </div>`;
+    }).join("");
+
+    // Listeners are delegated to the parent — no per-render attachment needed.
+  }
+
+  function populateScheduleForm(s) {
+    document.getElementById("scheduleFormTitle").textContent = "Edit Schedule";
+    document.getElementById("scheduleId").value        = s.id;
+    document.getElementById("schedName").value         = s.name || "";
+    document.getElementById("schedVendor").value       = s.vendor || "asa";
+    document.getElementById("schedHost").value         = s.host || "";
+    document.getElementById("schedPort").value         = s.port || 22;
+    document.getElementById("schedUser").value         = s.username || "";
+    document.getElementById("schedPass").value         = "";  // never pre-fill password
+    document.getElementById("schedTag").value          = s.tag || "";
+    document.getElementById("schedCompliance").value   = s.compliance || "";
+    document.getElementById("schedFrequency").value    = s.frequency || "daily";
+    document.getElementById("schedHour").value         = s.hour !== undefined ? s.hour : 2;
+    document.getElementById("schedMinute").value       = s.minute !== undefined ? s.minute : 0;
+    document.getElementById("schedDow").value          = s.day_of_week || "mon";
+    document.getElementById("schedEnabled").checked    = !!s.enabled;
+    toggleScheduleFreqFields(s.frequency || "daily");
+    document.getElementById("scheduleFormCard").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function toggleScheduleFreqFields(freq) {
+    document.getElementById("schedHourGroup").style.display = freq === "hourly" ? "none" : "";
+    document.getElementById("schedDowGroup").style.display  = freq === "weekly" ? ""     : "none";
+  }
+
+  document.getElementById("schedFrequency").addEventListener("change", function () {
+    toggleScheduleFreqFields(this.value);
+  });
+
+  document.getElementById("schedCancelBtn").addEventListener("click", function () {
+    document.getElementById("scheduleForm").reset();
+    document.getElementById("scheduleId").value = "";
+    document.getElementById("scheduleFormTitle").textContent = "New Schedule";
+    document.getElementById("schedSavedMsg").classList.add("hidden");
+    document.getElementById("schedErrorMsg").classList.add("hidden");
+    toggleScheduleFreqFields("daily");
+  });
+
+  document.getElementById("scheduleForm").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    const schedId = document.getElementById("scheduleId").value.trim();
+    const payload = {
+      name:        document.getElementById("schedName").value.trim(),
+      vendor:      document.getElementById("schedVendor").value,
+      host:        document.getElementById("schedHost").value.trim(),
+      port:        parseInt(document.getElementById("schedPort").value) || 22,
+      username:    document.getElementById("schedUser").value.trim(),
+      tag:         document.getElementById("schedTag").value.trim(),
+      compliance:  document.getElementById("schedCompliance").value,
+      frequency:   document.getElementById("schedFrequency").value,
+      hour:        parseInt(document.getElementById("schedHour").value) || 0,
+      minute:      parseInt(document.getElementById("schedMinute").value) || 0,
+      day_of_week: document.getElementById("schedDow").value,
+      enabled:     document.getElementById("schedEnabled").checked,
+    };
+    const pass = document.getElementById("schedPass").value;
+    if (pass) payload.password = pass;
+
+    try {
+      const url    = schedId ? "/schedules/" + schedId : "/schedules";
+      const method = schedId ? "PUT" : "POST";
+      const res    = await fetch(url, {
+        method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (data.error) {
+        const errEl = document.getElementById("schedErrorMsg");
+        errEl.textContent = data.error;
+        errEl.classList.remove("hidden");
+        return;
+      }
+      document.getElementById("schedErrorMsg").classList.add("hidden");
+      const msg = document.getElementById("schedSavedMsg");
+      msg.classList.remove("hidden");
+      setTimeout(() => msg.classList.add("hidden"), 2500);
+      // Reset form for new entry, keep editing state for updates
+      if (!schedId) {
+        this.reset();
+        document.getElementById("scheduleId").value = "";
+        toggleScheduleFreqFields("daily");
+      }
+      await loadSchedules();
+    } catch (err) {
+      alert("Failed to save schedule: " + err.message);
+    }
+  });
+
+  document.getElementById("refreshSchedulesBtn").addEventListener("click", loadSchedules);
+
+  // Delegated event handler for schedule list — set up once, works across re-renders.
+  document.getElementById("schedulesList").addEventListener("click", async function (e) {
+    const runBtn  = e.target.closest("[data-sched-run]");
+    const editBtn = e.target.closest("[data-sched-edit]");
+    const delBtn  = e.target.closest("[data-sched-del]");
+
+    if (runBtn) {
+      runBtn.disabled = true;
+      await fetch("/schedules/" + runBtn.dataset.schedRun + "/run", { method: "POST" });
+      runBtn.disabled = false;
+      alert("Audit queued — check Audit History in a moment.");
+    } else if (editBtn) {
+      const sched = schedulesData.find(s => s.id === editBtn.dataset.schedEdit);
+      if (sched) populateScheduleForm(sched);
+    } else if (delBtn) {
+      if (!confirm("Delete this schedule?")) return;
+      await fetch("/schedules/" + delBtn.dataset.schedDel, { method: "DELETE" });
+      await loadSchedules();
+    }
+  });
+
+  // ═════════════════════════════════════════════════════════ SETTINGS ══
+  let appSettings = { auto_pdf: false, auto_archive: false, default_compliance: "" };
+
+  async function loadSettings() {
+    try {
+      const res = await fetch("/settings");
+      appSettings = await res.json();
+      applySettingsToUI();
+      applySettingsToForm();
+    } catch (_) {}
+  }
+
+  function applySettingsToUI() {
+    document.getElementById("setting-auto-pdf").checked         = !!appSettings.auto_pdf;
+    document.getElementById("setting-auto-archive").checked     = !!appSettings.auto_archive;
+    document.getElementById("setting-default-compliance").value = appSettings.default_compliance || "";
+  }
+
+  function applySettingsToForm() {
+    document.getElementById("report").checked  = !!appSettings.auto_pdf;
+    document.getElementById("archive").checked = !!appSettings.auto_archive;
+    const comp = appSettings.default_compliance || "";
+    if (comp) {
+      document.getElementById("compliance").value     = comp;
+      document.getElementById("connCompliance").value = comp;
+    }
+  }
+
+  document.getElementById("saveSettingsBtn").addEventListener("click", async function () {
+    const data = {
+      auto_pdf:            document.getElementById("setting-auto-pdf").checked,
+      auto_archive:        document.getElementById("setting-auto-archive").checked,
+      default_compliance:  document.getElementById("setting-default-compliance").value,
+    };
+    try {
+      const res = await fetch("/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      appSettings = await res.json();
+      applySettingsToForm();
+      const msg = document.getElementById("settingsSavedMsg");
+      msg.classList.remove("hidden");
+      setTimeout(() => msg.classList.add("hidden"), 2500);
+    } catch (_) {}
+  });
+
+  // Load settings on startup and apply defaults to the audit form
+  loadSettings();
   </script>
 </body>
 </html>

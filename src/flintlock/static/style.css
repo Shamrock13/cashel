@@ -1074,3 +1074,249 @@ select:focus, input[type="text"]:focus {
   [data-theme="auto"] .cat-redundancy { background: rgba(255,255,255,0.05); color: #9999BB; border-color: rgba(255,255,255,0.15); }
   [data-theme="auto"] .cat-compliance { background: rgba(68,136,255,0.12);  color: #88AAFF; border-color: rgba(68,136,255,0.3); }
 }
+
+/* ===== Settings Tab ===== */
+.settings-group {
+  margin-bottom: 1.75rem;
+}
+.settings-group-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--border);
+}
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border);
+  cursor: default;
+}
+.settings-row:last-child { border-bottom: none; }
+.settings-row-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.settings-row-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text);
+}
+.settings-row-desc {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+.settings-select {
+  font-size: 0.85rem;
+  padding: 0.35rem 0.65rem;
+  background: var(--input-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  min-width: 160px;
+}
+.settings-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+.settings-saved-msg {
+  font-size: 0.85rem;
+  color: var(--pass);
+  font-weight: 500;
+}
+
+/* Toggle switch */
+.toggle-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.toggle-switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+.toggle-track {
+  display: inline-flex;
+  align-items: center;
+  width: 42px;
+  height: 24px;
+  background: var(--border);
+  border-radius: 12px;
+  transition: background 0.2s;
+  position: relative;
+}
+.toggle-switch input:checked + .toggle-track { background: var(--btn-primary-bg); }
+.toggle-thumb {
+  position: absolute;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.2s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.toggle-switch input:checked + .toggle-track .toggle-thumb { transform: translateX(18px); }
+
+/* ── PDF row ── */
+.pdf-row { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; margin-top: 1rem; }
+
+/* ── Bulk Audit ── */
+.bulk-result-row {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.9rem 1rem;
+  margin-bottom: 0.75rem;
+  background: var(--card-bg);
+}
+.bulk-result-row.bulk-result-error { border-color: var(--high); }
+.bulk-result-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.4rem;
+}
+.bulk-filename  { font-weight: 600; color: var(--text); word-break: break-all; }
+.bulk-vendor-tag {
+  font-size: 0.75rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 9999px;
+  background: var(--info-bg, #e8f0fe);
+  color: var(--info, #1a56db);
+  white-space: nowrap;
+}
+.bulk-score { font-size: 0.8rem; font-weight: 600; white-space: nowrap; }
+.score-good { color: var(--pass); }
+.score-warn { color: var(--medium); }
+.score-bad  { color: var(--high); }
+.bulk-status-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+  border-radius: 9999px;
+  margin-left: auto;
+  white-space: nowrap;
+}
+.badge-ok   { background: var(--pass-bg, #dcfce7); color: var(--pass, #16a34a); }
+.badge-fail { background: var(--high-bg, #fee2e2); color: var(--high, #dc2626); }
+.bulk-summary-row {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+}
+.bulk-archived {
+  font-size: 0.78rem;
+  color: var(--pass);
+  font-weight: 500;
+  margin-left: 0.25rem;
+}
+.bulk-findings-toggle {
+  font-size: 0.83rem;
+  color: var(--text-muted);
+}
+.bulk-findings-toggle summary {
+  cursor: pointer;
+  user-select: none;
+  padding: 0.2rem 0;
+}
+.bulk-findings-list { margin-top: 0.5rem; }
+
+/* ── Schedules ── */
+.schedules-list { display: flex; flex-direction: column; gap: 0.6rem; }
+.schedule-entry {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.8rem 1rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  background: var(--card-bg);
+  flex-wrap: wrap;
+}
+.schedule-entry.schedule-disabled { opacity: 0.55; }
+.schedule-entry-left  { flex: 1; min-width: 0; }
+.schedule-entry-right {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.schedule-entry-info  { display: flex; flex-direction: column; gap: 0.2rem; }
+.schedule-name        { font-weight: 600; color: var(--text); }
+.schedule-status-pill {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.15rem 0.55rem;
+  border-radius: 9999px;
+  white-space: nowrap;
+}
+.pill-enabled  { background: var(--pass-bg, #dcfce7);   color: var(--pass, #16a34a); }
+.pill-disabled { background: var(--border);              color: var(--text-muted); }
+.alert-inline {
+  font-size: 0.83rem;
+  color: var(--high);
+  background: var(--high-bg, #fee2e2);
+  border-radius: 6px;
+  padding: 0.3rem 0.6rem;
+}
+
+/* ===== Audit mode toggle (Single File / Bulk) ===== */
+.audit-mode-bar {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+.mode-btn {
+  padding: 0.4rem 1.1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1.5px solid var(--border);
+  background: var(--card-bg);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.mode-btn:hover { border-color: var(--btn-primary-bg); color: var(--text); }
+.mode-btn.mode-active {
+  background: var(--btn-primary-bg);
+  border-color: var(--btn-primary-bg);
+  color: #fff;
+}
+
+/* ===== History sub-tabs (Audit History / Activity Log) ===== */
+.sub-tab-nav {
+  display: flex;
+  gap: 0;
+  margin-bottom: 1.25rem;
+  border-bottom: 2px solid var(--border);
+}
+.sub-tab-btn {
+  padding: 0.5rem 1.2rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.sub-tab-btn:hover { color: var(--text); }
+.sub-tab-btn.sub-tab-active {
+  color: var(--btn-primary-bg);
+  border-bottom-color: var(--btn-primary-bg);
+}

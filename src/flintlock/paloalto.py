@@ -146,9 +146,10 @@ def check_missing_description_pa(rules):
 
 
 def audit_paloalto(filepath):
+    """Return (findings, rules). rules is the parsed rule list for reuse in compliance checks."""
     rules, error = parse_paloalto(filepath)
     if error:
-        return [_f("HIGH", "hygiene", f"[ERROR] {error}", "")]
+        return [_f("HIGH", "hygiene", f"[ERROR] {error}", "")], []
 
     findings = []
     findings += check_any_any_pa(rules)
@@ -158,4 +159,4 @@ def audit_paloalto(filepath):
     findings += check_any_application_pa(rules)
     findings += check_no_security_profile_pa(rules)
     findings += check_missing_description_pa(rules)
-    return findings
+    return findings, rules

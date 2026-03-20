@@ -213,11 +213,18 @@ def diff_azure(path_a, path_b):
     return {"added": added, "removed": removed, "unchanged": unchanged}
 
 
+# ── Cisco FTD ─────────────────────────────────────────────────────────────────
+# FTD LINA CLI uses the same access-list syntax as ASA, so we reuse diff_asa.
+
+def diff_ftd(path_a, path_b):
+    return diff_asa(path_a, path_b)
+
+
 # ── Main entrypoint ───────────────────────────────────────────────────────────
 
 def diff_configs(vendor, path_a, path_b):
     """Compare two configs of the same vendor. Returns {added, removed, unchanged}."""
-    if vendor == "asa":
+    if vendor in ("asa", "ftd"):
         return diff_asa(path_a, path_b)
     if vendor == "fortinet":
         return diff_fortinet(path_a, path_b)
