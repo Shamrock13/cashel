@@ -135,7 +135,7 @@ def audit(
         typer.echo("---------------------")
     
     elif vendor == "paloalto":
-        findings = audit_paloalto(file)
+        findings, _ = audit_paloalto(file)
 
         if findings:
             for f in findings:
@@ -314,6 +314,10 @@ def audit(
             typer.echo(f"NIST Compliance Medium:{len(nist_medium)}")
         typer.echo(f"Total Issues:          {len(findings)}")
         typer.echo("---------------------")
+
+    else:
+        typer.echo(f"[ERROR] Unknown vendor '{vendor}'. Supported: asa, paloalto, fortinet, pfsense")
+        raise typer.Exit(code=1)
 
 if __name__ == "__main__":
     app()
