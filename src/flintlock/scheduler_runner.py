@@ -25,7 +25,7 @@ def _run_scheduled_audit(schedule_id: str):
         run_vendor_audit, run_compliance_checks,
         _sort_findings, _build_summary, _findings_to_strings, _wrap_compliance,
     )
-    from .notify import send_slack, send_email
+    from .notify import send_slack, send_teams, send_email
     from .settings import get_settings
 
     schedule = get_schedule(schedule_id, include_password=True)
@@ -66,6 +66,8 @@ def _run_scheduled_audit(schedule_id: str):
         if schedule.get("notify_on_error"):
             send_slack(schedule.get("notify_slack_webhook", ""), schedule, {}, [],
                        error=str(e), extra_webhook_domains=_extra_domains)
+            send_teams(schedule.get("notify_teams_webhook", ""), schedule, {}, [],
+                       error=str(e), extra_webhook_domains=_extra_domains)
             send_email(schedule.get("notify_email", ""), schedule, {}, [], settings, error=str(e))
         return
 
@@ -93,6 +95,8 @@ def _run_scheduled_audit(schedule_id: str):
         if schedule.get("notify_on_finding") and summary.get("high", 0) > 0:
             send_slack(schedule.get("notify_slack_webhook", ""), schedule, summary, findings,
                        extra_webhook_domains=_extra_domains)
+            send_teams(schedule.get("notify_teams_webhook", ""), schedule, summary, findings,
+                       extra_webhook_domains=_extra_domains)
             send_email(schedule.get("notify_email", ""), schedule, summary, findings, settings)
 
     except Exception as e:
@@ -101,6 +105,8 @@ def _run_scheduled_audit(schedule_id: str):
                      error=str(e), details={"host": host, "scheduled": True})
         if schedule.get("notify_on_error"):
             send_slack(schedule.get("notify_slack_webhook", ""), schedule, {}, [],
+                       error=str(e), extra_webhook_domains=_extra_domains)
+            send_teams(schedule.get("notify_teams_webhook", ""), schedule, {}, [],
                        error=str(e), extra_webhook_domains=_extra_domains)
             send_email(schedule.get("notify_email", ""), schedule, {}, [], settings, error=str(e))
     finally:

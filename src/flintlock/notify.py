@@ -293,3 +293,102 @@ def send_email(
         logger.warning("Email alert connection error for schedule %s: %s", schedule.get("id"), exc)
     except Exception as exc:  # noqa: BLE001
         logger.warning("Email alert unexpected error for schedule %s: %s", schedule.get("id"), exc)
+
+
+# ── Microsoft Teams ───────────────────────────────────────────────────────────
+
+def send_teams(
+    webhook_url: str,
+    schedule: dict,
+    summary: dict,
+    findings: list,
+    error: str | None = None,
+    extra_webhook_domains: list[str] | None = None,
+) -> None:
+    """POST an audit alert to a Microsoft Teams incoming webhook.
+
+    Uses the legacy Office 365 Connector MessageCard format which is broadly
+    supported by all Teams tenants.  The webhook URL must resolve to
+    ``webhook.office.com`` (already in the built-in allowlist).
+
+    Fails silently — a misconfigured webhook will never crash the scheduler.
+    """
+    if not webhook_url:
+        return
+
+    valid, reason = validate_webhook_url(webhook_url, extra_webhook_domains)
+    if not valid:
+        logger.warning(
+            "Teams alert blocked for schedule %s — invalid webhook URL: %s",
+            schedule.get("id"), reason,
+        )
+        return
+
+    vendor = (schedule.get("vendor") or "device").upper()
+    host   = schedule.get("host") or "unknown"
+    tag    = schedule.get("tag") or ""
+    label  = f"{vendor}@{host}" + (f" [{tag}]" if tag else "")
+    now    = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
+    if error:
+        theme_color = "CC2200"
+        title       = f"\u274c Flintlock Audit Error — {label}"
+        facts       = [{"name": "Error", "value": error}]
+        text        = ""
+    else:
+        high  = summary.get("high",   0)
+        med   = summary.get("medium", 0)
+        low   = summary.get("low",    0)
+        total = summary.get("total",  0)
+        theme_color = "CC2200" if high else "1A8055"
+        title = (
+            f"\U0001f525 {high} HIGH finding(s) — {label}"
+            if high
+            else f"\u2705 Audit complete — {label}"
+        )
+        facts = [
+            {"name": "Completed", "value": now},
+            {"name": "Total",     "value": str(total)},
+            {"name": "HIGH",      "value": str(high)},
+            {"name": "MEDIUM",    "value": str(med)},
+            {"name": "LOW",       "value": str(low)},
+        ]
+        highs = _top_high_findings(findings)
+        text  = ""
+        if highs:
+            bullet_list = "\n\n".join(f"- {h}" for h in highs)
+            extra = summary.get("high", 0) - len(highs)
+            if extra > 0:
+                bullet_list += f"\n\n_\u2026and {extra} more HIGH finding(s)_"
+            text = f"**Top HIGH findings:**\n\n{bullet_list}"
+
+    card = {
+        "@type":      "MessageCard",
+        "@context":   "http://schema.org/extensions",
+        "themeColor": theme_color,
+        "summary":    title,
+        "sections": [
+            {
+                "activityTitle":    "**Flintlock Firewall Auditor**",
+                "activitySubtitle": title,
+                "facts":            facts,
+                **({"text": text} if text else {}),
+            }
+        ],
+    }
+
+    payload = json.dumps(card).encode("utf-8")
+    req = urllib.request.Request(
+        webhook_url,
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10):
+            pass
+        logger.info("Teams alert sent for schedule %s", schedule.get("id"))
+    except urllib.error.URLError as exc:
+        logger.warning("Teams alert failed for schedule %s: %s", schedule.get("id"), exc)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Teams alert unexpected error for schedule %s: %s", schedule.get("id"), exc)

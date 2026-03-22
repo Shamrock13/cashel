@@ -19,7 +19,10 @@
   <header class="header">
     <div class="header-inner">
       <div class="logo">
-        <span class="logo-icon">&#128293;</span>
+        <svg class="logo-icon" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M14 2L3 6.5v8C3 20.5 7.8 25.6 14 27c6.2-1.4 11-6.5 11-12.5v-8L14 2z" stroke="#7EAEFF" stroke-width="1.6" fill="rgba(126,174,255,0.12)"/>
+          <polyline points="9,14 12.5,17.5 19,11" stroke="#7EAEFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
         <span class="logo-text">Flintlock</span>
         <span class="logo-sub">Firewall Security Auditor</span>
       </div>
@@ -70,12 +73,30 @@
 
     <!-- Tab nav -->
     <nav class="tab-nav" role="tablist">
-      <button class="tab-btn tab-active" data-tab="audit"     role="tab">&#128196; Audit</button>
-      <button class="tab-btn"            data-tab="diff"      role="tab">&#8646; Compare</button>
-      <button class="tab-btn"            data-tab="connect"   role="tab">&#128246; Live Connect</button>
-      <button class="tab-btn"            data-tab="schedules" role="tab">&#128336; Schedules</button>
-      <button class="tab-btn"            data-tab="history"   role="tab">&#128337; History</button>
-      <button class="tab-btn"            data-tab="settings"  role="tab">&#9881; Settings</button>
+      <button class="tab-btn tab-active" data-tab="audit" role="tab">
+        <svg class="tab-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 2h8.5L16 4.5V17H5V2z"/><path d="M13 2v3h3"/><circle cx="10" cy="11.5" r="2.5"/><path d="M14 15.5l-1.8-1.8"/></svg>
+        Audit
+      </button>
+      <button class="tab-btn" data-tab="diff" role="tab">
+        <svg class="tab-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="7" height="14" rx="1"/><rect x="11" y="3" width="7" height="14" rx="1"/><path d="M5.5 7h2M5.5 10h2M5.5 13h2M12.5 7h2M12.5 10h2M12.5 13h2"/></svg>
+        Compare
+      </button>
+      <button class="tab-btn" data-tab="connect" role="tab">
+        <svg class="tab-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="16" height="14" rx="2"/><path d="M2 7h16"/><path d="M6 11l3 2.5L6 16"/><path d="M12 15h3"/></svg>
+        Live Connect
+      </button>
+      <button class="tab-btn" data-tab="schedules" role="tab">
+        <svg class="tab-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3.5" width="16" height="14" rx="2"/><path d="M2 8h16M7 2v3M13 2v3"/><circle cx="13.5" cy="13.5" r="3"/><path d="M13.5 12v1.5l1 1"/></svg>
+        Schedules
+      </button>
+      <button class="tab-btn" data-tab="history" role="tab">
+        <svg class="tab-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10a6 6 0 1 0 1.5-4"/><path d="M2 8.5l1.5 2 2-1.5"/><path d="M10 7v4l2 1.5"/></svg>
+        History
+      </button>
+      <button class="tab-btn" data-tab="settings" role="tab">
+        <svg class="tab-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><line x1="3" y1="5" x2="17" y2="5"/><line x1="3" y1="10" x2="17" y2="10"/><line x1="3" y1="15" x2="17" y2="15"/><circle cx="7" cy="5" r="2"/><circle cx="13" cy="10" r="2"/><circle cx="8" cy="15" r="2"/></svg>
+        Settings
+      </button>
     </nav>
 
     <!-- ══════════════════════════════════════════════ AUDIT ══ -->
@@ -593,6 +614,10 @@
               <input type="url" id="schedSlackWebhook" placeholder="https://hooks.slack.com/services/…" autocomplete="off" maxlength="512" />
             </div>
             <div class="form-group" style="grid-column:1/-1">
+              <label for="schedTeamsWebhook">Microsoft Teams Webhook URL <span class="optional">(optional)</span></label>
+              <input type="url" id="schedTeamsWebhook" placeholder="https://[tenant].webhook.office.com/webhookb2/…" autocomplete="off" maxlength="512" />
+            </div>
+            <div class="form-group" style="grid-column:1/-1">
               <label for="schedNotifyEmail">Alert Email <span class="optional">(optional)</span></label>
               <input type="email" id="schedNotifyEmail" placeholder="ops@example.com" autocomplete="off" maxlength="254" />
             </div>
@@ -609,134 +634,244 @@
 
     <!-- ════════════════════════════════════════════════ SETTINGS ══════ -->
     <section class="tab-panel hidden" id="tab-settings">
-      <div class="card">
-        <h2 class="card-title">Settings</h2>
-        <p class="card-desc">Global defaults applied to every audit. Individual audit options always override these defaults.</p>
+      <div class="settings-shell">
 
-        <div class="settings-group">
-          <h3 class="settings-group-title">File Audit Defaults</h3>
-          <label class="settings-row">
-            <div class="settings-row-info">
-              <span class="settings-row-label">Always generate PDF report</span>
-              <span class="settings-row-desc">Pre-check &ldquo;Generate PDF Report&rdquo; on every file audit.</span>
-            </div>
-            <label class="toggle-switch">
-              <input type="checkbox" id="setting-auto-pdf" />
-              <span class="toggle-track"><span class="toggle-thumb"></span></span>
-            </label>
-          </label>
-          <label class="settings-row">
-            <div class="settings-row-info">
-              <span class="settings-row-label">Always save to Audit History</span>
-              <span class="settings-row-desc">Pre-check &ldquo;Save to Audit History&rdquo; on every file audit.</span>
-            </div>
-            <label class="toggle-switch">
-              <input type="checkbox" id="setting-auto-archive" />
-              <span class="toggle-track"><span class="toggle-thumb"></span></span>
-            </label>
-          </label>
-        </div>
+        <!-- ── Left sidebar ─────────────────────────────────────────────── -->
+        <nav class="settings-sidebar" role="navigation" aria-label="Settings sections">
+          <div class="settings-nav-group-label">Configuration</div>
 
-        <div class="settings-group">
-          <h3 class="settings-group-title">Compliance Default</h3>
-          <label class="settings-row">
-            <div class="settings-row-info">
-              <span class="settings-row-label">Default compliance framework</span>
-              <span class="settings-row-desc">Pre-select a framework on the File Audit and Live Connect forms.</span>
-            </div>
-            <select id="setting-default-compliance" class="settings-select">
-              <option value="">None</option>
-              <option value="cis">CIS Benchmark</option>
-              <option value="stig">DISA STIG</option>
-              <option value="hipaa">HIPAA Security Rule</option>
-              <option value="nist">NIST SP 800-41</option>
-              <option value="pci">PCI-DSS</option>
-              <option value="soc2">SOC2</option>
-            </select>
-          </label>
-        </div>
+          <button class="settings-nav-item settings-nav-active" data-pane="general">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><line x1="2" y1="5" x2="14" y2="5"/><line x1="2" y1="9" x2="14" y2="9"/><line x1="2" y1="13" x2="14" y2="13"/><circle cx="6" cy="5" r="1.75"/><circle cx="10" cy="9" r="1.75"/><circle cx="6" cy="13" r="1.75"/></svg>
+            General
+          </button>
 
-        <div class="settings-group">
-          <h3 class="settings-group-title">Email (SMTP) Settings</h3>
-          <p class="card-desc" style="margin-bottom:0.75rem">Used to send alert emails from scheduled audits. Leave blank to disable email alerts.</p>
-          <div class="form-grid" style="margin-top:0">
-            <div class="form-group">
-              <label for="setting-smtp-host">SMTP Host</label>
-              <input type="text" id="setting-smtp-host" placeholder="smtp.gmail.com" autocomplete="off" />
+          <button class="settings-nav-item" data-pane="email">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="3.5" width="14" height="9" rx="1.5"/><path d="M1 5l7 4.5L15 5"/></svg>
+            Email (SMTP)
+          </button>
+
+          <button class="settings-nav-item" data-pane="security">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 1.5L2 4v4.5c0 3.5 2.5 6.7 6 7.5 3.5-.8 6-4 6-7.5V4L8 1.5z"/><path d="M5.5 8l2 2 3-3"/></svg>
+            Security
+          </button>
+
+          <button class="settings-nav-item" data-pane="syslog">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="1.5" width="14" height="5" rx="1.5"/><rect x="1" y="9.5" width="14" height="5" rx="1.5"/><circle cx="4" cy="4" r="0.8" fill="currentColor" stroke="none"/><circle cx="4" cy="12" r="0.8" fill="currentColor" stroke="none"/><line x1="7" y1="4" x2="12" y2="4"/><line x1="7" y1="12" x2="12" y2="12"/></svg>
+            Syslog
+          </button>
+        </nav>
+
+        <!-- ── Right content ─────────────────────────────────────────────── -->
+        <div class="settings-content">
+
+          <!-- General pane -->
+          <div class="settings-pane active" id="spane-general">
+            <div class="settings-pane-header">
+              <h2 class="settings-pane-title">General</h2>
+              <p class="settings-pane-desc">Global defaults applied to every audit. Individual audit options always override these defaults.</p>
             </div>
-            <div class="form-group">
-              <label for="setting-smtp-port">SMTP Port</label>
-              <input type="number" id="setting-smtp-port" value="587" min="1" max="65535" />
+
+            <div class="settings-group">
+              <h3 class="settings-group-title">File Audit Defaults</h3>
+              <label class="settings-row">
+                <div class="settings-row-info">
+                  <span class="settings-row-label">Always generate PDF report</span>
+                  <span class="settings-row-desc">Pre-check &ldquo;Generate PDF Report&rdquo; on every file audit.</span>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="setting-auto-pdf" />
+                  <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                </label>
+              </label>
+              <label class="settings-row">
+                <div class="settings-row-info">
+                  <span class="settings-row-label">Always save to Audit History</span>
+                  <span class="settings-row-desc">Pre-check &ldquo;Save to Audit History&rdquo; on every file audit.</span>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="setting-auto-archive" />
+                  <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                </label>
+              </label>
             </div>
-            <div class="form-group">
-              <label for="setting-smtp-user">SMTP Username</label>
-              <input type="text" id="setting-smtp-user" placeholder="alerts@example.com" autocomplete="off" />
-            </div>
-            <div class="form-group">
-              <label for="setting-smtp-password">SMTP Password</label>
-              <input type="password" id="setting-smtp-password" placeholder="leave blank to keep existing" autocomplete="new-password" />
-            </div>
-            <div class="form-group">
-              <label for="setting-smtp-from">From Address</label>
-              <input type="email" id="setting-smtp-from" placeholder="flintlock@example.com" autocomplete="off" />
-            </div>
-            <div class="form-group form-group-check" style="align-self:flex-end">
-              <label class="checkbox-label">
-                <input type="checkbox" id="setting-smtp-tls" checked />
-                <span>Use STARTTLS</span>
+
+            <div class="settings-group">
+              <h3 class="settings-group-title">Compliance Default</h3>
+              <label class="settings-row">
+                <div class="settings-row-info">
+                  <span class="settings-row-label">Default compliance framework</span>
+                  <span class="settings-row-desc">Pre-select a framework on the File Audit and Live Connect forms.</span>
+                </div>
+                <select id="setting-default-compliance" class="settings-select">
+                  <option value="">None</option>
+                  <option value="cis">CIS Benchmark</option>
+                  <option value="stig">DISA STIG</option>
+                  <option value="hipaa">HIPAA Security Rule</option>
+                  <option value="nist">NIST SP 800-41</option>
+                  <option value="pci">PCI-DSS</option>
+                  <option value="soc2">SOC2</option>
+                </select>
               </label>
             </div>
           </div>
-        </div>
 
-        <!-- ── Security Settings ─────────────────────────────────────────── -->
-        <div class="settings-group" style="margin-top:1.5rem">
-          <h3 class="settings-group-title">&#128274; Security</h3>
-          <div class="form-grid" style="margin-top:0">
-            <div class="form-group">
-              <label for="setting-ssh-host-key-policy">SSH Host Key Policy</label>
-              <select id="setting-ssh-host-key-policy">
-                <option value="warn">Warn (log unknown keys, continue)</option>
-                <option value="strict">Strict (reject unknown keys)</option>
-                <option value="auto_add">Auto-add (insecure — lab use only)</option>
-              </select>
-              <small style="color:var(--text-muted);margin-top:0.3rem;display:block">
-                Controls how Flintlock handles unrecognised SSH host keys during Live Connect audits.
-                <strong>Strict</strong> is most secure but requires hosts to be in known_hosts first.
-              </small>
+          <!-- Email pane -->
+          <div class="settings-pane" id="spane-email">
+            <div class="settings-pane-header">
+              <h2 class="settings-pane-title">Email (SMTP)</h2>
+              <p class="settings-pane-desc">Configure outbound email for scheduled audit alerts. Leave SMTP Host blank to disable email notifications.</p>
             </div>
-            <div class="form-group">
-              <label for="setting-error-detail">Error Detail Level</label>
-              <select id="setting-error-detail">
-                <option value="sanitized">Sanitized (production — hide raw errors)</option>
-                <option value="full">Full (development — expose exception text)</option>
-              </select>
-              <small style="color:var(--text-muted);margin-top:0.3rem;display:block">
-                In <strong>Sanitized</strong> mode, generic messages are returned to the browser;
-                full details are always written to the server log.
-              </small>
+
+            <div class="form-grid" style="margin-top:0">
+              <div class="form-group">
+                <label for="setting-smtp-host">SMTP Host</label>
+                <input type="text" id="setting-smtp-host" placeholder="smtp.gmail.com" autocomplete="off" />
+              </div>
+              <div class="form-group">
+                <label for="setting-smtp-port">SMTP Port</label>
+                <input type="number" id="setting-smtp-port" value="587" min="1" max="65535" />
+              </div>
+              <div class="form-group">
+                <label for="setting-smtp-user">SMTP Username</label>
+                <input type="text" id="setting-smtp-user" placeholder="alerts@example.com" autocomplete="off" />
+              </div>
+              <div class="form-group">
+                <label for="setting-smtp-password">SMTP Password</label>
+                <input type="password" id="setting-smtp-password" placeholder="leave blank to keep existing" autocomplete="new-password" />
+              </div>
+              <div class="form-group">
+                <label for="setting-smtp-from">From Address</label>
+                <input type="email" id="setting-smtp-from" placeholder="flintlock@example.com" autocomplete="off" />
+              </div>
+              <div class="form-group form-group-check" style="align-self:flex-end">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="setting-smtp-tls" checked />
+                  <span>Use STARTTLS</span>
+                </label>
+              </div>
             </div>
-            <div class="form-group" style="grid-column:1/-1">
-              <label for="setting-webhook-allowlist">Allowed Webhook Domains</label>
-              <input type="text" id="setting-webhook-allowlist"
-                     placeholder="webhooks.mycorp.com, hooks.internal.net"
-                     autocomplete="off" />
-              <small style="color:var(--text-muted);margin-top:0.3rem;display:block">
-                Comma-separated list of extra hostname suffixes permitted as outbound webhook
-                targets (in addition to Slack, Teams, and Discord).
-                Private / RFC-1918 addresses are always blocked.
-              </small>
+            <div style="margin-top:1.25rem;display:flex;align-items:center;gap:0.75rem">
+              <button class="btn-secondary" id="testSmtpBtn">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;vertical-align:-1px;margin-right:4px" aria-hidden="true"><rect x="1" y="3.5" width="14" height="9" rx="1.5"/><path d="M1 5l7 4.5L15 5"/></svg>
+                Test SMTP
+              </button>
+              <span id="smtpTestResult" style="font-size:0.85rem"></span>
             </div>
           </div>
-        </div>
 
-        <div class="settings-actions" style="gap:0.75rem;flex-wrap:wrap;align-items:center">
-          <button class="btn-secondary" id="testSmtpBtn">&#9993; Test SMTP</button>
-          <span id="smtpTestResult" style="font-size:0.85rem"></span>
-          <button class="btn-primary" id="saveSettingsBtn">Save Settings</button>
-          <span class="settings-saved-msg hidden" id="settingsSavedMsg">&#10003; Saved</span>
-        </div>
-      </div>
+          <!-- Security pane -->
+          <div class="settings-pane" id="spane-security">
+            <div class="settings-pane-header">
+              <h2 class="settings-pane-title">Security</h2>
+              <p class="settings-pane-desc">Controls for SSH host verification, outbound webhook restrictions, and error reporting exposure.</p>
+            </div>
+
+            <div class="settings-group">
+              <h3 class="settings-group-title">SSH Host Key Verification</h3>
+              <label class="settings-row">
+                <div class="settings-row-info">
+                  <span class="settings-row-label">SSH Host Key Policy</span>
+                  <span class="settings-row-desc">Controls how Flintlock handles unrecognised SSH host keys during Live Connect. <strong>Strict</strong> is most secure but requires hosts to be pre-approved in known_hosts.</span>
+                </div>
+                <select id="setting-ssh-host-key-policy" class="settings-select">
+                  <option value="warn">Warn — log and continue</option>
+                  <option value="strict">Strict — reject unknown</option>
+                  <option value="auto_add">Auto-add (lab only)</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="settings-group">
+              <h3 class="settings-group-title">Outbound Webhooks</h3>
+              <label class="settings-row" style="flex-direction:column;align-items:flex-start;gap:0.5rem">
+                <div class="settings-row-info">
+                  <span class="settings-row-label">Allowed Webhook Domains</span>
+                  <span class="settings-row-desc">Extra hostname suffixes (comma-separated) permitted as webhook targets beyond the built-in allowlist (Slack, Teams, Discord). RFC-1918 addresses are always blocked.</span>
+                </div>
+                <input type="text" id="setting-webhook-allowlist"
+                       placeholder="webhooks.mycorp.com, hooks.internal.net"
+                       autocomplete="off" style="width:100%;max-width:500px" />
+              </label>
+            </div>
+
+            <div class="settings-group">
+              <h3 class="settings-group-title">Error Reporting</h3>
+              <label class="settings-row">
+                <div class="settings-row-info">
+                  <span class="settings-row-label">Error Detail Level</span>
+                  <span class="settings-row-desc">In <strong>Sanitized</strong> mode only generic messages reach the browser; full exception details are always written to the server log.</span>
+                </div>
+                <select id="setting-error-detail" class="settings-select">
+                  <option value="sanitized">Sanitized (production)</option>
+                  <option value="full">Full (development only)</option>
+                </select>
+              </label>
+            </div>
+          </div>
+
+          <!-- Syslog pane -->
+          <div class="settings-pane" id="spane-syslog">
+            <div class="settings-pane-header">
+              <h2 class="settings-pane-title">Syslog</h2>
+              <p class="settings-pane-desc">Forward all Flintlock application events to a remote syslog server for SIEM integration and centralised log management.</p>
+            </div>
+
+            <div class="settings-group">
+              <h3 class="settings-group-title">Syslog Server</h3>
+              <label class="settings-row">
+                <div class="settings-row-info">
+                  <span class="settings-row-label">Enable Syslog Forwarding</span>
+                  <span class="settings-row-desc">Send application log events to the configured syslog target.</span>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="setting-syslog-enabled" />
+                  <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                </label>
+              </label>
+            </div>
+
+            <div class="form-grid" style="margin-top:0">
+              <div class="form-group">
+                <label for="setting-syslog-host">Syslog Host</label>
+                <input type="text" id="setting-syslog-host" placeholder="192.168.1.100 or siem.corp.net" autocomplete="off" />
+              </div>
+              <div class="form-group">
+                <label for="setting-syslog-port">Port</label>
+                <input type="number" id="setting-syslog-port" value="514" min="1" max="65535" />
+              </div>
+              <div class="form-group">
+                <label for="setting-syslog-protocol">Protocol</label>
+                <select id="setting-syslog-protocol">
+                  <option value="udp">UDP — RFC 3164</option>
+                  <option value="tcp">TCP — reliable delivery</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="setting-syslog-facility">Facility</label>
+                <select id="setting-syslog-facility">
+                  <option value="local0">LOCAL0</option>
+                  <option value="local1">LOCAL1</option>
+                  <option value="local2">LOCAL2</option>
+                  <option value="local3">LOCAL3</option>
+                  <option value="local4">LOCAL4</option>
+                  <option value="local5">LOCAL5</option>
+                  <option value="local6">LOCAL6</option>
+                  <option value="local7">LOCAL7</option>
+                  <option value="daemon">DAEMON</option>
+                  <option value="user">USER</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Shared footer -->
+          <div class="settings-footer">
+            <button class="btn-primary" id="saveSettingsBtn">Save Settings</button>
+            <span class="settings-saved-msg hidden" id="settingsSavedMsg">&#10003; Saved</span>
+          </div>
+
+        </div><!-- /.settings-content -->
+      </div><!-- /.settings-shell -->
     </section>
 
   </main>
@@ -1745,6 +1880,7 @@
     document.getElementById("schedNotifyFinding").checked   = !!s.notify_on_finding;
     document.getElementById("schedNotifyError").checked     = !!s.notify_on_error;
     document.getElementById("schedSlackWebhook").value      = s.notify_slack_webhook || "";
+    document.getElementById("schedTeamsWebhook").value      = s.notify_teams_webhook || "";
     document.getElementById("schedNotifyEmail").value       = s.notify_email || "";
     toggleScheduleFreqFields(s.frequency || "daily");
     document.getElementById("scheduleFormCard").scrollIntoView({ behavior: "smooth", block: "start" });
@@ -1787,6 +1923,7 @@
       notify_on_finding:    document.getElementById("schedNotifyFinding").checked,
       notify_on_error:      document.getElementById("schedNotifyError").checked,
       notify_slack_webhook: document.getElementById("schedSlackWebhook").value.trim(),
+      notify_teams_webhook: document.getElementById("schedTeamsWebhook").value.trim(),
       notify_email:         document.getElementById("schedNotifyEmail").value.trim(),
     };
     const pass = document.getElementById("schedPass").value;
@@ -1859,18 +1996,36 @@
   function applySettingsToUI() {
     document.getElementById("setting-auto-pdf").checked              = !!appSettings.auto_pdf;
     document.getElementById("setting-auto-archive").checked          = !!appSettings.auto_archive;
-    document.getElementById("setting-default-compliance").value      = appSettings.default_compliance || "";
-    document.getElementById("setting-smtp-host").value               = appSettings.smtp_host     || "";
-    document.getElementById("setting-smtp-port").value               = appSettings.smtp_port     || 587;
-    document.getElementById("setting-smtp-user").value               = appSettings.smtp_user     || "";
+    document.getElementById("setting-default-compliance").value      = appSettings.default_compliance  || "";
+    document.getElementById("setting-smtp-host").value               = appSettings.smtp_host            || "";
+    document.getElementById("setting-smtp-port").value               = appSettings.smtp_port            || 587;
+    document.getElementById("setting-smtp-user").value               = appSettings.smtp_user            || "";
     document.getElementById("setting-smtp-password").value           = "";  // never pre-fill password
-    document.getElementById("setting-smtp-from").value               = appSettings.smtp_from     || "";
+    document.getElementById("setting-smtp-from").value               = appSettings.smtp_from            || "";
     document.getElementById("setting-smtp-tls").checked              = appSettings.smtp_tls !== false;
     // Security settings
     document.getElementById("setting-ssh-host-key-policy").value     = appSettings.ssh_host_key_policy || "warn";
     document.getElementById("setting-error-detail").value            = appSettings.error_detail         || "sanitized";
     document.getElementById("setting-webhook-allowlist").value       = appSettings.webhook_allowlist    || "";
+    // Syslog settings
+    document.getElementById("setting-syslog-enabled").checked        = !!appSettings.syslog_enabled;
+    document.getElementById("setting-syslog-host").value             = appSettings.syslog_host          || "localhost";
+    document.getElementById("setting-syslog-port").value             = appSettings.syslog_port          || 514;
+    document.getElementById("setting-syslog-protocol").value         = appSettings.syslog_protocol      || "udp";
+    document.getElementById("setting-syslog-facility").value         = appSettings.syslog_facility      || "local0";
   }
+
+  // ── Settings sidebar navigation ──────────────────────────────────────────
+  document.querySelectorAll(".settings-nav-item").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const pane = btn.dataset.pane;
+      document.querySelectorAll(".settings-nav-item").forEach(b => b.classList.remove("settings-nav-active"));
+      document.querySelectorAll(".settings-pane").forEach(p => p.classList.remove("active"));
+      btn.classList.add("settings-nav-active");
+      const target = document.getElementById("spane-" + pane);
+      if (target) target.classList.add("active");
+    });
+  });
 
   function applySettingsToForm() {
     document.getElementById("report").checked  = !!appSettings.auto_pdf;
@@ -1896,6 +2051,12 @@
       ssh_host_key_policy:  document.getElementById("setting-ssh-host-key-policy").value,
       error_detail:         document.getElementById("setting-error-detail").value,
       webhook_allowlist:    document.getElementById("setting-webhook-allowlist").value.trim(),
+      // Syslog settings
+      syslog_enabled:       document.getElementById("setting-syslog-enabled").checked,
+      syslog_host:          document.getElementById("setting-syslog-host").value.trim(),
+      syslog_port:          parseInt(document.getElementById("setting-syslog-port").value) || 514,
+      syslog_protocol:      document.getElementById("setting-syslog-protocol").value,
+      syslog_facility:      document.getElementById("setting-syslog-facility").value,
       ...(document.getElementById("setting-smtp-password").value
           ? {smtp_password: document.getElementById("setting-smtp-password").value}
           : {}),

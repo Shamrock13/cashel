@@ -156,6 +156,7 @@ def create_schedule(data: dict) -> dict:
         "notify_on_finding":     bool(data.get("notify_on_finding", False)),
         "notify_on_error":       bool(data.get("notify_on_error", False)),
         "notify_slack_webhook":  str(data.get("notify_slack_webhook", ""))[:512],
+        "notify_teams_webhook":  str(data.get("notify_teams_webhook", ""))[:512],
         "notify_email":          str(data.get("notify_email", ""))[:254],
         "last_run":     None,
         "last_status":  None,
@@ -179,7 +180,7 @@ def update_schedule(entry_id: str, data: dict) -> dict | None:
 
     for key in ("name", "host", "tag",
                 "notify_on_finding", "notify_on_error",
-                "notify_slack_webhook", "notify_email"):
+                "notify_slack_webhook", "notify_teams_webhook", "notify_email"):
         if key in data:
             schedule[key] = data[key]
 

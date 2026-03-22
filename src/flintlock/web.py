@@ -32,6 +32,7 @@ from .scheduler_runner import (
     start_scheduler, stop_scheduler, reload_job,
     run_now as scheduler_run_now, scheduler_available,
 )
+from .syslog_handler import configure_syslog
 
 UPLOAD_FOLDER    = os.environ.get("UPLOAD_FOLDER",    "/tmp/flintlock_uploads")
 REPORTS_FOLDER   = os.environ.get("REPORTS_FOLDER",   "/tmp/flintlock_reports")
@@ -955,6 +956,8 @@ def settings_get():
 def settings_save():
     data = request.get_json(silent=True) or {}
     saved = save_settings(data)
+    # Reconfigure syslog immediately when settings are changed.
+    configure_syslog(saved)
     return jsonify(saved)
 
 
@@ -1021,6 +1024,7 @@ def main():
 # guard that prevents double-start if this module is reloaded.
 start_scheduler()
 atexit.register(stop_scheduler)
+configure_syslog(get_settings())
 
 
 if __name__ == "__main__":

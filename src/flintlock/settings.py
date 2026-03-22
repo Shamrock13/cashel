@@ -26,8 +26,14 @@ import os
 SETTINGS_FILE = os.environ.get("SETTINGS_FILE", "/tmp/flintlock_settings/settings.json")
 
 # Valid values for enumerated security settings.
-VALID_SSH_KEY_POLICIES = ("warn", "strict", "auto_add")
-VALID_ERROR_DETAIL     = ("sanitized", "full")
+VALID_SSH_KEY_POLICIES  = ("warn", "strict", "auto_add")
+VALID_ERROR_DETAIL      = ("sanitized", "full")
+VALID_SYSLOG_PROTOCOLS  = ("udp", "tcp")
+VALID_SYSLOG_FACILITIES = (
+    "kernel", "user", "daemon",
+    "local0", "local1", "local2", "local3",
+    "local4", "local5", "local6", "local7",
+)
 
 DEFAULTS: dict = {
     # ── General ───────────────────────────────────────────────────────────────
@@ -60,6 +66,16 @@ DEFAULTS: dict = {
     # "sanitized" → return generic messages to the browser (production default)
     # "full"      → return raw exception text (development only)
     "error_detail": "sanitized",
+
+    # ── Syslog ────────────────────────────────────────────────────────────────
+    # Forward application events to a remote syslog server for SIEM integration.
+    # Protocol: "udp" (RFC 3164, default) or "tcp" (reliable delivery).
+    # Facility: LOCAL0–LOCAL7, DAEMON, USER.
+    "syslog_enabled":  False,
+    "syslog_host":     "localhost",
+    "syslog_port":     514,
+    "syslog_protocol": "udp",
+    "syslog_facility": "local0",
 }
 
 
@@ -79,11 +95,21 @@ def save_settings(data: dict) -> dict:
     for k, default in DEFAULTS.items():
         merged[k] = data.get(k, default)
 
-    # Validate enumerated security fields before persisting.
+    # Validate enumerated fields before persisting.
     if merged["ssh_host_key_policy"] not in VALID_SSH_KEY_POLICIES:
         merged["ssh_host_key_policy"] = "warn"
     if merged["error_detail"] not in VALID_ERROR_DETAIL:
         merged["error_detail"] = "sanitized"
+    if merged["syslog_protocol"] not in VALID_SYSLOG_PROTOCOLS:
+        merged["syslog_protocol"] = "udp"
+    if merged["syslog_facility"] not in VALID_SYSLOG_FACILITIES:
+        merged["syslog_facility"] = "local0"
+    try:
+        merged["syslog_port"] = int(merged["syslog_port"])
+        if not 1 <= merged["syslog_port"] <= 65535:
+            merged["syslog_port"] = 514
+    except (TypeError, ValueError):
+        merged["syslog_port"] = 514
 
     os.makedirs(os.path.dirname(SETTINGS_FILE), exist_ok=True)
     with open(SETTINGS_FILE, "w") as f:
