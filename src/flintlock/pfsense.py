@@ -13,7 +13,7 @@ def parse_pfsense(filepath):
     try:
         tree = ET.parse(filepath)
         root = tree.getroot()
-    except ET.ParseError as e:
+    except (ET.ParseError, OSError) as e:
         return None, f"Failed to parse pfSense config: {e}"
 
     rules = []
@@ -21,8 +21,8 @@ def parse_pfsense(filepath):
         r = {
             "type":      rule.findtext("type") or "pass",
             "interface": rule.findtext("interface") or "",
-            "source":    rule.findtext("source/any") or rule.findtext("source/address") or "specific",
-            "destination": rule.findtext("destination/any") or rule.findtext("destination/address") or "specific",
+            "source":    "1" if rule.find("source/any") is not None else rule.findtext("source/address") or "specific",
+            "destination": "1" if rule.find("destination/any") is not None else rule.findtext("destination/address") or "specific",
             "protocol":  rule.findtext("protocol") or "any",
             "log":       rule.find("log") is not None,
             "descr":     rule.findtext("descr") or "",

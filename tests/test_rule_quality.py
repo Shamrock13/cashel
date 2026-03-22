@@ -89,7 +89,9 @@ def test_fortinet_shadow():
     result = check_shadow_rules_forti(policies)
     msgs   = _msgs(result)
 
-    assert len(result) == 3, f"Expected 3 shadow findings, got {len(result)}: {msgs}"
+    # Fixture has Allow-All (all/all/ALL) as rule 1; policies 2-7 are all shadowed by it.
+    # Policy 8 is disabled and skipped. Expected: 6 HIGH findings.
+    assert len(result) == 6, f"Expected 6 shadow findings, got {len(result)}: {msgs}"
     assert all(f["severity"] == "HIGH" for f in result)
     assert all(f["category"] == "redundancy" for f in result)
 
@@ -97,6 +99,8 @@ def test_fortinet_shadow():
     assert "Allow-Web"           in shadowed_names, "Allow-Web should be shadowed"
     assert "Allow-Web-Duplicate" in shadowed_names, "Allow-Web-Duplicate should be shadowed"
     assert "Block-All"           in shadowed_names, "Block-All should be shadowed"
+    assert "Allow-Telnet-Legacy" in shadowed_names, "Allow-Telnet-Legacy should be shadowed"
+    assert "Allow-Internet-NoUTM" in shadowed_names, "Allow-Internet-NoUTM should be shadowed"
 
     shadower_names = [m.split("'")[3] for m in msgs]  # third quoted name = shadowing rule
     assert all(n == "Allow-All" for n in shadower_names), "Allow-All should be the shadowing rule"
@@ -126,13 +130,17 @@ def test_paloalto_shadow():
     result = check_shadow_rules_pa(rules)
     msgs   = _msgs(result)
 
-    assert len(result) == 2, f"Expected 2 shadow findings, got {len(result)}: {msgs}"
+    # Fixture has Allow-Any-Any (any/any/any) as rule 1; Allow-Web, Allow-Web-Duplicate,
+    # Allow-SSH-Mgmt, and Block-RDP-External are all shadowed by it. Expected: 4 HIGH findings.
+    assert len(result) == 4, f"Expected 4 shadow findings, got {len(result)}: {msgs}"
     assert all(f["severity"] == "HIGH" for f in result)
     assert all(f["category"] == "redundancy" for f in result)
 
     shadowed_names = [m.split("'")[1] for m in msgs]
     assert "Allow-Web"           in shadowed_names, "Allow-Web should be shadowed"
     assert "Allow-Web-Duplicate" in shadowed_names, "Allow-Web-Duplicate should be shadowed"
+    assert "Allow-SSH-Mgmt"      in shadowed_names, "Allow-SSH-Mgmt should be shadowed"
+    assert "Block-RDP-External"  in shadowed_names, "Block-RDP-External should be shadowed"
 
     shadower_names = [m.split("'")[3] for m in msgs]
     assert all(n == "Allow-Any-Any" for n in shadower_names), "Allow-Any-Any should be the shadowing rule"

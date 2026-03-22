@@ -331,6 +331,141 @@ def test_audit_gcp_parse_error():
     assert rules == []
 
 
+# ── Priority and network-tag based rule tests ─────────────────────────────────
+
+RULES_PRIORITY = [
+    {
+        "name": "high-priority-allow-ssh",
+        "network": "https://www.googleapis.com/compute/v1/projects/p/global/networks/prod-vpc",
+        "direction": "INGRESS",
+        "priority": 100,
+        "disabled": False,
+        "description": "High-priority SSH allow from office",
+        "sourceRanges": ["203.0.113.0/24"],
+        "targetTags": ["bastion"],
+        "allowed": [{"IPProtocol": "tcp", "ports": ["22"]}],
+    },
+    {
+        "name": "low-priority-deny-all",
+        "network": "https://www.googleapis.com/compute/v1/projects/p/global/networks/prod-vpc",
+        "direction": "INGRESS",
+        "priority": 65534,
+        "disabled": False,
+        "description": "Catch-all deny",
+        "sourceRanges": ["0.0.0.0/0"],
+        "denied": [{"IPProtocol": "all"}],
+    },
+]
+
+RULES_SERVICE_ACCOUNT = [
+    {
+        "name": "allow-internal-svc-acct",
+        "network": "https://www.googleapis.com/compute/v1/projects/p/global/networks/prod-vpc",
+        "direction": "INGRESS",
+        "priority": 1000,
+        "disabled": False,
+        "description": "Allow traffic from specific service account",
+        "sourceServiceAccounts": ["app-sa@project.iam.gserviceaccount.com"],
+        "targetServiceAccounts": ["db-sa@project.iam.gserviceaccount.com"],
+        "allowed": [{"IPProtocol": "tcp", "ports": ["5432"]}],
+    },
+]
+
+RULES_MULTIPLE_NETWORKS = [
+    {
+        "name": "prod-allow-internal",
+        "network": "https://www.googleapis.com/compute/v1/projects/p/global/networks/prod-vpc",
+        "direction": "INGRESS",
+        "priority": 1000,
+        "disabled": False,
+        "description": "Allow internal prod traffic",
+        "sourceRanges": ["10.0.0.0/8"],
+        "targetTags": ["app-server"],
+        "allowed": [{"IPProtocol": "tcp", "ports": ["8080"]}],
+    },
+    {
+        "name": "staging-allow-ssh",
+        "network": "https://www.googleapis.com/compute/v1/projects/p/global/networks/staging-vpc",
+        "direction": "INGRESS",
+        "priority": 1000,
+        "disabled": False,
+        "description": "Allow SSH to staging from VPN",
+        "sourceRanges": ["10.8.0.0/24"],
+        "targetTags": ["staging-vm"],
+        "allowed": [{"IPProtocol": "tcp", "ports": ["22"]}],
+    },
+]
+
+
+def test_priority_rules_parse():
+    """Priority-based rules should parse correctly."""
+    rules, err = parse_gcp_firewall(json.dumps(RULES_PRIORITY).encode())
+    # parse_gcp_firewall expects a file path, use tempfile
+    import tempfile
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+        json.dump(RULES_PRIORITY, f)
+        path = f.name
+    rules, err = parse_gcp_firewall(path)
+    assert err is None, f"Parse error: {err}"
+    assert len(rules) == 2, f"Expected 2 rules: {len(rules)}"
+    assert rules[0]["priority"] == 100
+    assert rules[1]["priority"] == 65534
+    print(f"  PASS  test_priority_rules_parse — {len(rules)} rules")
+
+
+def test_priority_rules_restricted_source_no_ingress_finding():
+    """High-priority SSH from specific /24 CIDR should not trigger internet-ingress check."""
+    findings = check_internet_ingress_gcp(RULES_PRIORITY)
+    # SSH is from 203.0.113.0/24, not 0.0.0.0/0 → no finding
+    assert findings == [], f"Specific CIDR SSH should not flag internet ingress: {findings}"
+    print("  PASS  test_priority_rules_restricted_source_no_ingress_finding")
+
+
+def test_priority_rules_audit_no_high():
+    """Priority-based ruleset with restricted sources should have no HIGH findings."""
+    import tempfile
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+        json.dump(RULES_PRIORITY, f)
+        path = f.name
+    findings, rules = audit_gcp_firewall(path)
+    high = [fi for fi in findings if isinstance(fi, dict) and fi.get("severity") == "HIGH"]
+    assert len(high) == 0, f"Restricted ruleset should have no HIGH findings: {high}"
+    print(f"  PASS  test_priority_rules_audit_no_high — {len(findings)} findings (no HIGH)")
+
+
+def test_service_account_rules_parse():
+    """Service-account-based rules (no sourceRanges) should parse without error."""
+    import tempfile
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+        json.dump(RULES_SERVICE_ACCOUNT, f)
+        path = f.name
+    rules, err = parse_gcp_firewall(path)
+    assert err is None, f"Parse error: {err}"
+    assert len(rules) == 1
+    print("  PASS  test_service_account_rules_parse")
+
+
+def test_multiple_networks_parse():
+    """Rules from multiple VPC networks in one file should all parse."""
+    import tempfile
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+        json.dump(RULES_MULTIPLE_NETWORKS, f)
+        path = f.name
+    rules, err = parse_gcp_firewall(path)
+    assert err is None
+    assert len(rules) == 2
+    networks = {r["network"] for r in rules}
+    assert len(networks) == 2, f"Expected 2 distinct networks: {networks}"
+    print(f"  PASS  test_multiple_networks_parse — {len(rules)} rules across {len(networks)} networks")
+
+
+def test_multiple_networks_no_high_audit():
+    """Tightly scoped multi-network rules should not produce HIGH findings."""
+    findings = check_internet_ingress_gcp(RULES_MULTIPLE_NETWORKS)
+    assert findings == [], f"RFC-1918 and VPN sources should not flag internet ingress: {findings}"
+    print("  PASS  test_multiple_networks_no_high_audit")
+
+
 # ── Standalone runner ─────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
@@ -350,6 +485,10 @@ if __name__ == "__main__":
         test_no_target_restriction_flagged, test_no_target_restriction_clean,
         test_icmp_unrestricted_flagged, test_icmp_unrestricted_clean,
         test_audit_gcp_risky, test_audit_gcp_clean, test_audit_gcp_parse_error,
+        # Priority and network-tag based rules
+        test_priority_rules_parse, test_priority_rules_restricted_source_no_ingress_finding,
+        test_priority_rules_audit_no_high, test_service_account_rules_parse,
+        test_multiple_networks_parse, test_multiple_networks_no_high_audit,
     ]
 
     passed = failed = 0

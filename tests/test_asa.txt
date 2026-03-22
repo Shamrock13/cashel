@@ -1,6 +1,35 @@
+! Cisco ASA running config — test fixture
+! Includes system config, ACLs with shadow rules, and management settings.
+hostname asa-test-fw
+domain-name lab.example.com
+
+! Management access — risky: telnet enabled, SSHv1, SNMPv2c
+telnet 0.0.0.0 0.0.0.0 outside
+ssh version 1
+snmp-server community public
+
+! Syslog
+logging enable
+logging host management 10.0.1.100
+
+! ACL with broad any-any rule first (used by shadow detection tests)
+! These 6 lines must stay as-is — test_rule_quality.py asserts 5 shadow findings
 access-list OUTSIDE_IN extended permit ip any any
 access-list OUTSIDE_IN extended permit tcp any host 10.0.0.1 eq 80
 access-list OUTSIDE_IN extended permit tcp 192.168.1.0 255.255.255.0 host 10.0.0.2 eq 443
 access-list OUTSIDE_IN extended permit ip any any log
 access-list OUTSIDE_IN extended permit tcp any host 10.0.0.1 eq 80
 access-list OUTSIDE_IN extended deny ip any any
+
+! Second ACL — tighter, used to test per-check functions
+access-list MGMT_IN extended permit tcp 10.0.0.0 255.255.0.0 host 10.0.0.254 eq 22 log
+access-list MGMT_IN extended permit tcp 10.0.0.0 255.255.0.0 host 10.0.0.254 eq 443 log
+access-list MGMT_IN extended deny ip any any log
+
+! Third ACL — unrestricted ICMP for icmp check
+access-list ICMP_TEST extended permit icmp any any
+access-list ICMP_TEST extended deny ip any any log
+
+! HTTP server (ASDM) enabled without host restriction
+http server enable
+! (no 'http <network>' restriction lines present — triggers check)

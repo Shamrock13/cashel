@@ -36,4 +36,44 @@ config firewall policy
         set action deny
         set logtraffic all
     next
+    edit 5
+        set name "Allow-Telnet-Legacy"
+        set srcintf "lan"
+        set dstintf "wan1"
+        set srcaddr "all"
+        set dstaddr "LegacyServer"
+        set action accept
+        set service "TELNET" "FTP"
+        set logtraffic utm
+    next
+    edit 6
+        set name "Allow-Internet-NoUTM"
+        set srcintf "lan"
+        set dstintf "wan1"
+        set srcaddr "CorpUsers"
+        set dstaddr "all"
+        set action accept
+        set service "HTTPS"
+        set logtraffic all
+    next
+    edit 7
+        set srcintf "lan"
+        set dstintf "wan1"
+        set srcaddr "Printer"
+        set dstaddr "PrintServer"
+        set action accept
+        set service "TCP-8443"
+        set logtraffic all
+    next
+    edit 8
+        set name "Disabled-Policy"
+        set status disable
+        set srcintf "lan"
+        set dstintf "wan1"
+        set srcaddr "all"
+        set dstaddr "OldServer"
+        set action accept
+        set service "HTTP"
+        set logtraffic all
+    next
 end

@@ -35,6 +35,32 @@
                 <action>allow</action>
                 <log-end>yes</log-end>
               </entry>
+              <entry name="Allow-SSH-Mgmt">
+                <from><member>mgmt</member></from>
+                <to><member>trust</member></to>
+                <source><member>10.10.0.0/24</member></source>
+                <destination><member>10.0.0.254</member></destination>
+                <application><member>ssh</member></application>
+                <service><member>application-default</member></service>
+                <action>allow</action>
+                <log-end>yes</log-end>
+                <log-start>no</log-start>
+                <description>Allow SSH from management subnet to firewall</description>
+                <profile-setting>
+                  <group><member>default-security-group</member></group>
+                </profile-setting>
+              </entry>
+              <entry name="Block-RDP-External">
+                <from><member>untrust</member></from>
+                <to><member>trust</member></to>
+                <source><member>any</member></source>
+                <destination><member>any</member></destination>
+                <application><member>any</member></application>
+                <service><member>any</member></service>
+                <action>deny</action>
+                <log-end>yes</log-end>
+                <description>Explicit deny-all catch-all</description>
+              </entry>
             </rules>
           </security>
         </entry>

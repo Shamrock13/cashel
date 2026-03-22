@@ -8,7 +8,7 @@ Flintlock is a firewall configuration auditing tool with a CLI and Flask web UI.
 src/flintlock/          # Main package
   main.py               # CLI entry point (typer)
   web.py                # Flask web UI
-  audit_engine.py       # Core scoring and findings logic
+  audit_engine.py       # Core scoring and findings logic (includes ASA audit helpers)
   compliance.py         # All compliance framework checks (paid feature)
   reporter.py           # PDF report generation (fpdf2)
   export.py             # JSON / CSV / SARIF export
@@ -23,12 +23,13 @@ src/flintlock/          # Main package
   archive.py            # Historical audit storage
   settings.py           # User settings management
   license.py            # License key validation (compliance gate)
-  # Vendor parsers:
+  # Vendor parsers — Cisco is the vendor; ASA and FTD are different appliances:
+  audit_engine.py       # Also contains _audit_asa() for Cisco ASA appliances
+  ftd.py                # Cisco FTD (Firepower Threat Defense) appliances
   iptables.py           # iptables-save and nftables
   juniper.py            # Juniper SRX (set-style and hierarchical)
   paloalto.py           # Palo Alto (XML)
   fortinet.py           # Fortinet FortiGate
-  ftd.py                # Cisco FTD (Firepower)
   pfsense.py            # pfSense (XML)
   aws.py                # AWS Security Groups (JSON)
   azure.py              # Azure NSG (JSON)
@@ -64,21 +65,19 @@ Vendor config fixtures live in `tests/`:
 - `test_pa.xml` — Palo Alto XML config
 - `test_pfsense.xml` — pfSense XML config
 
+## Vendor Naming Convention
+
+**Cisco** is the vendor. The ASA (Adaptive Security Appliance) and FTD (Firepower Threat Defense) are
+different Cisco appliances, but they share LINA CLI syntax. In the vendor dispatch code they use the
+`"asa"` and `"ftd"` vendor keys respectively. Tests for both live in `tests/test_cisco.py`.
+
 ## Test Coverage Gaps
 
-The following modules have fixtures or implementations but **no test file yet**:
+All primary vendor modules now have test files. Remaining gap:
 
-| Module | Fixture | Missing Test |
-|---|---|---|
-| `fortinet.py` | `test_forti.txt` | `test_fortinet.py` |
-| `paloalto.py` | `test_pa.xml` | `test_paloalto.py` |
-| `pfsense.py` | `test_pfsense.xml` | `test_pfsense.py` |
-| `ftd.py` | — | `test_ftd.py` |
-| `aws.py` | — | `test_aws.py` |
-| `azure.py` | — | `test_azure.py` |
-| `audit_engine.py` | — | `test_audit_engine.py` |
-| `diff.py` | — | `test_diff.py` |
-| `compliance.py` | — | Expand `test_soc2_stig.py` for CIS/NIST/PCI/HIPAA |
+| Module | Status |
+|---|---|
+| `compliance.py` | Partially covered — `test_soc2_stig.py` covers SOC2/STIG; CIS/NIST/PCI/HIPAA checks need expansion |
 
 ## Roadmap (Pending Items)
 

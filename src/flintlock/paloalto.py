@@ -13,7 +13,7 @@ def parse_paloalto(filepath):
     try:
         tree = ET.parse(filepath)
         root = tree.getroot()
-    except ET.ParseError as e:
+    except (ET.ParseError, OSError) as e:
         return None, f"Failed to parse Palo Alto config: {e}"
 
     rules = root.findall(".//security/rules/entry")

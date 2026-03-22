@@ -325,6 +325,144 @@ def test_audit_juniper_missing_file():
     assert policies == []
 
 
+# ── Multi-zone config tests ───────────────────────────────────────────────────
+
+MULTI_ZONE_SET = """\
+set system host-name srx-multizone
+set system services ssh
+set system ntp server 10.0.0.1
+set system syslog host 10.0.0.2 any any
+set security policies from-zone trust to-zone untrust policy allow-web match source-address corp-net
+set security policies from-zone trust to-zone untrust policy allow-web match destination-address any
+set security policies from-zone trust to-zone untrust policy allow-web match application junos-https
+set security policies from-zone trust to-zone untrust policy allow-web then permit log
+set security policies from-zone trust to-zone untrust policy deny-out match source-address any
+set security policies from-zone trust to-zone untrust policy deny-out match destination-address any
+set security policies from-zone trust to-zone untrust policy deny-out match application any
+set security policies from-zone trust to-zone untrust policy deny-out then deny
+set security policies from-zone dmz to-zone trust policy allow-api match source-address api-server
+set security policies from-zone dmz to-zone trust policy allow-api match destination-address app-server
+set security policies from-zone dmz to-zone trust policy allow-api match application junos-https
+set security policies from-zone dmz to-zone trust policy allow-api then permit log
+set security policies from-zone dmz to-zone trust policy deny-dmz-trust match source-address any
+set security policies from-zone dmz to-zone trust policy deny-dmz-trust match destination-address any
+set security policies from-zone dmz to-zone trust policy deny-dmz-trust match application any
+set security policies from-zone dmz to-zone trust policy deny-dmz-trust then deny
+set security policies from-zone untrust to-zone dmz policy allow-https match source-address any
+set security policies from-zone untrust to-zone dmz policy allow-https match destination-address web-vip
+set security policies from-zone untrust to-zone dmz policy allow-https match application junos-https
+set security policies from-zone untrust to-zone dmz policy allow-https then permit log
+set security policies from-zone untrust to-zone dmz policy deny-in match source-address any
+set security policies from-zone untrust to-zone dmz policy deny-in match destination-address any
+set security policies from-zone untrust to-zone dmz policy deny-in match application any
+set security policies from-zone untrust to-zone dmz policy deny-in then deny
+"""
+
+MULTI_ZONE_HIERARCHICAL = """\
+security {
+    policies {
+        from-zone trust to-zone untrust {
+            policy allow-web {
+                match {
+                    source-address corp-net;
+                    destination-address any;
+                    application junos-https;
+                }
+                then {
+                    permit {
+                        log { session-close; }
+                    }
+                }
+            }
+            policy deny-out {
+                match {
+                    source-address any;
+                    destination-address any;
+                    application any;
+                }
+                then { deny; }
+            }
+        }
+        from-zone dmz to-zone untrust {
+            policy allow-updates {
+                match {
+                    source-address app-server;
+                    destination-address any;
+                    application junos-https;
+                }
+                then {
+                    permit {
+                        log { session-close; }
+                    }
+                }
+            }
+            policy deny-dmz-out {
+                match {
+                    source-address any;
+                    destination-address any;
+                    application any;
+                }
+                then { deny; }
+            }
+        }
+    }
+}
+"""
+
+
+def test_multi_zone_set_parses_all_zones():
+    """Multi-zone set-style config should produce policies for all zone pairs."""
+    from flintlock.juniper import _parse_set_style
+    policies = _parse_set_style(MULTI_ZONE_SET)
+    zone_pairs = {(p["from_zone"], p["to_zone"]) for p in policies}
+    assert ("trust", "untrust") in zone_pairs, f"trust→untrust zone pair missing: {zone_pairs}"
+    assert ("dmz", "trust") in zone_pairs, f"dmz→trust zone pair missing: {zone_pairs}"
+    assert ("untrust", "dmz") in zone_pairs, f"untrust→dmz zone pair missing: {zone_pairs}"
+    print(f"  PASS  test_multi_zone_set_parses_all_zones — {len(zone_pairs)} zone pairs")
+
+
+def test_multi_zone_set_no_any_any():
+    """Multi-zone config restricts all permit rules — no any-any violations."""
+    from flintlock.juniper import _parse_set_style, check_any_any_juniper
+    policies = _parse_set_style(MULTI_ZONE_SET)
+    permit_policies = [p for p in policies if p.get("action") == "permit"]
+    findings = check_any_any_juniper(permit_policies)
+    # None of the permit rules use any/any source+destination
+    assert findings == [], f"Restricted multi-zone config should not flag any-any: {findings}"
+    print("  PASS  test_multi_zone_set_no_any_any")
+
+
+def test_multi_zone_set_deny_all_per_zone():
+    """Each zone pair in multi-zone config should have a deny-all policy."""
+    from flintlock.juniper import _parse_set_style, check_deny_all_juniper
+    policies = _parse_set_style(MULTI_ZONE_SET)
+    findings = check_deny_all_juniper(policies)
+    assert findings == [], f"Multi-zone config has deny-all per zone pair, should not flag: {findings}"
+    print("  PASS  test_multi_zone_set_deny_all_per_zone")
+
+
+def test_multi_zone_hierarchical_parses():
+    """Multi-zone hierarchical config should parse both zone pairs."""
+    from flintlock.juniper import _parse_hierarchical
+    policies = _parse_hierarchical(MULTI_ZONE_HIERARCHICAL)
+    zone_pairs = {(p["from_zone"], p["to_zone"]) for p in policies}
+    assert ("trust", "untrust") in zone_pairs
+    assert ("dmz", "untrust") in zone_pairs
+    print(f"  PASS  test_multi_zone_hierarchical_parses — {len(zone_pairs)} zone pairs")
+
+
+def test_multi_zone_audit_no_high():
+    """Full audit of tightly-scoped multi-zone config should have no HIGH findings."""
+    import tempfile
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+        f.write(MULTI_ZONE_SET)
+        path = f.name
+    findings, _ = audit_juniper(path)
+    high = [fi for fi in findings if isinstance(fi, dict) and fi.get("severity") == "HIGH"]
+    assert len(high) == 0, f"Multi-zone config should have no HIGH findings: {high}"
+    print(f"  PASS  test_multi_zone_audit_no_high — {len(findings)} findings (no HIGH)")
+
+
 # ── Standalone runner ─────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
@@ -342,6 +480,10 @@ if __name__ == "__main__":
         test_system_no_ntp, test_system_no_syslog, test_system_clean_config,
         test_shadow_rules_detected, test_shadow_rules_clean,
         test_audit_juniper_risky, test_audit_juniper_hierarchical, test_audit_juniper_missing_file,
+        # Multi-zone configs
+        test_multi_zone_set_parses_all_zones, test_multi_zone_set_no_any_any,
+        test_multi_zone_set_deny_all_per_zone, test_multi_zone_hierarchical_parses,
+        test_multi_zone_audit_no_high,
     ]
 
     passed = failed = 0
