@@ -1,0 +1,39 @@
+config firewall policy
+    edit 1
+        set name "Allow-All"
+        set srcintf "wan1"
+        set dstintf "lan"
+        set srcaddr "all"
+        set dstaddr "all"
+        set action accept
+        set service "ALL"
+        set logtraffic disable
+    next
+    edit 2
+        set name "Allow-Web"
+        set srcintf "wan1"
+        set dstintf "lan"
+        set srcaddr "all"
+        set dstaddr "WebServer"
+        set action accept
+        set service "HTTP" "HTTPS"
+        set logtraffic all
+    next
+    edit 3
+        set name "Allow-Web-Duplicate"
+        set srcintf "wan1"
+        set dstintf "lan"
+        set srcaddr "all"
+        set dstaddr "WebServer"
+        set action accept
+        set service "HTTP" "HTTPS"
+        set logtraffic all
+    next
+    edit 4
+        set name "Block-All"
+        set srcaddr "all"
+        set dstaddr "all"
+        set action deny
+        set logtraffic all
+    next
+end

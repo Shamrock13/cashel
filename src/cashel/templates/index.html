@@ -1,0 +1,2136 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cashel &mdash; Firewall Audit</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script>
+    (function () {
+      const t = localStorage.getItem("cashel-theme") || "auto";
+      document.documentElement.setAttribute("data-theme", t);
+    })();
+  </script>
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header-inner">
+      <div class="logo">
+        <svg class="logo-icon" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M14 2L3 6.5v8C3 20.5 7.8 25.6 14 27c6.2-1.4 11-6.5 11-12.5v-8L14 2z" stroke="#7EAEFF" stroke-width="1.6" fill="rgba(126,174,255,0.12)"/>
+          <polyline points="9,14 12.5,17.5 19,11" stroke="#7EAEFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="logo-text">Cashel</span>
+        <span class="logo-sub">Firewall Security Auditor</span>
+      </div>
+      <div class="header-actions">
+        <button class="theme-toggle" id="themeToggle" title="Theme: Light / Dark / Auto" aria-label="Toggle theme">
+          <span id="themeIcon">&#9788;</span>
+        </button>
+        <button class="badge-btn" id="licenseBadgeBtn" title="Manage license">
+          {% if licensed %}
+            <span class="badge badge-active" id="licenseBadge">&#10003; Licensed</span>
+          {% else %}
+            <span class="badge badge-unlicensed" id="licenseBadge">&#9888; Unlicensed</span>
+          {% endif %}
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- License Modal -->
+  <div class="modal-overlay hidden" id="licenseModal" role="dialog" aria-modal="true" aria-label="License Management">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 class="modal-title">License Management</h3>
+        <button class="modal-close" id="modalClose" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="licenseStatus" class="license-status">
+          {% if licensed %}
+            <p class="status-ok">&#10003; Active license: <code>{{ license_info }}</code></p>
+          {% else %}
+            <p class="status-warn">No active license. Compliance checks require a valid key.</p>
+          {% endif %}
+        </div>
+        <p class="modal-label">Activate a license key</p>
+        <form id="activateForm" class="modal-form">
+          <input type="text" id="licenseKey" name="key" placeholder="CSL-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX" maxlength="48" autocomplete="off" />
+          <button type="submit" class="btn-secondary">Activate</button>
+        </form>
+        <form id="deactivateForm" class="modal-form mt-sm">
+          <button type="submit" class="btn-danger">Deactivate License</button>
+        </form>
+        <div id="licenseMsg" class="license-msg hidden"></div>
+      </div>
+    </div>
+  </div>
+
+  <main class="main">
+
+    <!-- Tab nav -->
+    <nav class="tab-nav" role="tablist">
+      <button class="tab-btn tab-active" data-tab="audit" role="tab">
+        <svg class="tab-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 2h8.5L16 4.5V17H5V2z"/><path d="M13 2v3h3"/><circle cx="10" cy="11.5" r="2.5"/><path d="M14 15.5l-1.8-1.8"/></svg>
+        Audit
+      </button>
+      <button class="tab-btn" data-tab="diff" role="tab">
+        <svg class="tab-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="7" height="14" rx="1"/><rect x="11" y="3" width="7" height="14" rx="1"/><path d="M5.5 7h2M5.5 10h2M5.5 13h2M12.5 7h2M12.5 10h2M12.5 13h2"/></svg>
+        Compare
+      </button>
+      <button class="tab-btn" data-tab="connect" role="tab">
+        <svg class="tab-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="16" height="14" rx="2"/><path d="M2 7h16"/><path d="M6 11l3 2.5L6 16"/><path d="M12 15h3"/></svg>
+        Live Connect
+      </button>
+      <button class="tab-btn" data-tab="schedules" role="tab">
+        <svg class="tab-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3.5" width="16" height="14" rx="2"/><path d="M2 8h16M7 2v3M13 2v3"/><circle cx="13.5" cy="13.5" r="3"/><path d="M13.5 12v1.5l1 1"/></svg>
+        Schedules
+      </button>
+      <button class="tab-btn" data-tab="history" role="tab">
+        <svg class="tab-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10a6 6 0 1 0 1.5-4"/><path d="M2 8.5l1.5 2 2-1.5"/><path d="M10 7v4l2 1.5"/></svg>
+        History
+      </button>
+      <button class="tab-btn" data-tab="settings" role="tab">
+        <svg class="tab-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><line x1="3" y1="5" x2="17" y2="5"/><line x1="3" y1="10" x2="17" y2="10"/><line x1="3" y1="15" x2="17" y2="15"/><circle cx="7" cy="5" r="2"/><circle cx="13" cy="10" r="2"/><circle cx="8" cy="15" r="2"/></svg>
+        Settings
+      </button>
+    </nav>
+
+    <!-- ══════════════════════════════════════════════ AUDIT ══ -->
+    <section class="tab-panel" id="tab-audit">
+
+      <!-- Audit mode toggle: Single File / Bulk -->
+      <div class="audit-mode-bar">
+        <button class="mode-btn mode-active" data-mode="single">Single File</button>
+        <button class="mode-btn" data-mode="bulk">Bulk</button>
+      </div>
+
+      <!-- ── Single File mode ── -->
+      <div id="audit-mode-single">
+      <div class="card">
+        <h2 class="card-title">Run Audit</h2>
+        <form id="auditForm" enctype="multipart/form-data">
+          <div class="form-grid">
+            <div class="form-group" style="grid-column:1/-1">
+              <label for="deviceTag">Device Tag</label>
+              <input type="text" id="deviceTag" name="tag" placeholder="e.g. ASA01, FortiGate-HQ&hellip;" autocomplete="off" maxlength="64" required />
+            </div>
+            <div class="form-group">
+              <label for="config">Config File</label>
+              <div class="file-input-wrapper">
+                <input type="file" id="config" name="config" required />
+                <span class="file-label" id="fileLabel">Choose a file&hellip;</span>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="vendor">Vendor</label>
+              <select id="vendor" name="vendor">
+                <option value="auto" selected>Auto-detect (recommended)</option>
+                <option value="aws">AWS Security Group</option>
+                <option value="azure">Azure NSG</option>
+                <option value="asa">Cisco ASA</option>
+                <option value="ftd">Cisco FTD</option>
+                <option value="fortinet">Fortinet</option>
+                <option value="gcp">GCP VPC Firewall</option>
+                <option value="iptables">iptables (Linux)</option>
+                <option value="juniper">Juniper SRX</option>
+                <option value="nftables">nftables (Linux)</option>
+                <option value="paloalto">Palo Alto Networks</option>
+                <option value="pfsense">pfSense</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="compliance">Compliance Framework <span class="optional">(licensed)</span></label>
+              <select id="compliance" name="compliance">
+                <option value="">None</option>
+                <option value="cis">CIS Benchmark</option>
+                <option value="stig">DISA STIG</option>
+                <option value="hipaa">HIPAA Security Rule</option>
+                <option value="nist">NIST SP 800-41</option>
+                <option value="pci">PCI-DSS</option>
+                <option value="soc2">SOC2</option>
+              </select>
+            </div>
+            <div class="form-group form-group-check">
+              <label class="checkbox-label">
+                <input type="checkbox" id="report" name="report" value="1" />
+                <span>Generate PDF Report</span>
+              </label>
+              <label class="checkbox-label mt-xs">
+                <input type="checkbox" id="archive" name="archive" value="1" />
+                <span>Save to Audit History</span>
+              </label>
+            </div>
+          </div>
+          <button type="submit" class="btn-primary" id="submitBtn">
+            <span id="submitText">Run Audit</span>
+            <span id="submitSpinner" class="spinner hidden"></span>
+          </button>
+        </form>
+      </div>
+
+      <!-- Audit Results -->
+      <div class="card hidden" id="resultsSection">
+        <div class="results-header">
+          <h2 class="card-title" style="margin-bottom:0">Results</h2>
+          <span class="detected-vendor hidden" id="detectedVendorTag"></span>
+        </div>
+        <div class="alert alert-warning hidden" id="licenseWarning"></div>
+        <div class="summary-grid" id="summaryGrid"></div>
+        <div id="findingsList"></div>
+        <div class="pdf-row hidden" id="pdfRow">
+          <a id="pdfLink" class="btn-download" href="#" download>&#8681; Download PDF</a>
+          <a id="pdfViewLink" class="btn-secondary" href="#" target="_blank" rel="noopener">&#128196; View PDF</a>
+        </div>
+        <div class="export-row hidden" id="exportRow">
+          <button id="exportJsonBtn" class="btn-secondary">&#8681; JSON</button>
+          <button id="exportCsvBtn"  class="btn-secondary">&#8681; CSV</button>
+          <button id="exportSarifBtn" class="btn-secondary">&#8681; SARIF</button>
+        </div>
+        <div class="archive-row hidden" id="archiveRow">
+          <span class="archive-saved-msg">&#10003; Saved to Audit History &mdash;
+            <button class="link-btn" id="viewHistoryBtn">View History</button>
+          </span>
+        </div>
+      </div>
+      </div><!-- /audit-mode-single -->
+
+      <!-- ── Bulk mode ── -->
+      <div id="audit-mode-bulk" class="hidden">
+      <div class="card">
+        <h2 class="card-title">Bulk Audit</h2>
+        <p class="card-desc">Upload multiple firewall configs at once. Each file is audited independently and results are shown side-by-side.</p>
+        <form id="bulkForm" enctype="multipart/form-data">
+          <div class="form-grid">
+            <div class="form-group" style="grid-column:1/-1">
+              <label for="bulkConfigs">Config Files</label>
+              <div class="file-input-wrapper">
+                <input type="file" id="bulkConfigs" name="configs[]" multiple required />
+                <span class="file-label" id="bulkFileLabel">Choose one or more files&hellip;</span>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="bulkVendor">Vendor</label>
+              <select id="bulkVendor" name="vendor">
+                <option value="auto" selected>Auto-detect (recommended)</option>
+                <option value="aws">AWS Security Group</option>
+                <option value="azure">Azure NSG</option>
+                <option value="asa">Cisco ASA</option>
+                <option value="ftd">Cisco FTD</option>
+                <option value="fortinet">Fortinet</option>
+                <option value="gcp">GCP VPC Firewall</option>
+                <option value="iptables">iptables (Linux)</option>
+                <option value="juniper">Juniper SRX</option>
+                <option value="nftables">nftables (Linux)</option>
+                <option value="paloalto">Palo Alto Networks</option>
+                <option value="pfsense">pfSense</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="bulkCompliance">Compliance Framework <span class="optional">(licensed)</span></label>
+              <select id="bulkCompliance" name="compliance">
+                <option value="">None</option>
+                <option value="cis">CIS Benchmark</option>
+                <option value="stig">DISA STIG</option>
+                <option value="hipaa">HIPAA Security Rule</option>
+                <option value="nist">NIST SP 800-41</option>
+                <option value="pci">PCI-DSS</option>
+                <option value="soc2">SOC2</option>
+              </select>
+            </div>
+            <div class="form-group form-group-check">
+              <label class="checkbox-label">
+                <input type="checkbox" id="bulkArchive" name="archive" value="1" />
+                <span>Save all to Audit History</span>
+              </label>
+            </div>
+          </div>
+          <button type="submit" class="btn-primary" id="bulkBtn">
+            <span id="bulkText">Run Bulk Audit</span>
+            <span id="bulkSpinner" class="spinner hidden"></span>
+          </button>
+        </form>
+      </div>
+
+      <div class="card hidden" id="bulkResults">
+        <h2 class="card-title">Bulk Results</h2>
+        <div id="bulkResultsList"></div>
+      </div>
+      </div><!-- /audit-mode-bulk -->
+
+    </section>
+
+    <!-- ═════════════════════════════════════════ COMPARE CONFIGS ══ -->
+    <section class="tab-panel hidden" id="tab-diff">
+      <div class="card">
+        <h2 class="card-title">Compare Configs</h2>
+        <p class="card-desc">Upload two firewall configs of the same vendor to see added, removed, and unchanged rules.</p>
+        <form id="diffForm" enctype="multipart/form-data">
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="config_a">Baseline Config <span class="optional">(older)</span></label>
+              <div class="file-input-wrapper">
+                <input type="file" id="config_a" name="config_a" required />
+                <span class="file-label" id="fileLabelA">Choose a file&hellip;</span>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="config_b">New Config <span class="optional">(current)</span></label>
+              <div class="file-input-wrapper">
+                <input type="file" id="config_b" name="config_b" required />
+                <span class="file-label" id="fileLabelB">Choose a file&hellip;</span>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="diffVendor">Vendor</label>
+              <select id="diffVendor" name="vendor">
+                <option value="auto" selected>Auto-detect (recommended)</option>
+                <option value="aws">AWS Security Group</option>
+                <option value="azure">Azure NSG</option>
+                <option value="asa">Cisco ASA</option>
+                <option value="ftd">Cisco FTD</option>
+                <option value="fortinet">Fortinet</option>
+                <option value="gcp">GCP VPC Firewall</option>
+                <option value="iptables">iptables (Linux)</option>
+                <option value="juniper">Juniper SRX</option>
+                <option value="nftables">nftables (Linux)</option>
+                <option value="paloalto">Palo Alto Networks</option>
+                <option value="pfsense">pfSense</option>
+              </select>
+            </div>
+          </div>
+          <button type="submit" class="btn-primary" id="diffBtn">
+            <span id="diffText">Compare</span>
+            <span id="diffSpinner" class="spinner hidden"></span>
+          </button>
+        </form>
+      </div>
+
+      <div class="card hidden" id="diffResults">
+        <div class="results-header">
+          <h2 class="card-title" style="margin-bottom:0">Diff Results</h2>
+          <span class="detected-vendor hidden" id="diffVendorTag"></span>
+        </div>
+        <div id="diffSummary"></div>
+        <div id="diffAdded"></div>
+        <div id="diffRemoved"></div>
+        <div id="diffUnchanged"></div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════ LIVE CONNECT ══════ -->
+    <section class="tab-panel hidden" id="tab-connect">
+      <div class="card">
+        <h2 class="card-title">Live SSH Connection</h2>
+        <p class="card-desc">Connect directly to a device to pull its running configuration and audit it in real time.</p>
+        <div class="alert alert-info">
+          Supported: <strong>Cisco</strong>, <strong>Fortinet</strong>, <strong>Palo Alto Networks</strong> (SSH).
+          Credentials are used only for the single connection and are never stored.
+        </div>
+        <form id="connectForm">
+          <div class="form-grid connect-grid">
+            <div class="form-group" style="grid-column:1/-1">
+              <label for="connDeviceTag">Device Tag</label>
+              <input type="text" id="connDeviceTag" name="tag" placeholder="e.g. ASA01, FortiGate-HQ&hellip;" autocomplete="off" maxlength="64" required />
+            </div>
+            <div class="form-group">
+              <label for="connVendor">Vendor</label>
+              <select id="connVendor" name="vendor">
+                <option value="asa">Cisco ASA</option>
+                <option value="ftd">Cisco FTD</option>
+                <option value="fortinet">Fortinet</option>
+                <option value="iptables">iptables (Linux)</option>
+                <option value="juniper">Juniper SRX</option>
+                <option value="nftables">nftables (Linux)</option>
+                <option value="paloalto">Palo Alto Networks</option>
+                <option value="pfsense">pfSense</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="connHost">Host / IP</label>
+              <input type="text" id="connHost" name="host" placeholder="192.168.1.1" autocomplete="off" />
+            </div>
+            <div class="form-group">
+              <label for="connPort">SSH Port</label>
+              <input type="text" id="connPort" name="port" value="22" placeholder="22" autocomplete="off" />
+            </div>
+            <div class="form-group">
+              <label for="connUser">Username</label>
+              <input type="text" id="connUser" name="username" placeholder="admin" autocomplete="off" />
+            </div>
+            <div class="form-group">
+              <label for="connPass">Password</label>
+              <input type="password" id="connPass" name="password" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" autocomplete="current-password" />
+            </div>
+            <div class="form-group">
+              <label for="connCompliance">Compliance <span class="optional">(licensed)</span></label>
+              <select id="connCompliance" name="compliance">
+                <option value="">None</option>
+                <option value="cis">CIS Benchmark</option>
+                <option value="stig">DISA STIG</option>
+                <option value="hipaa">HIPAA Security Rule</option>
+                <option value="nist">NIST SP 800-41</option>
+                <option value="pci">PCI-DSS</option>
+                <option value="soc2">SOC2</option>
+              </select>
+            </div>
+          </div>
+          <button type="submit" class="btn-primary" id="connectBtn">
+            <span id="connectText">Connect &amp; Audit</span>
+            <span id="connectSpinner" class="spinner hidden"></span>
+          </button>
+        </form>
+      </div>
+
+      <div class="card hidden" id="connectResults">
+        <div class="results-header">
+          <h2 class="card-title" style="margin-bottom:0">Live Audit Results</h2>
+          <span class="detected-vendor hidden" id="connVendorTag"></span>
+        </div>
+        <div class="summary-grid" id="connSummaryGrid"></div>
+        <div id="connFindingsList"></div>
+        <div class="archive-row hidden" id="connArchiveRow">
+          <span class="archive-saved-msg">&#10003; Result saved to Audit History &mdash;
+            <button class="link-btn" id="connViewHistoryBtn">View History</button>
+          </span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════ HISTORY ══════ -->
+    <section class="tab-panel hidden" id="tab-history">
+
+      <!-- History sub-tabs: Audit History / Activity Log -->
+      <div class="sub-tab-nav">
+        <button class="sub-tab-btn sub-tab-active" data-subtab="audits">&#128337; Audit History</button>
+        <button class="sub-tab-btn" data-subtab="activity">&#128203; Activity Log</button>
+      </div>
+
+      <!-- ── Audit History sub-tab ── -->
+      <div id="sub-audits">
+      <div class="card">
+        <div class="results-header">
+          <h2 class="card-title" style="margin-bottom:0">Audit History</h2>
+          <button class="btn-secondary" id="refreshHistoryBtn" style="font-size:0.8rem;padding:0.3rem 0.75rem">&#8635; Refresh</button>
+        </div>
+        <p class="card-desc">Saved audits. Select two entries and click Compare.</p>
+        <!-- Filters -->
+        <div class="history-filters">
+          <div class="history-filter-group">
+            <label class="filter-label">Vendor</label>
+            <select id="historyVendorFilter">
+              <option value="">All vendors</option>
+              <option value="aws">AWS Security Group</option>
+              <option value="azure">Azure NSG</option>
+              <option value="asa">Cisco ASA</option>
+              <option value="ftd">Cisco FTD</option>
+              <option value="fortinet">Fortinet</option>
+              <option value="gcp">GCP VPC Firewall</option>
+              <option value="iptables">iptables (Linux)</option>
+              <option value="juniper">Juniper SRX</option>
+              <option value="nftables">nftables (Linux)</option>
+              <option value="paloalto">Palo Alto Networks</option>
+              <option value="pfsense">pfSense</option>
+            </select>
+          </div>
+          <div class="history-filter-group">
+            <label class="filter-label">Sort by</label>
+            <select id="historySort">
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+              <option value="most">Most issues</option>
+              <option value="least">Least issues</option>
+            </select>
+          </div>
+          <div class="history-filter-group">
+            <label class="filter-label">Search</label>
+            <input type="text" id="historySearch" placeholder="Filter by filename&hellip;" style="padding:0.3rem 0.6rem;font-size:0.85rem;" />
+          </div>
+        </div>
+        <div id="historyList" class="history-list">
+          <p class="text-muted">Loading&hellip;</p>
+        </div>
+      </div>
+
+      <!-- Trends chart -->
+      <div class="card" id="trendsCard">
+        <div class="results-header">
+          <h2 class="card-title" style="margin-bottom:0">Score Trends</h2>
+          <button class="btn-secondary" id="refreshTrendsBtn" style="font-size:0.8rem;padding:0.3rem 0.75rem">&#8635; Refresh</button>
+        </div>
+        <p class="card-desc">Security score over time per device. Score = 100 &minus; (HIGH &times; 10) &minus; (MEDIUM &times; 3), min 0.</p>
+        <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1rem;" id="trendsFilters">
+          <div class="history-filter-group">
+            <label class="filter-label">Vendor</label>
+            <select id="trendsVendorFilter">
+              <option value="">All vendors</option>
+            </select>
+          </div>
+          <div class="history-filter-group">
+            <label class="filter-label">Device Tag</label>
+            <select id="trendsDeviceFilter">
+              <option value="">All devices</option>
+            </select>
+          </div>
+        </div>
+        <div id="trendsEmpty" class="hidden"><p class="text-muted">No trend data yet. Save two or more audits for the same device to see trends.</p></div>
+        <div id="trendsChartWrap" style="position:relative;max-height:320px;">
+          <canvas id="trendsChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Comparison result -->
+      <div class="card hidden" id="compareResults">
+        <h2 class="card-title">Comparison</h2>
+        <div id="compareContent"></div>
+      </div>
+      </div><!-- /sub-audits -->
+
+      <!-- ── Activity Log sub-tab ── -->
+      <div id="sub-activity" class="hidden">
+      <div class="card">
+        <div class="results-header">
+          <h2 class="card-title" style="margin-bottom:0">Activity Log</h2>
+          <div style="display:flex;gap:0.5rem;align-items:center;">
+            <button class="btn-secondary" id="refreshActivityBtn" style="font-size:0.8rem;padding:0.3rem 0.75rem">&#8635; Refresh</button>
+            <button class="btn-danger"    id="clearActivityBtn"   style="font-size:0.8rem;padding:0.3rem 0.75rem">&#128465; Clear All</button>
+          </div>
+        </div>
+        <p class="card-desc">All application activity — audits, SSH connections, and config diffs — including failures.</p>
+        <div id="activityList" class="history-list">
+          <p class="text-muted">Loading&hellip;</p>
+        </div>
+      </div>
+      </div><!-- /sub-activity -->
+
+    </section>
+
+    <!-- ═══════════════════════════════════════════════ SCHEDULES ══════ -->
+    <section class="tab-panel hidden" id="tab-schedules">
+      <div class="card">
+        <div class="results-header">
+          <h2 class="card-title" style="margin-bottom:0">Scheduled Audits</h2>
+          <button class="btn-secondary" id="refreshSchedulesBtn" style="font-size:0.8rem;padding:0.3rem 0.75rem">&#8635; Refresh</button>
+        </div>
+        <p class="card-desc">Automatically run SSH audits on a recurring schedule. Results are saved to Audit History.</p>
+        <div id="schedulesList" class="schedules-list">
+          <p class="text-muted">Loading&hellip;</p>
+        </div>
+      </div>
+
+      <!-- New / Edit Schedule Form -->
+      <div class="card" id="scheduleFormCard">
+        <h2 class="card-title" id="scheduleFormTitle">New Schedule</h2>
+        <form id="scheduleForm">
+          <input type="hidden" id="scheduleId" value="" />
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="schedName">Name</label>
+              <input type="text" id="schedName" name="name" placeholder="My ASA01 daily audit" maxlength="80" autocomplete="off" required />
+            </div>
+            <div class="form-group">
+              <label for="schedVendor">Vendor</label>
+              <select id="schedVendor" name="vendor">
+                <option value="asa">Cisco ASA</option>
+                <option value="ftd">Cisco FTD</option>
+                <option value="fortinet">Fortinet</option>
+                <option value="iptables">iptables (Linux)</option>
+                <option value="juniper">Juniper SRX</option>
+                <option value="nftables">nftables (Linux)</option>
+                <option value="paloalto">Palo Alto Networks</option>
+                <option value="pfsense">pfSense</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="schedHost">Host / IP</label>
+              <input type="text" id="schedHost" name="host" placeholder="192.168.1.1" autocomplete="off" required />
+            </div>
+            <div class="form-group">
+              <label for="schedPort">SSH Port</label>
+              <input type="text" id="schedPort" name="port" value="22" placeholder="22" autocomplete="off" />
+            </div>
+            <div class="form-group">
+              <label for="schedUser">Username</label>
+              <input type="text" id="schedUser" name="username" placeholder="admin" autocomplete="off" required />
+            </div>
+            <div class="form-group">
+              <label for="schedPass">Password</label>
+              <input type="password" id="schedPass" name="password" placeholder="leave blank to keep existing" autocomplete="new-password" />
+            </div>
+            <div class="form-group">
+              <label for="schedTag">Device Tag</label>
+              <input type="text" id="schedTag" name="tag" placeholder="ASA01" maxlength="64" autocomplete="off" />
+            </div>
+            <div class="form-group">
+              <label for="schedCompliance">Compliance <span class="optional">(licensed)</span></label>
+              <select id="schedCompliance" name="compliance">
+                <option value="">None</option>
+                <option value="cis">CIS Benchmark</option>
+                <option value="stig">DISA STIG</option>
+                <option value="hipaa">HIPAA Security Rule</option>
+                <option value="nist">NIST SP 800-41</option>
+                <option value="pci">PCI-DSS</option>
+                <option value="soc2">SOC2</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="schedFrequency">Frequency</label>
+              <select id="schedFrequency" name="frequency">
+                <option value="hourly">Hourly</option>
+                <option value="daily" selected>Daily</option>
+                <option value="weekly">Weekly</option>
+              </select>
+            </div>
+            <div class="form-group" id="schedHourGroup">
+              <label for="schedHour">Hour (UTC, 0&ndash;23)</label>
+              <input type="number" id="schedHour" name="hour" value="2" min="0" max="23" />
+            </div>
+            <div class="form-group">
+              <label for="schedMinute">Minute (0&ndash;59)</label>
+              <input type="number" id="schedMinute" name="minute" value="0" min="0" max="59" />
+            </div>
+            <div class="form-group" id="schedDowGroup" style="display:none">
+              <label for="schedDow">Day of Week</label>
+              <select id="schedDow" name="day_of_week">
+                <option value="mon" selected>Monday</option>
+                <option value="tue">Tuesday</option>
+                <option value="wed">Wednesday</option>
+                <option value="thu">Thursday</option>
+                <option value="fri">Friday</option>
+                <option value="sat">Saturday</option>
+                <option value="sun">Sunday</option>
+              </select>
+            </div>
+            <div class="form-group form-group-check">
+              <label class="checkbox-label">
+                <input type="checkbox" id="schedEnabled" name="enabled" checked />
+                <span>Enabled</span>
+              </label>
+            </div>
+            <!-- Notifications -->
+            <div class="form-group" style="grid-column:1/-1">
+              <label>Notifications</label>
+              <div style="display:flex;gap:1.5rem;flex-wrap:wrap;margin-top:0.35rem">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="schedNotifyFinding" />
+                  <span>Alert on HIGH findings</span>
+                </label>
+                <label class="checkbox-label">
+                  <input type="checkbox" id="schedNotifyError" />
+                  <span>Alert on audit errors</span>
+                </label>
+              </div>
+            </div>
+            <div class="form-group" style="grid-column:1/-1">
+              <label for="schedSlackWebhook">Slack Webhook URL <span class="optional">(optional)</span></label>
+              <input type="url" id="schedSlackWebhook" placeholder="https://hooks.slack.com/services/…" autocomplete="off" maxlength="512" />
+            </div>
+            <div class="form-group" style="grid-column:1/-1">
+              <label for="schedTeamsWebhook">Microsoft Teams Webhook URL <span class="optional">(optional)</span></label>
+              <input type="url" id="schedTeamsWebhook" placeholder="https://[tenant].webhook.office.com/webhookb2/…" autocomplete="off" maxlength="512" />
+            </div>
+            <div class="form-group" style="grid-column:1/-1">
+              <label for="schedNotifyEmail">Alert Email <span class="optional">(optional)</span></label>
+              <input type="email" id="schedNotifyEmail" placeholder="ops@example.com" autocomplete="off" maxlength="254" />
+            </div>
+          </div>
+          <div style="display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap">
+            <button type="submit" class="btn-primary" id="schedSaveBtn">Save Schedule</button>
+            <button type="button" class="btn-secondary" id="schedCancelBtn">Cancel</button>
+            <span class="settings-saved-msg hidden" id="schedSavedMsg">&#10003; Saved</span>
+            <span class="alert-inline hidden" id="schedErrorMsg"></span>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- ════════════════════════════════════════════════ SETTINGS ══════ -->
+    <section class="tab-panel hidden" id="tab-settings">
+      <div class="settings-shell">
+
+        <!-- ── Left sidebar ─────────────────────────────────────────────── -->
+        <nav class="settings-sidebar" role="navigation" aria-label="Settings sections">
+          <div class="settings-nav-group-label">Configuration</div>
+
+          <button class="settings-nav-item settings-nav-active" data-pane="general">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><line x1="2" y1="5" x2="14" y2="5"/><line x1="2" y1="9" x2="14" y2="9"/><line x1="2" y1="13" x2="14" y2="13"/><circle cx="6" cy="5" r="1.75"/><circle cx="10" cy="9" r="1.75"/><circle cx="6" cy="13" r="1.75"/></svg>
+            General
+          </button>
+
+          <button class="settings-nav-item" data-pane="email">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="3.5" width="14" height="9" rx="1.5"/><path d="M1 5l7 4.5L15 5"/></svg>
+            Email (SMTP)
+          </button>
+
+          <button class="settings-nav-item" data-pane="security">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 1.5L2 4v4.5c0 3.5 2.5 6.7 6 7.5 3.5-.8 6-4 6-7.5V4L8 1.5z"/><path d="M5.5 8l2 2 3-3"/></svg>
+            Security
+          </button>
+
+          <button class="settings-nav-item" data-pane="syslog">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="1.5" width="14" height="5" rx="1.5"/><rect x="1" y="9.5" width="14" height="5" rx="1.5"/><circle cx="4" cy="4" r="0.8" fill="currentColor" stroke="none"/><circle cx="4" cy="12" r="0.8" fill="currentColor" stroke="none"/><line x1="7" y1="4" x2="12" y2="4"/><line x1="7" y1="12" x2="12" y2="12"/></svg>
+            Syslog
+          </button>
+        </nav>
+
+        <!-- ── Right content ─────────────────────────────────────────────── -->
+        <div class="settings-content">
+
+          <!-- General pane -->
+          <div class="settings-pane active" id="spane-general">
+            <div class="settings-pane-header">
+              <h2 class="settings-pane-title">General</h2>
+              <p class="settings-pane-desc">Global defaults applied to every audit. Individual audit options always override these defaults.</p>
+            </div>
+
+            <div class="settings-group">
+              <h3 class="settings-group-title">File Audit Defaults</h3>
+              <label class="settings-row">
+                <div class="settings-row-info">
+                  <span class="settings-row-label">Always generate PDF report</span>
+                  <span class="settings-row-desc">Pre-check &ldquo;Generate PDF Report&rdquo; on every file audit.</span>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="setting-auto-pdf" />
+                  <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                </label>
+              </label>
+              <label class="settings-row">
+                <div class="settings-row-info">
+                  <span class="settings-row-label">Always save to Audit History</span>
+                  <span class="settings-row-desc">Pre-check &ldquo;Save to Audit History&rdquo; on every file audit.</span>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="setting-auto-archive" />
+                  <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                </label>
+              </label>
+            </div>
+
+            <div class="settings-group">
+              <h3 class="settings-group-title">Compliance Default</h3>
+              <label class="settings-row">
+                <div class="settings-row-info">
+                  <span class="settings-row-label">Default compliance framework</span>
+                  <span class="settings-row-desc">Pre-select a framework on the File Audit and Live Connect forms.</span>
+                </div>
+                <select id="setting-default-compliance" class="settings-select">
+                  <option value="">None</option>
+                  <option value="cis">CIS Benchmark</option>
+                  <option value="stig">DISA STIG</option>
+                  <option value="hipaa">HIPAA Security Rule</option>
+                  <option value="nist">NIST SP 800-41</option>
+                  <option value="pci">PCI-DSS</option>
+                  <option value="soc2">SOC2</option>
+                </select>
+              </label>
+            </div>
+          </div>
+
+          <!-- Email pane -->
+          <div class="settings-pane" id="spane-email">
+            <div class="settings-pane-header">
+              <h2 class="settings-pane-title">Email (SMTP)</h2>
+              <p class="settings-pane-desc">Configure outbound email for scheduled audit alerts. Leave SMTP Host blank to disable email notifications.</p>
+            </div>
+
+            <div class="form-grid" style="margin-top:0">
+              <div class="form-group">
+                <label for="setting-smtp-host">SMTP Host</label>
+                <input type="text" id="setting-smtp-host" placeholder="smtp.gmail.com" autocomplete="off" />
+              </div>
+              <div class="form-group">
+                <label for="setting-smtp-port">SMTP Port</label>
+                <input type="number" id="setting-smtp-port" value="587" min="1" max="65535" />
+              </div>
+              <div class="form-group">
+                <label for="setting-smtp-user">SMTP Username</label>
+                <input type="text" id="setting-smtp-user" placeholder="alerts@example.com" autocomplete="off" />
+              </div>
+              <div class="form-group">
+                <label for="setting-smtp-password">SMTP Password</label>
+                <input type="password" id="setting-smtp-password" placeholder="leave blank to keep existing" autocomplete="new-password" />
+              </div>
+              <div class="form-group">
+                <label for="setting-smtp-from">From Address</label>
+                <input type="email" id="setting-smtp-from" placeholder="cashel@example.com" autocomplete="off" />
+              </div>
+              <div class="form-group form-group-check" style="align-self:flex-end">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="setting-smtp-tls" checked />
+                  <span>Use STARTTLS</span>
+                </label>
+              </div>
+            </div>
+            <div style="margin-top:1.25rem;display:flex;align-items:center;gap:0.75rem">
+              <button class="btn-secondary" id="testSmtpBtn">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;vertical-align:-1px;margin-right:4px" aria-hidden="true"><rect x="1" y="3.5" width="14" height="9" rx="1.5"/><path d="M1 5l7 4.5L15 5"/></svg>
+                Test SMTP
+              </button>
+              <span id="smtpTestResult" style="font-size:0.85rem"></span>
+            </div>
+          </div>
+
+          <!-- Security pane -->
+          <div class="settings-pane" id="spane-security">
+            <div class="settings-pane-header">
+              <h2 class="settings-pane-title">Security</h2>
+              <p class="settings-pane-desc">Controls for SSH host verification, outbound webhook restrictions, and error reporting exposure.</p>
+            </div>
+
+            <div class="settings-group">
+              <h3 class="settings-group-title">SSH Host Key Verification</h3>
+              <label class="settings-row">
+                <div class="settings-row-info">
+                  <span class="settings-row-label">SSH Host Key Policy</span>
+                  <span class="settings-row-desc">Controls how Cashel handles unrecognised SSH host keys during Live Connect. <strong>Strict</strong> is most secure but requires hosts to be pre-approved in known_hosts.</span>
+                </div>
+                <select id="setting-ssh-host-key-policy" class="settings-select">
+                  <option value="warn">Warn — log and continue</option>
+                  <option value="strict">Strict — reject unknown</option>
+                  <option value="auto_add">Auto-add (lab only)</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="settings-group">
+              <h3 class="settings-group-title">Outbound Webhooks</h3>
+              <label class="settings-row" style="flex-direction:column;align-items:flex-start;gap:0.5rem">
+                <div class="settings-row-info">
+                  <span class="settings-row-label">Allowed Webhook Domains</span>
+                  <span class="settings-row-desc">Extra hostname suffixes (comma-separated) permitted as webhook targets beyond the built-in allowlist (Slack, Teams, Discord). RFC-1918 addresses are always blocked.</span>
+                </div>
+                <input type="text" id="setting-webhook-allowlist"
+                       placeholder="webhooks.mycorp.com, hooks.internal.net"
+                       autocomplete="off" style="width:100%;max-width:500px" />
+              </label>
+            </div>
+
+            <div class="settings-group">
+              <h3 class="settings-group-title">Error Reporting</h3>
+              <label class="settings-row">
+                <div class="settings-row-info">
+                  <span class="settings-row-label">Error Detail Level</span>
+                  <span class="settings-row-desc">In <strong>Sanitized</strong> mode only generic messages reach the browser; full exception details are always written to the server log.</span>
+                </div>
+                <select id="setting-error-detail" class="settings-select">
+                  <option value="sanitized">Sanitized (production)</option>
+                  <option value="full">Full (development only)</option>
+                </select>
+              </label>
+            </div>
+          </div>
+
+          <!-- Syslog pane -->
+          <div class="settings-pane" id="spane-syslog">
+            <div class="settings-pane-header">
+              <h2 class="settings-pane-title">Syslog</h2>
+              <p class="settings-pane-desc">Forward all Cashel application events to a remote syslog server for SIEM integration and centralised log management.</p>
+            </div>
+
+            <div class="settings-group">
+              <h3 class="settings-group-title">Syslog Server</h3>
+              <label class="settings-row">
+                <div class="settings-row-info">
+                  <span class="settings-row-label">Enable Syslog Forwarding</span>
+                  <span class="settings-row-desc">Send application log events to the configured syslog target.</span>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="setting-syslog-enabled" />
+                  <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                </label>
+              </label>
+            </div>
+
+            <div class="form-grid" style="margin-top:0">
+              <div class="form-group">
+                <label for="setting-syslog-host">Syslog Host</label>
+                <input type="text" id="setting-syslog-host" placeholder="192.168.1.100 or siem.corp.net" autocomplete="off" />
+              </div>
+              <div class="form-group">
+                <label for="setting-syslog-port">Port</label>
+                <input type="number" id="setting-syslog-port" value="514" min="1" max="65535" />
+              </div>
+              <div class="form-group">
+                <label for="setting-syslog-protocol">Protocol</label>
+                <select id="setting-syslog-protocol">
+                  <option value="udp">UDP — RFC 3164</option>
+                  <option value="tcp">TCP — reliable delivery</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="setting-syslog-facility">Facility</label>
+                <select id="setting-syslog-facility">
+                  <option value="local0">LOCAL0</option>
+                  <option value="local1">LOCAL1</option>
+                  <option value="local2">LOCAL2</option>
+                  <option value="local3">LOCAL3</option>
+                  <option value="local4">LOCAL4</option>
+                  <option value="local5">LOCAL5</option>
+                  <option value="local6">LOCAL6</option>
+                  <option value="local7">LOCAL7</option>
+                  <option value="daemon">DAEMON</option>
+                  <option value="user">USER</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Shared footer -->
+          <div class="settings-footer">
+            <button class="btn-primary" id="saveSettingsBtn">Save Settings</button>
+            <span class="settings-saved-msg hidden" id="settingsSavedMsg">&#10003; Saved</span>
+          </div>
+
+        </div><!-- /.settings-content -->
+      </div><!-- /.settings-shell -->
+    </section>
+
+  </main>
+
+  <footer class="footer">
+    <p>Cashel v1.2 &mdash; Firewall Security Auditor</p>
+  </footer>
+
+  <script>
+  // ═══════════════════════════════════════════════════════════════ THEME ══
+  const html = document.documentElement;
+  const themeIcon = document.getElementById("themeIcon");
+  function applyTheme(theme) {
+    html.setAttribute("data-theme", theme);
+    themeIcon.innerHTML = theme === "dark" ? "&#9790;" : theme === "auto" ? "&#9681;" : "&#9788;";
+    localStorage.setItem("cashel-theme", theme);
+  }
+  applyTheme(html.getAttribute("data-theme") || "auto");
+  document.getElementById("themeToggle").addEventListener("click", () => {
+    const cur = html.getAttribute("data-theme") || "auto";
+    applyTheme(cur === "light" ? "dark" : cur === "dark" ? "auto" : "light");
+  });
+
+  // ═══════════════════════════════════════════════════════ LICENSE MODAL ══
+  const modal = document.getElementById("licenseModal");
+  const openModal  = () => { modal.classList.remove("hidden"); document.body.style.overflow = "hidden"; document.getElementById("licenseKey").focus(); };
+  const closeModal = () => { modal.classList.add("hidden");    document.body.style.overflow = ""; };
+  document.getElementById("licenseBadgeBtn").addEventListener("click", openModal);
+  document.getElementById("modalClose").addEventListener("click", closeModal);
+  modal.addEventListener("click", e => { if (e.target === modal) closeModal(); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
+
+  document.getElementById("activateForm").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    const key  = document.getElementById("licenseKey").value.trim();
+    const res  = await fetch("/license/activate", { method: "POST", body: new URLSearchParams({ key }) });
+    const data = await res.json();
+    showLicenseMsg(data.message, data.success ? "ok" : "error");
+    if (data.success) refreshLicenseBadge(true, key.toUpperCase());
+  });
+  document.getElementById("deactivateForm").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    const res  = await fetch("/license/deactivate", { method: "POST" });
+    const data = await res.json();
+    showLicenseMsg(data.message, data.success ? "ok" : "error");
+    if (data.success) refreshLicenseBadge(false, null);
+  });
+  function showLicenseMsg(msg, type) {
+    const el = document.getElementById("licenseMsg");
+    el.textContent = msg;
+    el.className = "license-msg " + (type === "ok" ? "msg-ok" : "msg-error");
+    el.classList.remove("hidden");
+  }
+  function refreshLicenseBadge(licensed, key) {
+    const badge = document.getElementById("licenseBadge");
+    const status = document.getElementById("licenseStatus");
+    if (licensed) {
+      badge.className = "badge badge-active";
+      badge.innerHTML = "&#10003; Licensed";
+      status.innerHTML = `<p class="status-ok">&#10003; Active license: <code>${escHtml(key)}</code></p>`;
+    } else {
+      badge.className = "badge badge-unlicensed";
+      badge.innerHTML = "&#9888; Unlicensed";
+      status.innerHTML = `<p class="status-warn">No active license. Compliance checks require a valid key.</p>`;
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════ TABS ══
+  const tabBtns   = document.querySelectorAll(".tab-btn");
+  const tabPanels = document.querySelectorAll(".tab-panel");
+  function switchTab(tabId) {
+    tabBtns.forEach(b => b.classList.toggle("tab-active", b.dataset.tab === tabId));
+    tabPanels.forEach(p => p.classList.toggle("hidden", p.id !== "tab-" + tabId));
+    if (tabId === "history")   { loadHistory(); loadTrends(); }
+    if (tabId === "settings")  applySettingsToUI();
+    if (tabId === "schedules") loadSchedules();
+  }
+  tabBtns.forEach(btn => btn.addEventListener("click", () => switchTab(btn.dataset.tab)));
+
+  // ════════════════════════════════════════ AUDIT MODE TOGGLE (single/bulk) ══
+  function switchAuditMode(mode) {
+    document.querySelectorAll(".mode-btn").forEach(b => b.classList.toggle("mode-active", b.dataset.mode === mode));
+    document.getElementById("audit-mode-single").classList.toggle("hidden", mode !== "single");
+    document.getElementById("audit-mode-bulk").classList.toggle("hidden", mode !== "bulk");
+  }
+  document.querySelectorAll(".mode-btn").forEach(btn =>
+    btn.addEventListener("click", () => switchAuditMode(btn.dataset.mode))
+  );
+
+  // ═══════════════════════════════════════ HISTORY SUB-TABS (audits/activity) ══
+  function switchHistorySubTab(subtab) {
+    document.querySelectorAll(".sub-tab-btn").forEach(b => b.classList.toggle("sub-tab-active", b.dataset.subtab === subtab));
+    document.getElementById("sub-audits").classList.toggle("hidden", subtab !== "audits");
+    document.getElementById("sub-activity").classList.toggle("hidden", subtab !== "activity");
+    if (subtab === "activity") loadActivity();
+  }
+  document.querySelectorAll(".sub-tab-btn").forEach(btn =>
+    btn.addEventListener("click", () => switchHistorySubTab(btn.dataset.subtab))
+  );
+
+  // ═════════════════════════════════════════════════════ FILE AUDIT ══════
+  const VENDOR_LABELS = {
+    asa: "Cisco ASA", ftd: "Cisco FTD", paloalto: "Palo Alto Networks", fortinet: "Fortinet",
+    pfsense: "pfSense", aws: "AWS Security Group", azure: "Azure NSG",
+    juniper: "Juniper SRX", gcp: "GCP VPC Firewall",
+    iptables: "iptables (Linux)", nftables: "nftables (Linux)"
+  };
+
+  document.getElementById("config").addEventListener("change", function () {
+    document.getElementById("fileLabel").textContent =
+      this.files.length ? this.files[0].name : "Choose a file\u2026";
+  });
+
+  // Filter state for audit results
+  let activeFilter = null;
+  document.getElementById("summaryGrid").addEventListener("click", function (e) {
+    const box = e.target.closest(".summary-box[data-filter]");
+    if (!box) return;
+    const filter = box.dataset.filter;
+    if (activeFilter === filter && filter !== "all") {
+      activeFilter = null; applyFindingFilter(null);
+      document.querySelectorAll("#summaryGrid .summary-box").forEach(b => b.classList.remove("filter-active"));
+    } else {
+      activeFilter = filter === "all" ? null : filter;
+      applyFindingFilter(activeFilter);
+      document.querySelectorAll("#summaryGrid .summary-box").forEach(b =>
+        b.classList.toggle("filter-active", b === box)
+      );
+    }
+  });
+
+  function applyFindingFilter(filter) {
+    document.querySelectorAll("#findingsList .finding").forEach(f => {
+      if (!filter) { f.style.display = ""; return; }
+      const show =
+        filter === "high"       ? f.classList.contains("finding-high") :
+        filter === "medium"     ? f.classList.contains("finding-medium") :
+        filter === "compliance" ? (f.classList.contains("finding-compliance-high") || f.classList.contains("finding-compliance-medium")) :
+        true;
+      f.style.display = show ? "" : "none";
+    });
+  }
+
+  // ═══════════════════════════════════════════════ TRENDS CHART ══
+  let trendsChartInstance = null;
+  let trendsData = [];
+
+  const CHART_COLORS = [
+    "#4488FF","#FF6868","#44BB88","#FFAA00","#AA44FF","#FF8844","#44CCFF","#FF44AA"
+  ];
+
+  async function loadTrends() {
+    try {
+      const res  = await fetch("/archive/trends");
+      trendsData = await res.json();
+      renderTrends(trendsData);
+    } catch (_) {}
+  }
+
+  function renderTrends(data) {
+    // Populate vendor dropdown from full trendsData
+    const vendorSel  = document.getElementById("trendsVendorFilter");
+    const deviceSel  = document.getElementById("trendsDeviceFilter");
+    const selVendor  = vendorSel.value;
+    const selDevice  = deviceSel.value;
+
+    const allVendors = [...new Set(trendsData.map(e => e.vendor).filter(Boolean))].sort();
+    vendorSel.innerHTML = `<option value="">All vendors</option>` +
+      allVendors.map(v => `<option value="${escHtml(v)}" ${v === selVendor ? "selected" : ""}>${escHtml(VENDOR_LABELS[v] || v)}</option>`).join("");
+
+    // Populate device dropdown (filtered by vendor if selected)
+    const deviceSource = selVendor ? trendsData.filter(e => e.vendor === selVendor) : trendsData;
+    const allDevices = [...new Set(deviceSource.map(e => e.tag || e.filename).filter(Boolean))].sort();
+    deviceSel.innerHTML = `<option value="">All devices</option>` +
+      allDevices.map(d => `<option value="${escHtml(d)}" ${d === selDevice ? "selected" : ""}>${escHtml(d)}</option>`).join("");
+
+    // Apply filters
+    let scored = data.filter(e => e.score !== null && e.score !== undefined);
+    if (selVendor) scored = scored.filter(e => e.vendor === selVendor);
+    const effectiveDevice = allDevices.includes(selDevice) ? selDevice : "";
+    if (effectiveDevice) scored = scored.filter(e => (e.tag || e.filename) === effectiveDevice);
+
+    const empty  = document.getElementById("trendsEmpty");
+    const wrap   = document.getElementById("trendsChartWrap");
+
+    if (scored.length < 2) {
+      empty.classList.remove("hidden");
+      wrap.style.display = "none";
+      return;
+    }
+    empty.classList.add("hidden");
+    wrap.style.display = "";
+
+    // Group by device key (tag || filename)
+    const byDevice = {};
+    scored.forEach(e => {
+      const key = e.tag || e.filename;
+      if (!byDevice[key]) byDevice[key] = [];
+      byDevice[key].push(e);
+    });
+
+    const allTimestamps = [...new Set(scored.map(e => e.timestamp))].sort();
+    const labels = allTimestamps.map(ts => {
+      const d = new Date(ts);
+      return d.toLocaleDateString() + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    });
+
+    const devices = Object.keys(byDevice);
+    const datasets = devices.map((dev, i) => {
+      const color = CHART_COLORS[i % CHART_COLORS.length];
+      const points = allTimestamps.map(ts => {
+        const entry = byDevice[dev].find(e => e.timestamp === ts);
+        return entry ? entry.score : null;
+      });
+      return {
+        label: dev,
+        data: points,
+        borderColor: color,
+        backgroundColor: color + "22",
+        pointBackgroundColor: color,
+        tension: 0.3,
+        spanGaps: true,
+        pointRadius: 4,
+        pointHoverRadius: 6,
+      };
+    });
+
+    const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+    const gridColor  = isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)";
+    const tickColor  = isDark ? "#9999BB" : "#6B6B8A";
+
+    if (trendsChartInstance) trendsChartInstance.destroy();
+    trendsChartInstance = new Chart(document.getElementById("trendsChart"), {
+      type: "line",
+      data: { labels, datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        interaction: { mode: "index", intersect: false },
+        plugins: {
+          legend: { labels: { color: tickColor, font: { size: 11 } } },
+          tooltip: {
+            callbacks: {
+              label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y !== null ? ctx.parsed.y + "/100" : "—"}`
+            }
+          }
+        },
+        scales: {
+          x: { ticks: { color: tickColor, maxRotation: 30, font: { size: 10 } }, grid: { color: gridColor } },
+          y: {
+            min: 0, max: 100,
+            ticks: { color: tickColor, callback: v => v + "/100", font: { size: 10 } },
+            grid: { color: gridColor },
+          }
+        }
+      }
+    });
+  }
+
+  document.getElementById("refreshTrendsBtn").addEventListener("click", loadTrends);
+  document.getElementById("trendsVendorFilter").addEventListener("change", () => {
+    // Reset device filter when vendor changes, then re-render
+    document.getElementById("trendsDeviceFilter").value = "";
+    renderTrends(trendsData);
+  });
+  document.getElementById("trendsDeviceFilter").addEventListener("change", () => renderTrends(trendsData));
+
+  document.getElementById("auditForm").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    setLoading("submitBtn", "submitText", "submitSpinner", "Running\u2026", true);
+    try {
+      const res  = await fetch("/audit", { method: "POST", body: new FormData(this) });
+      const data = await res.json();
+      if (data.error) { showAuditError(data.error); return; }
+      renderResults(data);
+    } catch (err) {
+      showAuditError("Unexpected error: " + err.message);
+    } finally {
+      setLoading("submitBtn", "submitText", "submitSpinner", "Run Audit", false);
+    }
+  });
+
+  function showAuditError(msg) {
+    const section = document.getElementById("resultsSection");
+    section.classList.remove("hidden");
+    ["summaryGrid"].forEach(id => document.getElementById(id).innerHTML = "");
+    document.getElementById("findingsList").innerHTML = `<div class="alert alert-error">${escHtml(msg)}</div>`;
+    ["pdfRow","exportRow","archiveRow","licenseWarning"].forEach(id => document.getElementById(id).classList.add("hidden"));
+    document.getElementById("detectedVendorTag").classList.add("hidden");
+  }
+
+  function renderResults(data) {
+    document.getElementById("resultsSection").classList.remove("hidden");
+
+    const tag = document.getElementById("detectedVendorTag");
+    if (data.detected_vendor) {
+      tag.textContent = "Detected: " + (VENDOR_LABELS[data.detected_vendor] || data.detected_vendor);
+      tag.classList.remove("hidden");
+    } else { tag.classList.add("hidden"); }
+
+    // Auto-fill device tag from config hostname if the field is still empty
+    if (data.detected_hostname) {
+      const tagField = document.getElementById("deviceTag");
+      if (!tagField.value.trim()) tagField.value = data.detected_hostname;
+    }
+
+    const warn = document.getElementById("licenseWarning");
+    if (data.license_warning) { warn.innerHTML = data.license_warning; warn.classList.remove("hidden"); }
+    else { warn.classList.add("hidden"); }
+
+    activeFilter = null; applyFindingFilter(null);
+    document.getElementById("summaryGrid").innerHTML = buildSummaryHTML(data.summary);
+
+    const enriched = data.enriched_findings || data.findings.map(f => ({ message: f, category: null, remediation: null }));
+    document.getElementById("findingsList").innerHTML = enriched.length
+      ? enriched.map(f => buildFindingHTML(f)).join("")
+      : `<div class="finding finding-pass">[PASS] No issues found</div>`;
+
+    const pdfRow = document.getElementById("pdfRow");
+    if (data.report) {
+      document.getElementById("pdfLink").href     = "/reports/" + data.report;
+      document.getElementById("pdfViewLink").href = "/reports/" + data.report + "/view";
+      pdfRow.classList.remove("hidden");
+    } else { pdfRow.classList.add("hidden"); }
+
+    if (data.archive_id) { document.getElementById("archiveRow").classList.remove("hidden"); }
+    else { document.getElementById("archiveRow").classList.add("hidden"); }
+
+    lastAuditData = data;
+    document.getElementById("exportRow").classList.remove("hidden");
+  }
+
+  document.getElementById("viewHistoryBtn").addEventListener("click", () => switchTab("history"));
+
+  // ══════════════════════════════════════════════════════ EXPORT ══
+  let lastAuditData = null;
+
+  function _downloadBlob(content, filename, mime) {
+    const blob = new Blob([content], {type: mime});
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function _exportBasename() {
+    if (!lastAuditData) return "audit";
+    const fn = lastAuditData.filename || lastAuditData.vendor || "audit";
+    return fn.replace(/\.[^.]+$/, "");
+  }
+
+  function exportJSON() {
+    if (!lastAuditData) return;
+    const payload = {
+      tool: "Cashel", version: "1.2",
+      filename:  lastAuditData.filename  || "",
+      vendor:    lastAuditData.vendor    || "",
+      timestamp: new Date().toISOString(),
+      summary:   lastAuditData.summary   || {},
+      findings:  lastAuditData.enriched_findings || lastAuditData.findings || [],
+    };
+    _downloadBlob(JSON.stringify(payload, null, 2), _exportBasename() + "_cashel.json", "application/json");
+  }
+
+  function exportCSV() {
+    if (!lastAuditData) return;
+    const findings = lastAuditData.enriched_findings || [];
+    const rows = [["severity","category","message","remediation"]];
+    for (const f of findings) {
+      if (typeof f === "string") {
+        const sev = f.includes("[HIGH]") ? "HIGH" : f.includes("[MEDIUM]") ? "MEDIUM" : "";
+        rows.push([sev, "", f, ""]);
+      } else {
+        rows.push([f.severity||"", f.category||"", f.message||"", f.remediation||""]);
+      }
+    }
+    const csv = rows.map(r => r.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(",")).join("\n");
+    _downloadBlob(csv, _exportBasename() + "_cashel.csv", "text/csv");
+  }
+
+  function exportSARIF() {
+    if (!lastAuditData) return;
+    const findings  = lastAuditData.enriched_findings || [];
+    const seenRules = {};
+    const results   = findings.map(f => {
+      const isStr      = typeof f === "string";
+      const category   = (!isStr && f.category)  || "general";
+      const severity   = (!isStr && f.severity)   || (String(f).includes("[HIGH]") ? "HIGH" : "MEDIUM");
+      const message    = (!isStr && f.message)    || String(f);
+      const remediation = (!isStr && f.remediation) || "";
+      const ruleId     = "FLK-" + category.toUpperCase();
+      if (!seenRules[ruleId]) {
+        seenRules[ruleId] = {
+          id: ruleId,
+          name: category.replace(/-/g," ").replace(/\b\w/g, c => c.toUpperCase()),
+          shortDescription: {text: "Cashel " + category + " check"},
+          properties: {category},
+        };
+      }
+      const result = {ruleId, level: severity === "HIGH" ? "error" : "warning", message: {text: message}, locations: []};
+      if (remediation) result.fixes = [{description: {text: remediation}}];
+      return result;
+    });
+    const sarif = {
+      version: "2.1.0",
+      "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+      runs: [{
+        tool: {driver: {name:"Cashel", version:"1.2", informationUri:"https://github.com/Shamrock13/cashel", rules: Object.values(seenRules)}},
+        results,
+      }],
+    };
+    _downloadBlob(JSON.stringify(sarif, null, 2), _exportBasename() + "_cashel.sarif", "application/json");
+  }
+
+  document.getElementById("exportJsonBtn").addEventListener("click",  exportJSON);
+  document.getElementById("exportCsvBtn").addEventListener("click",   exportCSV);
+  document.getElementById("exportSarifBtn").addEventListener("click", exportSARIF);
+
+  // ══════════════════════════════════════════════════ COMPARE CONFIGS ══
+  document.getElementById("config_a").addEventListener("change", function () {
+    document.getElementById("fileLabelA").textContent = this.files.length ? this.files[0].name : "Choose a file\u2026";
+  });
+  document.getElementById("config_b").addEventListener("change", function () {
+    document.getElementById("fileLabelB").textContent = this.files.length ? this.files[0].name : "Choose a file\u2026";
+  });
+
+  document.getElementById("diffForm").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    setLoading("diffBtn", "diffText", "diffSpinner", "Comparing\u2026", true);
+    try {
+      const res  = await fetch("/diff", { method: "POST", body: new FormData(this) });
+      const data = await res.json();
+      if (data.error) {
+        document.getElementById("diffResults").classList.remove("hidden");
+        document.getElementById("diffSummary").innerHTML = `<div class="alert alert-error">${escHtml(data.error)}</div>`;
+        ["diffAdded","diffRemoved","diffUnchanged"].forEach(id => document.getElementById(id).innerHTML = "");
+        return;
+      }
+      renderDiff(data);
+    } catch (err) {
+      document.getElementById("diffResults").classList.remove("hidden");
+      document.getElementById("diffSummary").innerHTML = `<div class="alert alert-error">Unexpected error: ${escHtml(err.message)}</div>`;
+    } finally {
+      setLoading("diffBtn", "diffText", "diffSpinner", "Compare", false);
+    }
+  });
+
+  function renderDiff(data) {
+    document.getElementById("diffResults").classList.remove("hidden");
+
+    const tag = document.getElementById("diffVendorTag");
+    tag.textContent = "Vendor: " + (VENDOR_LABELS[data.vendor] || data.vendor);
+    tag.classList.remove("hidden");
+
+    const added     = data.added     || [];
+    const removed   = data.removed   || [];
+    const unchanged = data.unchanged || [];
+
+    document.getElementById("diffSummary").innerHTML = `
+      <div class="diff-stat-row">
+        <span class="diff-stat diff-stat-added">+${added.length} added</span>
+        <span class="diff-stat diff-stat-removed">&#8722;${removed.length} removed</span>
+        <span class="diff-stat diff-stat-unchanged">${unchanged.length} unchanged</span>
+      </div>
+      <p class="diff-files">${escHtml(data.filename_a)} &rarr; ${escHtml(data.filename_b)}</p>`;
+
+    const renderGroup = (elId, items, cls, label) => {
+      const el = document.getElementById(elId);
+      if (!items.length) { el.innerHTML = ""; return; }
+      el.innerHTML = `<div class="diff-group-label ${cls}-label">${label} (${items.length})</div>` +
+        items.map(r => `<div class="diff-row ${cls}">${escHtml(r)}</div>`).join("");
+    };
+    renderGroup("diffAdded",     added,     "diff-added",     "&#43; Added");
+    renderGroup("diffRemoved",   removed,   "diff-removed",   "&#8722; Removed");
+    renderGroup("diffUnchanged", unchanged, "diff-unchanged", "&#8799; Unchanged");
+  }
+
+  // ════════════════════════════════════════════════════ LIVE CONNECT ══════
+  document.getElementById("connectForm").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    setLoading("connectBtn", "connectText", "connectSpinner", "Connecting\u2026", true);
+    try {
+      const res  = await fetch("/connect", { method: "POST", body: new URLSearchParams(new FormData(this)) });
+      const data = await res.json();
+      if (data.error) {
+        document.getElementById("connectResults").classList.remove("hidden");
+        document.getElementById("connFindingsList").innerHTML = `<div class="alert alert-error">${escHtml(data.error)}</div>`;
+        document.getElementById("connSummaryGrid").innerHTML  = "";
+        document.getElementById("connVendorTag").classList.add("hidden");
+        return;
+      }
+      renderConnectResults(data);
+    } catch (err) {
+      document.getElementById("connectResults").classList.remove("hidden");
+      document.getElementById("connFindingsList").innerHTML = `<div class="alert alert-error">Unexpected error: ${escHtml(err.message)}</div>`;
+    } finally {
+      setLoading("connectBtn", "connectText", "connectSpinner", "Connect & Audit", false);
+    }
+  });
+
+  function renderConnectResults(data) {
+    document.getElementById("connectResults").classList.remove("hidden");
+    const tag = document.getElementById("connVendorTag");
+    tag.textContent = (VENDOR_LABELS[data.detected_vendor] || data.detected_vendor) + " @ " + data.host;
+    tag.classList.remove("hidden");
+    document.getElementById("connSummaryGrid").innerHTML = buildSummaryHTML(data.summary);
+    const enriched = data.enriched_findings || data.findings.map(f => ({ message: f, category: null, remediation: null }));
+    document.getElementById("connFindingsList").innerHTML = enriched.length
+      ? enriched.map(f => buildFindingHTML(f)).join("")
+      : `<div class="finding finding-pass">[PASS] No issues found</div>`;
+    const connArchiveRow = document.getElementById("connArchiveRow");
+    if (data.archive_id) connArchiveRow.classList.remove("hidden");
+    else connArchiveRow.classList.add("hidden");
+  }
+  document.getElementById("connViewHistoryBtn").addEventListener("click", () => switchTab("history"));
+
+  // ════════════════════════════════════════════════ AUDIT HISTORY ══════
+  let historyData = [];
+  let compareSelections = [];
+
+  async function loadHistory() {
+    document.getElementById("historyList").innerHTML = `<p class="text-muted">Loading&hellip;</p>`;
+    try {
+      const res  = await fetch("/archive");
+      historyData = await res.json();
+      compareSelections = [];
+      applyHistoryFilters();
+    } catch (err) {
+      document.getElementById("historyList").innerHTML =
+        `<div class="alert alert-error">Failed to load history: ${escHtml(err.message)}</div>`;
+    }
+  }
+
+  function applyHistoryFilters() {
+    const vendorFilter = document.getElementById("historyVendorFilter").value;
+    const sortMode     = document.getElementById("historySort").value;
+    const search       = document.getElementById("historySearch").value.trim().toLowerCase();
+
+    let entries = historyData.slice();
+    if (vendorFilter) entries = entries.filter(e => e.vendor === vendorFilter);
+    if (search)       entries = entries.filter(e => (e.filename || "").toLowerCase().includes(search) || (e.tag || "").toLowerCase().includes(search));
+
+    if (sortMode === "newest")  entries.sort((a, b) => (b.timestamp || "").localeCompare(a.timestamp || ""));
+    if (sortMode === "oldest")  entries.sort((a, b) => (a.timestamp || "").localeCompare(b.timestamp || ""));
+    if (sortMode === "most")    entries.sort((a, b) => (b.summary?.total || 0) - (a.summary?.total || 0));
+    if (sortMode === "least")   entries.sort((a, b) => (a.summary?.total || 0) - (b.summary?.total || 0));
+
+    renderHistory(entries);
+  }
+
+  ["historyVendorFilter", "historySort"].forEach(id =>
+    document.getElementById(id).addEventListener("change", applyHistoryFilters)
+  );
+  document.getElementById("historySearch").addEventListener("input", applyHistoryFilters);
+
+  function renderHistory(entries) {
+    const el = document.getElementById("historyList");
+    if (!entries.length) {
+      el.innerHTML = `<p class="text-muted">No audit history yet. Run an audit and check &ldquo;Save to Audit History&rdquo;.</p>`;
+      return;
+    }
+    el.innerHTML = entries.map(e => {
+      const ts     = e.timestamp ? new Date(e.timestamp).toLocaleString() : "—";
+      const vendor = VENDOR_LABELS[e.vendor] || e.vendor;
+      const hi = e.summary?.high || 0, med = e.summary?.medium || 0, tot = e.summary?.total || 0;
+      const primaryName = e.tag ? escHtml(e.tag) + " <span style='font-weight:400;color:var(--text-muted)'>v" + (e.version || 1) + "</span>" : escHtml(e.filename);
+      const secondaryMeta = e.tag ? escHtml(e.filename) + " &bull; " + escHtml(vendor) + " &bull; " + escHtml(ts) : escHtml(vendor) + " &bull; " + escHtml(ts);
+      return `<div class="history-entry" data-id="${escHtml(e.id)}">
+        <div class="history-entry-left">
+          <label class="history-check-wrap" title="Select to compare">
+            <input type="checkbox" class="history-check" data-id="${escHtml(e.id)}" />
+          </label>
+          <div class="history-entry-info">
+            <span class="history-filename">${primaryName}</span>
+            <span class="history-meta">${secondaryMeta}</span>
+          </div>
+        </div>
+        <div class="history-entry-right">
+          <span class="history-badge sev-high" title="High">${hi}</span>
+          <span class="history-badge sev-medium" title="Medium">${med}</span>
+          <span class="history-badge sev-total" title="Total">${tot}</span>
+          <a class="btn-secondary btn-sm" href="/archive/${escHtml(e.id)}/export?fmt=json"  download title="Download JSON">JSON</a>
+          <a class="btn-secondary btn-sm" href="/archive/${escHtml(e.id)}/export?fmt=csv"   download title="Download CSV">CSV</a>
+          <a class="btn-secondary btn-sm" href="/archive/${escHtml(e.id)}/export?fmt=sarif" download title="Download SARIF">SARIF</a>
+          <button class="btn-danger btn-sm" data-delete="${escHtml(e.id)}" title="Delete">&#128465;</button>
+        </div>
+      </div>`;
+    }).join("") + `
+    <div class="history-compare-bar" id="compareBar">
+      <span id="compareBarText">Select two entries to compare</span>
+      <button class="btn-primary btn-sm" id="compareBtn" disabled>Compare Selected</button>
+    </div>`;
+
+    el.querySelectorAll(".history-check").forEach(cb => {
+      cb.addEventListener("change", function () {
+        if (this.checked) {
+          if (compareSelections.length >= 2) {
+            const old = compareSelections.shift();
+            const oldCb = el.querySelector(`.history-check[data-id="${old}"]`);
+            if (oldCb) oldCb.checked = false;
+          }
+          compareSelections.push(this.dataset.id);
+        } else {
+          compareSelections = compareSelections.filter(id => id !== this.dataset.id);
+        }
+        updateCompareBar();
+      });
+    });
+
+    el.querySelectorAll("[data-delete]").forEach(btn => {
+      btn.addEventListener("click", async function () {
+        await fetch("/archive/" + this.dataset.delete, { method: "DELETE" });
+        await loadHistory();
+      });
+    });
+
+    document.getElementById("compareBtn").addEventListener("click", runCompare);
+  }
+
+  function updateCompareBar() {
+    const btn  = document.getElementById("compareBtn");
+    const text = document.getElementById("compareBarText");
+    const n    = compareSelections.length;
+    btn.disabled = n < 2;
+    text.textContent = n === 0 ? "Select two entries to compare" :
+                       n === 1 ? "Select one more entry" : "Ready to compare";
+  }
+
+  async function runCompare() {
+    if (compareSelections.length < 2) return;
+    // Always put the older entry as baseline (id_a) regardless of selection order
+    const entries = compareSelections.map(id => historyData.find(e => e.id === id)).filter(Boolean);
+
+    // Block cross-vendor comparisons
+    if (entries[0].vendor !== entries[1].vendor) {
+      const section = document.getElementById("compareResults");
+      section.classList.remove("hidden");
+      document.getElementById("compareContent").innerHTML =
+        `<div class="alert alert-error">Cannot compare audits from different vendors. Both entries must be the same vendor.</div>`;
+      return;
+    }
+
+    entries.sort((a, b) => (a.timestamp || "").localeCompare(b.timestamp || ""));
+    const id_a = entries[0].id;
+    const id_b = entries[1].id;
+    try {
+      const res  = await fetch("/archive/compare", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id_a, id_b }),
+      });
+      const data = await res.json();
+      if (data.error) { alert("Compare error: " + data.error); return; }
+      renderComparison(data);
+    } catch (err) {
+      alert("Failed to compare: " + err.message);
+    }
+  }
+
+  function renderComparison(data) {
+    const section = document.getElementById("compareResults");
+    section.classList.remove("hidden");
+
+    const ea = data.entry_a, eb = data.entry_b, d = data.delta;
+    const tsA = ea.timestamp ? new Date(ea.timestamp).toLocaleString() : "—";
+    const tsB = eb.timestamp ? new Date(eb.timestamp).toLocaleString() : "—";
+
+    const deltaStr = v =>
+      v > 0 ? `<span class="delta-worse">+${v}</span>` :
+      v < 0 ? `<span class="delta-better">${v}</span>` :
+      `<span class="delta-neutral">0</span>`;
+
+    const dirLabel = data.improved   ? "&#8679; Improved" :
+                     d.total === 0   ? "&#8596; No change" : "&#8681; Regressed";
+    const dirClass = data.improved   ? "arrow-better" :
+                     d.total === 0   ? "arrow-neutral" : "arrow-worse";
+
+    document.getElementById("compareContent").innerHTML = `
+      <div class="compare-header">
+        <div class="compare-col">
+          <div class="compare-label">Baseline</div>
+          <div class="compare-filename">${escHtml(ea.filename)}</div>
+          <div class="compare-ts">${escHtml(tsA)}</div>
+          <div class="compare-stats">
+            <span class="sev-high history-badge">${ea.summary.high} High</span>
+            <span class="sev-medium history-badge">${ea.summary.medium} Med</span>
+          </div>
+        </div>
+        <div class="compare-arrow ${dirClass}">${dirLabel}</div>
+        <div class="compare-col">
+          <div class="compare-label">Current</div>
+          <div class="compare-filename">${escHtml(eb.filename)}</div>
+          <div class="compare-ts">${escHtml(tsB)}</div>
+          <div class="compare-stats">
+            <span class="sev-high history-badge">${eb.summary.high} High</span>
+            <span class="sev-medium history-badge">${eb.summary.medium} Med</span>
+          </div>
+        </div>
+      </div>
+      <div class="compare-delta-row">
+        <div class="compare-delta-box"><span class="delta-label">High &Delta;</span>${deltaStr(d.high)}</div>
+        <div class="compare-delta-box"><span class="delta-label">Medium &Delta;</span>${deltaStr(d.medium)}</div>
+        <div class="compare-delta-box"><span class="delta-label">Total &Delta;</span>${deltaStr(d.total)}</div>
+      </div>
+      ${data.resolved_findings.length ? `
+        <div class="diff-group-label diff-added-label">&#10003; Resolved Issues (${data.resolved_findings.length})</div>
+        ${data.resolved_findings.map(f => `<div class="diff-row diff-added">${escHtml(f)}</div>`).join("")}
+      ` : ""}
+      ${data.new_findings.length ? `
+        <div class="diff-group-label diff-removed-label">&#9888; New Issues (${data.new_findings.length})</div>
+        ${data.new_findings.map(f => `<div class="diff-row diff-removed">${escHtml(f)}</div>`).join("")}
+      ` : ""}
+      ${!data.resolved_findings.length && !data.new_findings.length ? `
+        <div class="finding finding-pass">[PASS] No change in findings between the two audits.</div>
+      ` : ""}`;
+  }
+
+  document.getElementById("refreshHistoryBtn").addEventListener("click", loadHistory);
+
+  // ════════════════════════════════════════════════ ACTIVITY LOG ══════
+  const ACTION_LABELS = {
+    file_audit:      "File Audit",
+    ssh_connect:     "Live SSH",
+    config_diff:     "Config Diff",
+    archive_compare: "Comparison",
+  };
+
+  async function loadActivity() {
+    document.getElementById("activityList").innerHTML = `<p class="text-muted">Loading&hellip;</p>`;
+    try {
+      const res    = await fetch("/activity");
+      const events = await res.json();
+      renderActivity(events);
+    } catch (err) {
+      document.getElementById("activityList").innerHTML =
+        `<div class="alert alert-error">Failed to load activity: ${escHtml(err.message)}</div>`;
+    }
+  }
+
+  function renderActivity(events) {
+    const el = document.getElementById("activityList");
+    if (!events.length) {
+      el.innerHTML = `<p class="text-muted">No activity yet.</p>`;
+      return;
+    }
+    el.innerHTML = events.map(e => {
+      const ts     = e.timestamp ? new Date(e.timestamp).toLocaleString() : "—";
+      const action = ACTION_LABELS[e.action] || e.action;
+      const vendor = VENDOR_LABELS[e.vendor] || e.vendor || "";
+      const ok     = e.success;
+      const errMsg = e.error ? `<span class="activity-error">${escHtml(e.error)}</span>` : "";
+      return `<div class="activity-entry ${ok ? "" : "activity-entry-fail"}">
+        <div class="activity-entry-left">
+          <span class="activity-action-badge">${escHtml(action)}</span>
+          <div class="history-entry-info">
+            <span class="history-filename">${escHtml(e.label)}</span>
+            <span class="history-meta">${vendor ? escHtml(vendor) + " &bull; " : ""}${escHtml(ts)}</span>
+            ${errMsg}
+          </div>
+        </div>
+        <div class="activity-entry-right">
+          <span class="${ok ? "activity-ok" : "activity-fail"}">${ok ? "&#10003; OK" : "&#10007; Failed"}</span>
+          <button class="btn-danger btn-sm" data-delete-activity="${escHtml(e.id)}" title="Delete">&#128465;</button>
+        </div>
+      </div>`;
+    }).join("");
+
+    el.querySelectorAll("[data-delete-activity]").forEach(btn => {
+      btn.addEventListener("click", async function () {
+        await fetch("/activity/" + this.dataset.deleteActivity, { method: "DELETE" });
+        await loadActivity();
+      });
+    });
+  }
+
+  document.getElementById("refreshActivityBtn").addEventListener("click", loadActivity);
+  document.getElementById("clearActivityBtn").addEventListener("click", async function () {
+    if (!confirm("Clear all activity log entries?")) return;
+    await fetch("/activity/clear", { method: "POST" });
+    await loadActivity();
+  });
+
+  // ══════════════════════════════════════════════════════════ HELPERS ══
+  function buildSummaryHTML(s) {
+    const items = [
+      { label: "High",   value: s.high,   cls: "sev-high",   filter: "high" },
+      { label: "Medium", value: s.medium, cls: "sev-medium", filter: "medium" },
+      { label: "Total",  value: s.total,  cls: "sev-total",  filter: "all" },
+    ];
+    if (s.cis_high    || s.cis_medium)   { items.push({ label:"CIS High",    value:s.cis_high,    cls:"sev-compliance",filter:"compliance"}); items.push({ label:"CIS Med",     value:s.cis_medium,   cls:"sev-compliance",filter:"compliance"}); }
+    if (s.stig_cat_i  || s.stig_cat_ii || s.stig_cat_iii) {
+      if (s.stig_cat_i)   items.push({ label:"STIG CAT-I",   value:s.stig_cat_i,   cls:"sev-compliance",filter:"compliance"});
+      if (s.stig_cat_ii)  items.push({ label:"STIG CAT-II",  value:s.stig_cat_ii,  cls:"sev-compliance",filter:"compliance"});
+      if (s.stig_cat_iii) items.push({ label:"STIG CAT-III", value:s.stig_cat_iii, cls:"sev-compliance",filter:"compliance"});
+    }
+    if (s.hipaa_high  || s.hipaa_medium) { items.push({ label:"HIPAA High",  value:s.hipaa_high,  cls:"sev-compliance",filter:"compliance"}); items.push({ label:"HIPAA Med",   value:s.hipaa_medium, cls:"sev-compliance",filter:"compliance"}); }
+    if (s.nist_high   || s.nist_medium)  { items.push({ label:"NIST High",   value:s.nist_high,   cls:"sev-compliance",filter:"compliance"}); items.push({ label:"NIST Med",    value:s.nist_medium,  cls:"sev-compliance",filter:"compliance"}); }
+    if (s.pci_high    || s.pci_medium)   { items.push({ label:"PCI High",    value:s.pci_high,    cls:"sev-compliance",filter:"compliance"}); items.push({ label:"PCI Med",     value:s.pci_medium,   cls:"sev-compliance",filter:"compliance"}); }
+    if (s.soc2_high   || s.soc2_medium)  { items.push({ label:"SOC2 High",   value:s.soc2_high,   cls:"sev-compliance",filter:"compliance"}); items.push({ label:"SOC2 Med",    value:s.soc2_medium,  cls:"sev-compliance",filter:"compliance"}); }
+    let html = items.map(i =>
+      `<div class="summary-box ${i.cls}" data-filter="${i.filter}" title="Click to filter">
+         <span class="summary-val">${i.value}</span><span class="summary-lbl">${i.label}</span>
+       </div>`
+    ).join("");
+    if (s.score !== undefined && s.score !== null) {
+      const scoreCls = s.score >= 80 ? "sev-score-good" : s.score >= 50 ? "sev-score-warn" : "sev-score-bad";
+      html += `<div class="summary-box ${scoreCls}" data-filter="" title="Security score (100 \u2212 HIGH\u00d710 \u2212 MEDIUM\u00d73)">
+        <span class="summary-val">${s.score}</span><span class="summary-lbl">Score /100</span>
+      </div>`;
+    }
+    return html;
+  }
+
+  function findingClass(f) {
+    const msg = typeof f === "object" ? f.message : f;
+    if (msg.includes("[HIGH]")   && !msg.match(/PCI-|CIS-|NIST-|HIPAA-|SOC2-|STIG-/)) return "finding-high";
+    if (msg.includes("[MEDIUM]") && !msg.match(/PCI-|CIS-|NIST-|HIPAA-|SOC2-|STIG-/)) return "finding-medium";
+    if (msg.match(/PCI-HIGH|CIS-HIGH|NIST-HIGH|HIPAA-HIGH|SOC2-HIGH|STIG-CAT-I\]/))   return "finding-compliance-high";
+    if (msg.match(/PCI-MEDIUM|CIS-MEDIUM|NIST-MEDIUM|HIPAA-MEDIUM|SOC2-MEDIUM|STIG-CAT-II\]|STIG-CAT-III\]/)) return "finding-compliance-medium";
+    return "finding-info";
+  }
+
+  const CATEGORY_LABELS = {
+    exposure:   { label: "Exposure",    cls: "cat-exposure" },
+    logging:    { label: "Logging",     cls: "cat-logging" },
+    protocol:   { label: "Protocol",    cls: "cat-protocol" },
+    hygiene:    { label: "Hygiene",     cls: "cat-hygiene" },
+    redundancy: { label: "Redundancy",  cls: "cat-redundancy" },
+    compliance: { label: "Compliance",  cls: "cat-compliance" },
+  };
+
+  function buildFindingHTML(f) {
+    const msg        = typeof f === "object" ? f.message      : f;
+    const category   = typeof f === "object" ? f.category     : null;
+    const remediation= typeof f === "object" ? f.remediation  : null;
+    const cls        = findingClass(f);
+    const catInfo    = category ? (CATEGORY_LABELS[category] || { label: category, cls: "cat-hygiene" }) : null;
+    const catBadge   = catInfo ? `<span class="finding-cat-badge ${catInfo.cls}">${catInfo.label}</span>` : "";
+    const remDiv     = remediation
+      ? `<div class="finding-remediation">&#8618; ${escHtml(remediation)}</div>`
+      : "";
+    return `<div class="finding ${cls}">${catBadge}<span class="finding-msg">${escHtml(msg)}</span>${remDiv}</div>`;
+  }
+
+  function setLoading(btnId, textId, spinnerId, label, loading) {
+    const btn = document.getElementById(btnId);
+    btn.disabled = loading;
+    document.getElementById(textId).textContent = loading ? label : label.replace(/\u2026$/, "").trim();
+    document.getElementById(spinnerId).classList.toggle("hidden", !loading);
+    if (!loading) {
+      const origLabels = { submitBtn:"Run Audit", bulkBtn:"Run Bulk Audit", diffBtn:"Compare", connectBtn:"Connect & Audit" };
+      document.getElementById(textId).textContent = origLabels[btnId] || label;
+    }
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  }
+
+  // ══════════════════════════════════════════════════════ BULK AUDIT ══
+  document.getElementById("bulkConfigs").addEventListener("change", function () {
+    const n = this.files.length;
+    document.getElementById("bulkFileLabel").textContent =
+      n === 0 ? "Choose one or more files\u2026" :
+      n === 1 ? this.files[0].name : n + " files selected";
+  });
+
+  document.getElementById("bulkForm").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    setLoading("bulkBtn", "bulkText", "bulkSpinner", "Running\u2026", true);
+    document.getElementById("bulkResults").classList.add("hidden");
+    try {
+      const res  = await fetch("/bulk_audit", { method: "POST", body: new FormData(this) });
+      const data = await res.json();
+      if (data.error) {
+        document.getElementById("bulkResults").classList.remove("hidden");
+        document.getElementById("bulkResultsList").innerHTML =
+          `<div class="alert alert-error">${escHtml(data.error)}</div>`;
+        return;
+      }
+      renderBulkResults(data);
+    } catch (err) {
+      document.getElementById("bulkResults").classList.remove("hidden");
+      document.getElementById("bulkResultsList").innerHTML =
+        `<div class="alert alert-error">Unexpected error: ${escHtml(err.message)}</div>`;
+    } finally {
+      setLoading("bulkBtn", "bulkText", "bulkSpinner", "Run Bulk Audit", false);
+    }
+  });
+
+  function renderBulkResults(results) {
+    const el = document.getElementById("bulkResultsList");
+    if (!results.length) { el.innerHTML = `<p class="text-muted">No files processed.</p>`; return; }
+    el.innerHTML = results.map(r => {
+      const vendor = VENDOR_LABELS[r.vendor] || r.vendor || "Unknown";
+      const s = r.summary || {};
+      if (r.status === "error") {
+        return `<div class="bulk-result-row bulk-result-error">
+          <div class="bulk-result-header">
+            <span class="bulk-filename">${escHtml(r.filename)}</span>
+            <span class="bulk-status-badge badge-fail">&#10007; Error</span>
+          </div>
+          <div class="alert alert-error" style="margin:0.5rem 0 0">${escHtml(r.error || "Unknown error")}</div>
+        </div>`;
+      }
+      const scoreVal = s.score !== undefined ? s.score : "—";
+      const scoreCls = s.score >= 80 ? "score-good" : s.score >= 50 ? "score-warn" : "score-bad";
+      return `<div class="bulk-result-row">
+        <div class="bulk-result-header">
+          <span class="bulk-filename">${escHtml(r.filename)}</span>
+          <span class="bulk-vendor-tag">${escHtml(vendor)}</span>
+          <span class="bulk-score ${scoreCls}">${scoreVal}/100</span>
+          <span class="bulk-status-badge badge-ok">&#10003; OK</span>
+        </div>
+        <div class="bulk-summary-row">
+          <span class="history-badge sev-high" title="High">${s.high||0} H</span>
+          <span class="history-badge sev-medium" title="Medium">${s.medium||0} M</span>
+          <span class="history-badge sev-total" title="Total">${s.total||0} Total</span>
+          ${r.archive_id ? `<span class="bulk-archived">&#10003; Saved to History</span>` : ""}
+        </div>
+        <details class="bulk-findings-toggle">
+          <summary>${(r.enriched_findings||r.findings||[]).length} finding(s) &mdash; click to expand</summary>
+          <div class="bulk-findings-list">${(r.enriched_findings||[]).length
+            ? (r.enriched_findings).map(f => buildFindingHTML(f)).join("")
+            : (r.findings||[]).map(f => `<div class="finding finding-info">${escHtml(f)}</div>`).join("")
+            || `<div class="finding finding-pass">[PASS] No issues found</div>`}
+          </div>
+        </details>
+      </div>`;
+    }).join("");
+    document.getElementById("bulkResults").classList.remove("hidden");
+  }
+
+  // ══════════════════════════════════════════════════════ SCHEDULES ══
+  let schedulesData = [];
+
+  async function loadSchedules() {
+    document.getElementById("schedulesList").innerHTML = `<p class="text-muted">Loading\u2026</p>`;
+    try {
+      const res = await fetch("/schedules");
+      schedulesData = await res.json();
+      renderSchedules(schedulesData);
+    } catch (err) {
+      document.getElementById("schedulesList").innerHTML =
+        `<div class="alert alert-error">Failed to load schedules: ${escHtml(err.message)}</div>`;
+    }
+  }
+
+  const FREQ_LABELS = { hourly: "Hourly", daily: "Daily", weekly: "Weekly" };
+  const DOW_LABELS  = { mon:"Mon", tue:"Tue", wed:"Wed", thu:"Thu", fri:"Fri", sat:"Sat", sun:"Sun" };
+  const COMP_LABELS = { cis:"CIS", pci:"PCI-DSS", nist:"NIST", hipaa:"HIPAA", "":"—" };
+
+  function renderSchedules(list) {
+    const el = document.getElementById("schedulesList");
+    if (!list.length) {
+      el.innerHTML = `<p class="text-muted">No scheduled audits yet. Fill in the form below to create one.</p>`;
+      return;
+    }
+    el.innerHTML = list.map(s => {
+      const freq    = FREQ_LABELS[s.frequency] || s.frequency;
+      const vendor  = VENDOR_LABELS[s.vendor]  || s.vendor;
+      const comp    = COMP_LABELS[s.compliance||""] || s.compliance || "—";
+      const lastRun = s.last_run ? new Date(s.last_run).toLocaleString() : "Never";
+      const lastSt  = s.last_status === "ok"    ? `<span class="activity-ok">&#10003; OK</span>` :
+                      s.last_status === "error"  ? `<span class="activity-fail">&#10007; Error</span>` : "—";
+      const timing  = s.frequency === "weekly"
+        ? `${DOW_LABELS[s.day_of_week]||s.day_of_week} ${String(s.hour).padStart(2,"0")}:${String(s.minute).padStart(2,"0")} UTC`
+        : s.frequency === "hourly"
+        ? `Every hour at :${String(s.minute).padStart(2,"0")}`
+        : `${String(s.hour).padStart(2,"0")}:${String(s.minute).padStart(2,"0")} UTC`;
+      return `<div class="schedule-entry ${s.enabled ? "" : "schedule-disabled"}">
+        <div class="schedule-entry-left">
+          <div class="schedule-entry-info">
+            <span class="schedule-name">${escHtml(s.name)}</span>
+            <span class="history-meta">${escHtml(vendor)} &bull; ${escHtml(s.host)} &bull; ${freq} @ ${timing} &bull; Compliance: ${escHtml(comp)}</span>
+            <span class="history-meta">Last run: ${escHtml(lastRun)} ${lastSt}${s.last_error ? ` &mdash; <span class="activity-error">${escHtml(s.last_error)}</span>` : ""}</span>
+          </div>
+        </div>
+        <div class="schedule-entry-right">
+          <span class="schedule-status-pill ${s.enabled ? "pill-enabled" : "pill-disabled"}">${s.enabled ? "Enabled" : "Disabled"}</span>
+          <button class="btn-secondary btn-sm" data-sched-run="${escHtml(s.id)}" title="Run now">&#9654; Run Now</button>
+          <button class="btn-secondary btn-sm" data-sched-edit="${escHtml(s.id)}" title="Edit">&#9998; Edit</button>
+          <button class="btn-danger btn-sm"    data-sched-del="${escHtml(s.id)}"  title="Delete">&#128465;</button>
+        </div>
+      </div>`;
+    }).join("");
+
+    // Listeners are delegated to the parent — no per-render attachment needed.
+  }
+
+  function populateScheduleForm(s) {
+    document.getElementById("scheduleFormTitle").textContent = "Edit Schedule";
+    document.getElementById("scheduleId").value        = s.id;
+    document.getElementById("schedName").value         = s.name || "";
+    document.getElementById("schedVendor").value       = s.vendor || "asa";
+    document.getElementById("schedHost").value         = s.host || "";
+    document.getElementById("schedPort").value         = s.port || 22;
+    document.getElementById("schedUser").value         = s.username || "";
+    document.getElementById("schedPass").value         = "";  // never pre-fill password
+    document.getElementById("schedTag").value          = s.tag || "";
+    document.getElementById("schedCompliance").value   = s.compliance || "";
+    document.getElementById("schedFrequency").value    = s.frequency || "daily";
+    document.getElementById("schedHour").value         = s.hour !== undefined ? s.hour : 2;
+    document.getElementById("schedMinute").value       = s.minute !== undefined ? s.minute : 0;
+    document.getElementById("schedDow").value          = s.day_of_week || "mon";
+    document.getElementById("schedEnabled").checked         = !!s.enabled;
+    document.getElementById("schedNotifyFinding").checked   = !!s.notify_on_finding;
+    document.getElementById("schedNotifyError").checked     = !!s.notify_on_error;
+    document.getElementById("schedSlackWebhook").value      = s.notify_slack_webhook || "";
+    document.getElementById("schedTeamsWebhook").value      = s.notify_teams_webhook || "";
+    document.getElementById("schedNotifyEmail").value       = s.notify_email || "";
+    toggleScheduleFreqFields(s.frequency || "daily");
+    document.getElementById("scheduleFormCard").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function toggleScheduleFreqFields(freq) {
+    document.getElementById("schedHourGroup").style.display = freq === "hourly" ? "none" : "";
+    document.getElementById("schedDowGroup").style.display  = freq === "weekly" ? ""     : "none";
+  }
+
+  document.getElementById("schedFrequency").addEventListener("change", function () {
+    toggleScheduleFreqFields(this.value);
+  });
+
+  document.getElementById("schedCancelBtn").addEventListener("click", function () {
+    document.getElementById("scheduleForm").reset();
+    document.getElementById("scheduleId").value = "";
+    document.getElementById("scheduleFormTitle").textContent = "New Schedule";
+    document.getElementById("schedSavedMsg").classList.add("hidden");
+    document.getElementById("schedErrorMsg").classList.add("hidden");
+    toggleScheduleFreqFields("daily");
+  });
+
+  document.getElementById("scheduleForm").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    const schedId = document.getElementById("scheduleId").value.trim();
+    const payload = {
+      name:        document.getElementById("schedName").value.trim(),
+      vendor:      document.getElementById("schedVendor").value,
+      host:        document.getElementById("schedHost").value.trim(),
+      port:        parseInt(document.getElementById("schedPort").value) || 22,
+      username:    document.getElementById("schedUser").value.trim(),
+      tag:         document.getElementById("schedTag").value.trim(),
+      compliance:  document.getElementById("schedCompliance").value,
+      frequency:   document.getElementById("schedFrequency").value,
+      hour:        parseInt(document.getElementById("schedHour").value) || 0,
+      minute:      parseInt(document.getElementById("schedMinute").value) || 0,
+      day_of_week:          document.getElementById("schedDow").value,
+      enabled:              document.getElementById("schedEnabled").checked,
+      notify_on_finding:    document.getElementById("schedNotifyFinding").checked,
+      notify_on_error:      document.getElementById("schedNotifyError").checked,
+      notify_slack_webhook: document.getElementById("schedSlackWebhook").value.trim(),
+      notify_teams_webhook: document.getElementById("schedTeamsWebhook").value.trim(),
+      notify_email:         document.getElementById("schedNotifyEmail").value.trim(),
+    };
+    const pass = document.getElementById("schedPass").value;
+    if (pass) payload.password = pass;
+
+    try {
+      const url    = schedId ? "/schedules/" + schedId : "/schedules";
+      const method = schedId ? "PUT" : "POST";
+      const res    = await fetch(url, {
+        method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (data.error) {
+        const errEl = document.getElementById("schedErrorMsg");
+        errEl.textContent = data.error;
+        errEl.classList.remove("hidden");
+        return;
+      }
+      document.getElementById("schedErrorMsg").classList.add("hidden");
+      const msg = document.getElementById("schedSavedMsg");
+      msg.classList.remove("hidden");
+      setTimeout(() => msg.classList.add("hidden"), 2500);
+      // Reset form for new entry, keep editing state for updates
+      if (!schedId) {
+        this.reset();
+        document.getElementById("scheduleId").value = "";
+        toggleScheduleFreqFields("daily");
+      }
+      await loadSchedules();
+    } catch (err) {
+      alert("Failed to save schedule: " + err.message);
+    }
+  });
+
+  document.getElementById("refreshSchedulesBtn").addEventListener("click", loadSchedules);
+
+  // Delegated event handler for schedule list — set up once, works across re-renders.
+  document.getElementById("schedulesList").addEventListener("click", async function (e) {
+    const runBtn  = e.target.closest("[data-sched-run]");
+    const editBtn = e.target.closest("[data-sched-edit]");
+    const delBtn  = e.target.closest("[data-sched-del]");
+
+    if (runBtn) {
+      runBtn.disabled = true;
+      await fetch("/schedules/" + runBtn.dataset.schedRun + "/run", { method: "POST" });
+      runBtn.disabled = false;
+      alert("Audit queued — check Audit History in a moment.");
+    } else if (editBtn) {
+      const sched = schedulesData.find(s => s.id === editBtn.dataset.schedEdit);
+      if (sched) populateScheduleForm(sched);
+    } else if (delBtn) {
+      if (!confirm("Delete this schedule?")) return;
+      await fetch("/schedules/" + delBtn.dataset.schedDel, { method: "DELETE" });
+      await loadSchedules();
+    }
+  });
+
+  // ═════════════════════════════════════════════════════════ SETTINGS ══
+  let appSettings = { auto_pdf: false, auto_archive: false, default_compliance: "" };
+
+  async function loadSettings() {
+    try {
+      const res = await fetch("/settings");
+      appSettings = await res.json();
+      applySettingsToUI();
+      applySettingsToForm();
+    } catch (_) {}
+  }
+
+  function applySettingsToUI() {
+    document.getElementById("setting-auto-pdf").checked              = !!appSettings.auto_pdf;
+    document.getElementById("setting-auto-archive").checked          = !!appSettings.auto_archive;
+    document.getElementById("setting-default-compliance").value      = appSettings.default_compliance  || "";
+    document.getElementById("setting-smtp-host").value               = appSettings.smtp_host            || "";
+    document.getElementById("setting-smtp-port").value               = appSettings.smtp_port            || 587;
+    document.getElementById("setting-smtp-user").value               = appSettings.smtp_user            || "";
+    document.getElementById("setting-smtp-password").value           = "";  // never pre-fill password
+    document.getElementById("setting-smtp-from").value               = appSettings.smtp_from            || "";
+    document.getElementById("setting-smtp-tls").checked              = appSettings.smtp_tls !== false;
+    // Security settings
+    document.getElementById("setting-ssh-host-key-policy").value     = appSettings.ssh_host_key_policy || "warn";
+    document.getElementById("setting-error-detail").value            = appSettings.error_detail         || "sanitized";
+    document.getElementById("setting-webhook-allowlist").value       = appSettings.webhook_allowlist    || "";
+    // Syslog settings
+    document.getElementById("setting-syslog-enabled").checked        = !!appSettings.syslog_enabled;
+    document.getElementById("setting-syslog-host").value             = appSettings.syslog_host          || "localhost";
+    document.getElementById("setting-syslog-port").value             = appSettings.syslog_port          || 514;
+    document.getElementById("setting-syslog-protocol").value         = appSettings.syslog_protocol      || "udp";
+    document.getElementById("setting-syslog-facility").value         = appSettings.syslog_facility      || "local0";
+  }
+
+  // ── Settings sidebar navigation ──────────────────────────────────────────
+  document.querySelectorAll(".settings-nav-item").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const pane = btn.dataset.pane;
+      document.querySelectorAll(".settings-nav-item").forEach(b => b.classList.remove("settings-nav-active"));
+      document.querySelectorAll(".settings-pane").forEach(p => p.classList.remove("active"));
+      btn.classList.add("settings-nav-active");
+      const target = document.getElementById("spane-" + pane);
+      if (target) target.classList.add("active");
+    });
+  });
+
+  function applySettingsToForm() {
+    document.getElementById("report").checked  = !!appSettings.auto_pdf;
+    document.getElementById("archive").checked = !!appSettings.auto_archive;
+    const comp = appSettings.default_compliance || "";
+    if (comp) {
+      document.getElementById("compliance").value     = comp;
+      document.getElementById("connCompliance").value = comp;
+    }
+  }
+
+  document.getElementById("saveSettingsBtn").addEventListener("click", async function () {
+    const data = {
+      auto_pdf:             document.getElementById("setting-auto-pdf").checked,
+      auto_archive:         document.getElementById("setting-auto-archive").checked,
+      default_compliance:   document.getElementById("setting-default-compliance").value,
+      smtp_host:            document.getElementById("setting-smtp-host").value.trim(),
+      smtp_port:            parseInt(document.getElementById("setting-smtp-port").value) || 587,
+      smtp_user:            document.getElementById("setting-smtp-user").value.trim(),
+      smtp_from:            document.getElementById("setting-smtp-from").value.trim(),
+      smtp_tls:             document.getElementById("setting-smtp-tls").checked,
+      // Security settings
+      ssh_host_key_policy:  document.getElementById("setting-ssh-host-key-policy").value,
+      error_detail:         document.getElementById("setting-error-detail").value,
+      webhook_allowlist:    document.getElementById("setting-webhook-allowlist").value.trim(),
+      // Syslog settings
+      syslog_enabled:       document.getElementById("setting-syslog-enabled").checked,
+      syslog_host:          document.getElementById("setting-syslog-host").value.trim(),
+      syslog_port:          parseInt(document.getElementById("setting-syslog-port").value) || 514,
+      syslog_protocol:      document.getElementById("setting-syslog-protocol").value,
+      syslog_facility:      document.getElementById("setting-syslog-facility").value,
+      ...(document.getElementById("setting-smtp-password").value
+          ? {smtp_password: document.getElementById("setting-smtp-password").value}
+          : {}),
+    };
+    try {
+      const res = await fetch("/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      appSettings = await res.json();
+      applySettingsToForm();
+      const msg = document.getElementById("settingsSavedMsg");
+      msg.classList.remove("hidden");
+      setTimeout(() => msg.classList.add("hidden"), 2500);
+    } catch (_) {}
+  });
+
+  // ══════════════════════════════════════════════════ TEST SMTP ══
+  document.getElementById("testSmtpBtn").addEventListener("click", async function () {
+    const btn    = this;
+    const result = document.getElementById("smtpTestResult");
+    btn.disabled = true;
+    btn.textContent = "Sending…";
+    result.textContent = "";
+    result.style.color = "";
+
+    const payload = {
+      smtp_host:     document.getElementById("setting-smtp-host").value.trim(),
+      smtp_port:     parseInt(document.getElementById("setting-smtp-port").value) || 587,
+      smtp_user:     document.getElementById("setting-smtp-user").value.trim(),
+      smtp_from:     document.getElementById("setting-smtp-from").value.trim(),
+      smtp_tls:      document.getElementById("setting-smtp-tls").checked,
+      to_address:    document.getElementById("setting-smtp-from").value.trim() ||
+                     document.getElementById("setting-smtp-user").value.trim(),
+    };
+    const pass = document.getElementById("setting-smtp-password").value;
+    if (pass) payload.smtp_password = pass;
+
+    try {
+      const res  = await fetch("/settings/test-smtp", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      result.textContent = (data.ok ? "✓ " : "✗ ") + data.message;
+      result.style.color = data.ok ? "var(--color-pass, #16a34a)" : "var(--color-high, #dc2626)";
+    } catch (err) {
+      result.textContent = "✗ Request failed: " + err.message;
+      result.style.color = "var(--color-high, #dc2626)";
+    } finally {
+      btn.disabled    = false;
+      btn.textContent = "✉ Test SMTP";
+    }
+  });
+
+  // Load settings on startup and apply defaults to the audit form
+  loadSettings();
+  </script>
+</body>
+</html>

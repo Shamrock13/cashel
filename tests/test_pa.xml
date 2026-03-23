@@ -1,0 +1,44 @@
+<?xml version="1.0"?>
+<config>
+  <devices>
+    <entry>
+      <vsys>
+        <entry>
+          <security>
+            <rules>
+              <entry name="Allow-Any-Any">
+                <from><member>any</member></from>
+                <to><member>any</member></to>
+                <source><member>any</member></source>
+                <destination><member>any</member></destination>
+                <application><member>any</member></application>
+                <service><member>any</member></service>
+                <action>allow</action>
+              </entry>
+              <entry name="Allow-Web">
+                <from><member>untrust</member></from>
+                <to><member>trust</member></to>
+                <source><member>any</member></source>
+                <destination><member>10.0.0.1</member></destination>
+                <application><member>web-browsing</member></application>
+                <service><member>application-default</member></service>
+                <action>allow</action>
+                <log-end>yes</log-end>
+              </entry>
+              <entry name="Allow-Web-Duplicate">
+                <from><member>untrust</member></from>
+                <to><member>trust</member></to>
+                <source><member>any</member></source>
+                <destination><member>10.0.0.1</member></destination>
+                <application><member>web-browsing</member></application>
+                <service><member>application-default</member></service>
+                <action>allow</action>
+                <log-end>yes</log-end>
+              </entry>
+            </rules>
+          </security>
+        </entry>
+      </vsys>
+    </entry>
+  </devices>
+</config>
