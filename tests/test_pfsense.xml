@@ -1,0 +1,40 @@
+<?xml version="1.0"?>
+<pfsense>
+  <filter>
+    <rule>
+      <type>pass</type>
+      <interface>wan</interface>
+      <source><any/></source>
+      <destination><any/></destination>
+      <protocol>any</protocol>
+      <descr>Allow All</descr>
+    </rule>
+    <rule>
+      <type>pass</type>
+      <interface>wan</interface>
+      <source><any/></source>
+      <destination><address>10.0.0.1</address></destination>
+      <protocol>tcp</protocol>
+      <log/>
+      <descr>Allow Web</descr>
+    </rule>
+    <rule>
+      <type>pass</type>
+      <interface>wan</interface>
+      <source><any/></source>
+      <destination><address>10.0.0.1</address></destination>
+      <protocol>tcp</protocol>
+      <log/>
+      <descr>Allow Web Duplicate</descr>
+    </rule>
+    <rule>
+      <type>block</type>
+      <interface>wan</interface>
+      <source><any/></source>
+      <destination><any/></destination>
+      <protocol>any</protocol>
+      <log/>
+      <descr>Block All</descr>
+    </rule>
+  </filter>
+</pfsense>

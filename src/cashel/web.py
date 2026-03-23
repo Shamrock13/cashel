@@ -1,0 +1,1031 @@
+import atexit
+import json
+import logging as _logging
+import os
+import re
+import uuid
+from defusedxml import ElementTree as ET
+from pathlib import Path
+from flask import Flask, render_template, request, jsonify, send_file
+
+from .license import check_license, activate_license, deactivate_license
+from .ftd import is_ftd_config
+from .reporter import generate_report
+from .audit_engine import (
+    _findings_to_strings, _wrap_compliance,
+    _sort_findings, _build_summary,
+    run_vendor_audit, run_compliance_checks,
+)
+from .diff import diff_configs
+from .archive import save_audit, list_archive, get_entry, delete_entry, compare_entries
+from .export import to_json, to_csv, to_sarif
+from .activity_log import (
+    log_activity, list_activity, delete_activity_entry, clear_activity,
+    ACTION_FILE_AUDIT, ACTION_SSH_CONNECT, ACTION_CONFIG_DIFF,
+)
+from .settings import get_settings, save_settings
+from .schedule_store import (
+    list_schedules, get_schedule, create_schedule,
+    update_schedule, delete_schedule, ScheduleValidationError,
+)
+from .scheduler_runner import (
+    start_scheduler, stop_scheduler, reload_job,
+    run_now as scheduler_run_now, scheduler_available,
+)
+from .syslog_handler import configure_syslog
+
+UPLOAD_FOLDER    = os.environ.get("UPLOAD_FOLDER",    "/tmp/cashel_uploads")
+REPORTS_FOLDER   = os.environ.get("REPORTS_FOLDER",   "/tmp/cashel_reports")
+ARCHIVE_FOLDER   = os.environ.get("ARCHIVE_FOLDER",   "/tmp/cashel_archive")
+ACTIVITY_FOLDER  = os.environ.get("ACTIVITY_FOLDER",  "/tmp/cashel_activity")
+
+for _d in (UPLOAD_FOLDER, REPORTS_FOLDER, ARCHIVE_FOLDER, ACTIVITY_FOLDER):
+    os.makedirs(_d, exist_ok=True)
+
+# Settings folder is created lazily by settings.py on first save
+
+app = Flask(__name__, template_folder="templates", static_folder="static")
+app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10 MB upload limit
+
+
+# ── HTTP security headers ─────────────────────────────────────────────────────
+# Applied to every response.  HSTS is intentionally omitted here because
+# Cashel may run over plain HTTP in local/dev setups; enable it at the
+# reverse-proxy layer when deploying with TLS.
+# CSP is omitted pending a full frontend audit (inline scripts + CDN assets
+# need to be enumerated first) — tracked in the security roadmap Phase 2.
+
+@app.after_request
+def _add_security_headers(response):
+    response.headers.setdefault("X-Frame-Options",        "SAMEORIGIN")
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-XSS-Protection",       "1; mode=block")
+    response.headers.setdefault("Referrer-Policy",        "strict-origin-when-cross-origin")
+    response.headers.setdefault(
+        "Permissions-Policy",
+        "geolocation=(), microphone=(), camera=()",
+    )
+    return response
+
+
+# ── Error response helper ─────────────────────────────────────────────────────
+
+_logger = _logging.getLogger(__name__)
+
+
+def _err(exc: Exception, generic_msg: str = "An internal error occurred.") -> str:
+    """Return an error message string respecting the error_detail setting.
+
+    In 'full' mode (development) the raw exception is surfaced.
+    In 'sanitized' mode (production default) only *generic_msg* is returned and
+    the full exception is written to the application log.
+    """
+    _logger.exception("Internal error: %s", exc)
+    if get_settings().get("error_detail") == "full":
+        return str(exc)
+    return generic_msg
+
+
+VENDOR_DISPLAY = {
+    "asa":      "Cisco ASA",
+    "ftd":      "Cisco FTD",
+    "paloalto": "Palo Alto Networks",
+    "fortinet": "Fortinet",
+    "pfsense":  "pfSense",
+    "aws":      "AWS Security Group",
+    "azure":    "Azure NSG",
+    "gcp":      "GCP VPC Firewall",
+    "iptables": "iptables",
+    "juniper":  "Juniper SRX",
+    "nftables": "nftables",
+}
+
+ALL_VENDORS = set(VENDOR_DISPLAY)
+
+
+# ── Vendor auto-detection ─────────────────────────────────────────────────────
+
+def detect_vendor(content: str, filename: str) -> str | None:
+    """Infer firewall vendor from file content and filename."""
+    filename_lower = filename.lower()
+    content_lower  = content.lower()
+    stripped       = content.strip()
+
+    # JSON-based: AWS, Azure, or GCP
+    if stripped.startswith("{") or stripped.startswith("[") or filename_lower.endswith(".json"):
+        try:
+            data = json.loads(content[:8192])  # partial parse for detection
+            if isinstance(data, dict):
+                if "SecurityGroups" in data or "GroupId" in data or "IpPermissions" in data:
+                    return "aws"
+                if "securityRules" in data or "defaultSecurityRules" in data:
+                    return "azure"
+                if isinstance(data.get("value"), list):
+                    # Could be az network nsg list output
+                    if data["value"] and "securityRules" in data["value"][0]:
+                        return "azure"
+                if "items" in data and isinstance(data["items"], list) and data["items"]:
+                    first = data["items"][0]
+                    if "direction" in first and "IPProtocol" not in first and (
+                        "allowed" in first or "denied" in first
+                    ):
+                        return "gcp"
+                if "direction" in data and ("allowed" in data or "denied" in data):
+                    return "gcp"
+            elif isinstance(data, list) and data:
+                first = data[0]
+                if "GroupId" in first or "IpPermissions" in first:
+                    return "aws"
+                if "securityRules" in first or "defaultSecurityRules" in first:
+                    return "azure"
+                if "direction" in first and ("allowed" in first or "denied" in first):
+                    return "gcp"
+        except Exception:
+            pass
+
+    # XML-based: pfSense or Palo Alto
+    if stripped.startswith("<") or filename_lower.endswith(".xml"):
+        if "<pfsense>" in content_lower or ("<filter>" in content_lower and "<rule>" in content_lower):
+            return "pfsense"
+        if any(k in content_lower for k in ("<devices>", "<vsys>", "<security>", "<rulebase>")):
+            return "paloalto"
+
+    # Text-based: Fortinet
+    if "config firewall policy" in content_lower or (
+        "set srcintf" in content_lower and "set dstintf" in content_lower
+    ):
+        return "fortinet"
+
+    # Text-based: Cisco FTD (check before ASA — FTD has ASA-style ACLs too)
+    if any(k in content_lower for k in ("access-control-policy", "firepower threat defense",
+                                         "firepower-module", "intrusion-policy")):
+        return "ftd"
+
+    # Text-based: Juniper SRX ("set" style or hierarchical brace style)
+    if re.search(r"set security policies from-zone", content) or (
+        "from-zone" in content_lower and "to-zone" in content_lower
+        and ("security {" in content or "security{" in content)
+    ):
+        return "juniper"
+
+    # Text-based: nftables ("nft list ruleset" output)
+    if re.search(r"\btable\s+\w+\s+\w+\s*\{|\bchain\s+\w+\s*\{", content):
+        return "nftables"
+
+    # JSON nftables ("nft -j list ruleset")
+    if stripped.startswith("{") or stripped.startswith("["):
+        try:
+            data = json.loads(content[:8192])
+            nft_entries = data if isinstance(data, list) else data.get("nftables", [])
+            if isinstance(nft_entries, list) and any("chain" in e or "rule" in e for e in nft_entries):
+                return "nftables"
+        except Exception:
+            pass
+
+    # Text-based: iptables-save
+    if re.search(r"^\*\w+$|^-A\s+\w+", content, re.MULTILINE):
+        return "iptables"
+
+    # Text-based: Cisco ASA
+    if "access-list" in content_lower and any(k in content_lower for k in ("permit", "deny")):
+        return "asa"
+
+    return None
+
+
+def validate_vendor_format(content: str, filename: str, vendor: str) -> tuple[bool, str]:
+    """Return (is_valid, error_message). Ensures the file actually matches the vendor format."""
+    content_lower = content.lower()
+    is_xml  = content.strip().startswith("<") or filename.lower().endswith(".xml")
+    is_json = content.strip().startswith(("{", "[")) or filename.lower().endswith(".json")
+
+    if vendor == "ftd":
+        if is_xml or is_json:
+            return False, "Cisco FTD LINA configs are text-based, but this file appears to be XML or JSON."
+        # FTD configs may or may not have access-list; require at least some Cisco CLI content
+        if not any(k in content_lower for k in ("access-list", "access-control-policy",
+                                                  "threat-detection", "intrusion-policy",
+                                                  "interface", "firepower")):
+            return False, "No recognizable Cisco FTD configuration markers found. Check vendor selection."
+
+    elif vendor == "asa":
+        if is_xml or is_json:
+            return False, "Cisco configs are text-based, but this file appears to be XML or JSON."
+        # If the file actually looks like FTD, upgrade silently
+        if is_ftd_config(content):
+            return True, ""  # will be re-routed to ftd in run_audit
+        if "access-list" not in content_lower:
+            return False, "No Cisco access-list statements found. Check vendor selection."
+
+    elif vendor == "paloalto":
+        if not is_xml:
+            return False, "Palo Alto configs are XML-based, but this file is not XML."
+        if not any(m in content_lower for m in ("<devices>", "<vsys>", "<security>", "<rulebase>")):
+            return False, "This XML does not contain Palo Alto Networks configuration markers."
+
+    elif vendor == "fortinet":
+        if is_xml or is_json:
+            return False, "Fortinet configs are text-based, but this file appears to be XML or JSON."
+        if not any(m in content_lower for m in ("config firewall policy", "set srcintf", "set dstintf")):
+            return False, "No Fortinet firewall policy statements found. Check vendor selection."
+
+    elif vendor == "pfsense":
+        if not is_xml:
+            return False, "pfSense configs are XML-based, but this file is not XML."
+        if "<pfsense>" not in content_lower:
+            return False, "pfSense root element <pfsense> not found in this XML file."
+
+    elif vendor == "aws":
+        if not is_json:
+            return False, "AWS Security Group exports are JSON. Please upload a .json file."
+
+    elif vendor == "azure":
+        if not is_json:
+            return False, "Azure NSG exports are JSON. Please upload a .json file."
+
+    elif vendor == "juniper":
+        if is_xml or is_json:
+            return False, "Juniper SRX configs are text-based, but this file appears to be XML or JSON."
+        if not any(m in content_lower for m in (
+            "set security", "from-zone", "to-zone", "security-zone", "security {"
+        )):
+            return False, "No Juniper SRX security configuration markers found. Check vendor selection."
+
+    elif vendor == "gcp":
+        if not is_json:
+            return False, "GCP VPC firewall exports are JSON. Please upload a .json file."
+        try:
+            parsed = json.loads(content[:8192])
+            items = parsed if isinstance(parsed, list) else parsed.get("items", [parsed])
+            if not items or not isinstance(items[0], dict):
+                raise ValueError("empty")
+            first = items[0]
+            if "direction" not in first or ("allowed" not in first and "denied" not in first):
+                return False, (
+                    "This JSON does not contain GCP VPC firewall rule markers "
+                    "('direction', 'allowed'/'denied'). Check vendor selection."
+                )
+        except Exception:
+            return False, "Could not parse this file as a GCP VPC firewall JSON export."
+
+    elif vendor == "iptables":
+        if is_xml:
+            return False, "iptables-save files are text-based, not XML."
+        if not re.search(r"^\*\w+$|^-A\s+\w+", content, re.MULTILINE):
+            return False, ("No iptables-save markers found (expected '*filter' or '-A INPUT ...'). "
+                           "Export with 'iptables-save > rules.txt'.")
+
+    elif vendor == "nftables":
+        # Accept either nft text or JSON
+        is_nft_text = bool(re.search(r"\btable\s+\w+\s+\w+\s*\{|\bchain\s+\w+\s*\{", content))
+        is_nft_json = False
+        if is_json:
+            try:
+                data = json.loads(content[:8192])
+                nft_entries = data if isinstance(data, list) else data.get("nftables", [])
+                is_nft_json = isinstance(nft_entries, list) and any(
+                    "chain" in e or "rule" in e for e in nft_entries
+                )
+            except Exception:
+                pass
+        if not is_nft_text and not is_nft_json:
+            return False, ("No nftables markers found. "
+                           "Export with 'nft list ruleset' or 'nft -j list ruleset'.")
+
+    else:
+        return False, f"Unknown vendor: {vendor}"
+
+    return True, ""
+
+
+# ── Hostname extraction ───────────────────────────────────────────────────────
+
+def extract_hostname(vendor: str, content: str) -> str | None:
+    """Try to extract the device hostname from a config file."""
+    try:
+        if vendor in ("asa", "ftd"):
+            m = re.search(r"^hostname\s+(\S+)", content, re.MULTILINE)
+            return m.group(1) if m else None
+
+        if vendor == "paloalto":
+            root = ET.fromstring(content)
+            el = root.find(".//devices/entry/deviceconfig/system/hostname")
+            return el.text.strip() if el is not None and el.text else None
+
+        if vendor == "fortinet":
+            block = re.search(r"config system global(.*?)end", content, re.DOTALL)
+            if block:
+                m = re.search(r'set hostname\s+"?([^"\n]+)"?', block.group(1))
+                return m.group(1).strip().strip('"') if m else None
+            return None
+
+        if vendor == "pfsense":
+            root = ET.fromstring(content)
+            el = root.find("system/hostname")
+            return el.text.strip() if el is not None and el.text else None
+
+        if vendor == "aws":
+            data = json.loads(content)
+            groups = data if isinstance(data, list) else data.get("SecurityGroups", [data])
+            if groups:
+                for t in groups[0].get("Tags", []):
+                    if t.get("Key") == "Name":
+                        return t["Value"]
+                return groups[0].get("GroupName")
+
+        if vendor == "azure":
+            data = json.loads(content)
+            items = data.get("value", [data]) if isinstance(data, dict) else data
+            if items:
+                return items[0].get("name")
+
+    except Exception:
+        pass
+    return None
+
+
+# ── Routes ────────────────────────────────────────────────────────────────────
+
+@app.route("/")
+def index():
+    licensed, license_info = check_license()
+    return render_template("index.html", licensed=licensed, license_info=license_info)
+
+
+@app.route("/audit", methods=["POST"])
+def run_audit():
+    if "config" not in request.files or request.files["config"].filename == "":
+        return jsonify({"error": "No config file uploaded"}), 400
+
+    vendor       = request.form.get("vendor", "auto").strip().lower()
+    compliance   = request.form.get("compliance", "").strip().lower() or None
+    generate_pdf = request.form.get("report") == "1"
+    archive_it   = request.form.get("archive") == "1"
+    tag          = request.form.get("tag", "").strip() or None
+
+    # Early vendor allowlist check — reject unknown values before touching disk.
+    if vendor not in ("auto", *ALL_VENDORS):
+        return jsonify({"error": f"Unknown vendor '{vendor}'."}), 400
+
+    # Early compliance allowlist check.
+    from .schedule_store import VALID_FRAMEWORKS
+    if compliance and compliance not in VALID_FRAMEWORKS:
+        return jsonify({"error": f"Unknown compliance framework '{compliance}'."}), 400
+
+    upload = request.files["config"]
+    suffix = Path(upload.filename).suffix or ".txt"
+    temp_name = f"{uuid.uuid4()}{suffix}"
+    temp_path = os.path.join(UPLOAD_FOLDER, temp_name)
+    upload.save(temp_path)
+
+    try:
+        with open(temp_path, "r", errors="ignore") as f:
+            sample = f.read(16384)
+    except Exception:
+        sample = ""
+
+    if vendor == "auto":
+        vendor = detect_vendor(sample, upload.filename) or ""
+
+    if vendor not in ALL_VENDORS:
+        os.remove(temp_path)
+        return jsonify({"error": "Could not determine vendor. Please select one manually."}), 400
+
+    # When user selects "Cisco" (asa) manually, check if file is actually FTD
+    if vendor == "asa" and is_ftd_config(sample):
+        vendor = "ftd"
+
+    detected_hostname = extract_hostname(vendor, sample)
+
+    is_valid, validation_msg = validate_vendor_format(sample, upload.filename, vendor)
+    if not is_valid:
+        os.remove(temp_path)
+        return jsonify({"error": f"Wrong vendor selected ({VENDOR_DISPLAY.get(vendor, vendor)}): {validation_msg}"}), 400
+
+    try:
+        findings, parse, extra_data = run_vendor_audit(vendor, temp_path)
+
+        # Compliance checks (license-gated; not applicable for AWS/Azure)
+        license_warning = None
+        if compliance and vendor not in ("aws", "azure"):
+            licensed, _ = check_license()
+            if not licensed:
+                license_warning = (
+                    "Compliance checks require a valid license. "
+                    'Purchase one at <a href="https://shamrock13.gumroad.com/l/cashel" '
+                    'target="_blank" rel="noopener">shamrock13.gumroad.com/l/cashel</a>. '
+                    "Once purchased, enter your key using the Licensed/Unlicensed badge in the top-right corner."
+                )
+            else:
+                raw = run_compliance_checks(vendor, compliance, parse, extra_data)
+                findings += [_wrap_compliance(c) for c in raw]
+
+        findings = _sort_findings(findings)
+        summary  = _build_summary(findings)
+
+        report_filename = None
+        if generate_pdf:
+            report_name = f"cashel_report_{uuid.uuid4().hex[:8]}.pdf"
+            report_path = os.path.join(REPORTS_FOLDER, report_name)
+            generate_report(_findings_to_strings(findings), upload.filename, vendor, compliance, output_path=report_path, summary=summary)
+            report_filename = report_name
+
+        # Optional archive save (store plain strings)
+        archive_id = None
+        if archive_it:
+            archive_id, _ = save_audit(
+                upload.filename, vendor, _findings_to_strings(findings), summary, config_path=temp_path, tag=tag
+            )
+
+        # Always log activity
+        log_activity(
+            ACTION_FILE_AUDIT, upload.filename, vendor=vendor, success=True,
+            details={"total": summary.get("total", 0), "high": summary.get("high", 0),
+                     "archived": archive_id is not None},
+        )
+
+        return jsonify({
+            "findings":           _findings_to_strings(findings),
+            "enriched_findings":  findings,
+            "summary":            summary,
+            "report":             report_filename,
+            "license_warning":    license_warning,
+            "detected_vendor":    vendor,
+            "detected_hostname":  detected_hostname,
+            "archive_id":         archive_id,
+        })
+
+    except Exception as e:
+        log_activity(ACTION_FILE_AUDIT, upload.filename, vendor=vendor or "unknown",
+                     success=False, error=str(e))
+        return jsonify({"error": _err(e, "Audit failed. Check your configuration file and vendor selection.")}), 500
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+
+# ── Config diff ───────────────────────────────────────────────────────────────
+
+@app.route("/diff", methods=["POST"])
+def run_diff():
+    if "config_a" not in request.files or "config_b" not in request.files:
+        return jsonify({"error": "Two config files required (config_a and config_b)"}), 400
+    if request.files["config_a"].filename == "" or request.files["config_b"].filename == "":
+        return jsonify({"error": "Both config files must be selected"}), 400
+
+    vendor = request.form.get("vendor", "auto").strip().lower()
+
+    # Early vendor allowlist check before touching disk.
+    if vendor not in ("auto", *ALL_VENDORS):
+        return jsonify({"error": f"Unknown vendor '{vendor}'."}), 400
+
+    upload_a = request.files["config_a"]
+    upload_b = request.files["config_b"]
+    suffix_a = Path(upload_a.filename).suffix or ".txt"
+    suffix_b = Path(upload_b.filename).suffix or ".txt"
+    path_a = os.path.join(UPLOAD_FOLDER, f"{uuid.uuid4()}{suffix_a}")
+    path_b = os.path.join(UPLOAD_FOLDER, f"{uuid.uuid4()}{suffix_b}")
+    upload_a.save(path_a)
+    upload_b.save(path_b)
+
+    try:
+        # Auto-detect from the first file if needed
+        if vendor == "auto":
+            with open(path_a, "r", errors="ignore") as f:
+                sample = f.read(16384)
+            vendor = detect_vendor(sample, upload_a.filename) or ""
+
+        if vendor not in ALL_VENDORS:
+            return jsonify({"error": "Could not determine vendor. Please select one manually."}), 400
+
+        result = diff_configs(vendor, path_a, path_b)
+        result["vendor"]     = vendor
+        result["filename_a"] = upload_a.filename
+        result["filename_b"] = upload_b.filename
+
+        log_activity(ACTION_CONFIG_DIFF,
+                     f"{upload_a.filename} → {upload_b.filename}",
+                     vendor=vendor, success=True,
+                     details={"added": len(result.get("added", [])),
+                               "removed": len(result.get("removed", [])),
+                               "unchanged": len(result.get("unchanged", []))})
+        return jsonify(result)
+
+    except Exception as e:
+        log_activity(ACTION_CONFIG_DIFF,
+                     f"{upload_a.filename} → {upload_b.filename}",
+                     vendor=vendor or "unknown", success=False, error=str(e))
+        return jsonify({"error": _err(e, "Audit failed. Check your configuration file and vendor selection.")}), 500
+    finally:
+        for p in (path_a, path_b):
+            if os.path.exists(p):
+                os.remove(p)
+
+
+# ── Live SSH connect ──────────────────────────────────────────────────────────
+
+@app.route("/connect", methods=["POST"])
+def live_connect():
+    host       = request.form.get("host", "").strip()
+    port       = request.form.get("port", "22").strip() or "22"
+    username   = request.form.get("username", "").strip()
+    password   = request.form.get("password", "")
+    vendor     = request.form.get("vendor", "").strip().lower()
+    compliance = request.form.get("compliance", "").strip().lower() or None
+    tag        = request.form.get("tag", "").strip() or None
+
+    if not host or not username or not vendor:
+        return jsonify({"error": "host, username, and vendor are required"}), 400
+    if vendor not in ("asa", "ftd", "fortinet", "paloalto"):
+        return jsonify({"error": f"Live SSH not supported for vendor '{vendor}'. Supported: Cisco (ASA/FTD), Fortinet, Palo Alto Networks"}), 400
+
+    label = f"{vendor.upper()}@{host}"
+
+    try:
+        from .ssh_connector import connect_and_pull
+        _settings = get_settings()
+        temp_path, _ = connect_and_pull(
+            vendor, host, port, username, password,
+            timeout=30, upload_folder=UPLOAD_FOLDER,
+            host_key_policy=_settings.get("ssh_host_key_policy", "warn"),
+        )
+    except Exception as e:
+        # Log the failed attempt to activity log only — do NOT save to Audit History
+        log_activity(ACTION_SSH_CONNECT, label, vendor=vendor, success=False, error=str(e),
+                     details={"host": host, "port": port})
+        return jsonify({"error": f"Connection failed: {e}"}), 500
+
+    try:
+        findings, parse, extra_data = run_vendor_audit(vendor, temp_path)
+
+        if compliance:
+            licensed, _ = check_license()
+            if licensed:
+                raw = run_compliance_checks(vendor, compliance, parse, extra_data)
+                findings += [_wrap_compliance(c) for c in raw]
+
+        findings = _sort_findings(findings)
+        summary  = _build_summary(findings)
+
+        # Save successful SSH audits to Audit History (store plain strings)
+        archive_id, _ = save_audit(label, vendor, _findings_to_strings(findings), summary, config_path=temp_path, tag=tag)
+
+        # Log successful activity
+        log_activity(ACTION_SSH_CONNECT, label, vendor=vendor, success=True,
+                     details={"host": host, "port": port,
+                              "total": summary.get("total", 0), "high": summary.get("high", 0)})
+
+        return jsonify({
+            "findings":          _findings_to_strings(findings),
+            "enriched_findings": findings,
+            "summary":           summary,
+            "detected_vendor":   vendor,
+            "host":              host,
+            "archive_id":        archive_id,
+        })
+
+    except Exception as e:
+        log_activity(ACTION_SSH_CONNECT, label, vendor=vendor, success=False, error=str(e),
+                     details={"host": host, "port": port})
+        return jsonify({"error": _err(e, "Audit failed. Check your configuration file and vendor selection.")}), 500
+    finally:
+        if "temp_path" in dir() and os.path.exists(temp_path):
+            os.remove(temp_path)
+
+
+# ── Archive API ───────────────────────────────────────────────────────────────
+
+@app.route("/archive", methods=["GET"])
+def archive_list():
+    return jsonify(list_archive())
+
+
+@app.route("/archive/save", methods=["POST"])
+def archive_save():
+    """Manually save the most recent audit result to the archive."""
+    data = request.get_json(silent=True) or {}
+    filename = data.get("filename", "unknown")
+    vendor   = data.get("vendor", "unknown")
+    findings = data.get("findings", [])
+    summary  = data.get("summary", {})
+    tag      = data.get("tag")
+    if not findings and not summary:
+        return jsonify({"error": "No audit data to save"}), 400
+    entry_id, entry = save_audit(filename, vendor, findings, summary, tag=tag)
+    return jsonify({"id": entry_id, "entry": entry})
+
+
+@app.route("/archive/<entry_id>", methods=["GET"])
+def archive_get(entry_id):
+    entry = get_entry(entry_id)
+    if not entry:
+        return jsonify({"error": "Not found"}), 404
+    return jsonify(entry)
+
+
+@app.route("/archive/<entry_id>", methods=["DELETE"])
+def archive_delete(entry_id):
+    deleted = delete_entry(entry_id)
+    return jsonify({"deleted": deleted})
+
+
+@app.route("/archive/<entry_id>/export", methods=["GET"])
+def archive_export(entry_id):
+    """Export an archived audit as JSON, CSV, or SARIF.
+
+    Query param: fmt = json | csv | sarif  (default: json)
+    """
+    from flask import Response
+    fmt   = request.args.get("fmt", "json").lower()
+    entry = get_entry(entry_id)
+    if not entry:
+        return jsonify({"error": "Not found"}), 404
+
+    base = (entry.get("filename") or "audit").rsplit(".", 1)[0]
+
+    if fmt == "json":
+        content, mime, ext = to_json(entry), "application/json", "json"
+    elif fmt == "csv":
+        content, mime, ext = to_csv(entry), "text/csv", "csv"
+    elif fmt == "sarif":
+        content, mime, ext = to_sarif(entry), "application/json", "sarif"
+    else:
+        return jsonify({"error": f"Unknown format '{fmt}'. Use json, csv, or sarif."}), 400
+
+    return Response(
+        content,
+        mimetype=mime,
+        headers={"Content-Disposition": f'attachment; filename="{base}_cashel.{ext}"'},
+    )
+
+
+@app.route("/archive/trends", methods=["GET"])
+def archive_trends():
+    """Return time-series data for score/finding trends grouped by filename."""
+    entries = list_archive()
+    series = []
+    for e in entries:
+        s = e.get("summary", {})
+        series.append({
+            "id":        e["id"],
+            "filename":  e["filename"],
+            "vendor":    e.get("vendor", ""),
+            "timestamp": e.get("timestamp", ""),
+            "score":     s.get("score"),
+            "high":      s.get("high", 0),
+            "medium":    s.get("medium", 0),
+            "total":     s.get("total", 0),
+            "tag":       e.get("tag"),
+            "version":   e.get("version", 1),
+        })
+    series.sort(key=lambda x: x["timestamp"])
+    return jsonify(series)
+
+
+@app.route("/archive/compare", methods=["POST"])
+def archive_compare():
+    data = request.get_json(silent=True) or {}
+    id_a = data.get("id_a", "")
+    id_b = data.get("id_b", "")
+    if not id_a or not id_b:
+        return jsonify({"error": "id_a and id_b are required"}), 400
+    result, error = compare_entries(id_a, id_b)
+    if error:
+        return jsonify({"error": error}), 404
+    return jsonify(result)
+
+
+# ── Activity Log API ──────────────────────────────────────────────────────────
+
+@app.route("/activity", methods=["GET"])
+def activity_list():
+    limit = int(request.args.get("limit", 200))
+    return jsonify(list_activity(limit=limit))
+
+
+@app.route("/activity/<event_id>", methods=["DELETE"])
+def activity_delete(event_id):
+    deleted = delete_activity_entry(event_id)
+    return jsonify({"deleted": deleted})
+
+
+@app.route("/activity/clear", methods=["POST"])
+def activity_clear():
+    count = clear_activity()
+    return jsonify({"cleared": count})
+
+
+# ── Bulk audit ────────────────────────────────────────────────────────────────
+
+@app.route("/bulk_audit", methods=["POST"])
+def bulk_audit():
+    """Audit multiple config files in one request.
+
+    Accepts: multipart/form-data with repeated field ``configs[]``.
+    Optional shared fields: vendor (default auto), compliance, archive (1/0), tag.
+    Returns: JSON list of per-file result objects.
+    """
+    uploads = request.files.getlist("configs[]")
+    if not uploads or all(u.filename == "" for u in uploads):
+        return jsonify({"error": "No config files uploaded"}), 400
+
+    vendor_override = request.form.get("vendor", "auto").strip().lower()
+    compliance      = request.form.get("compliance", "").strip().lower() or None
+    archive_it      = request.form.get("archive") == "1"
+    tag_prefix      = request.form.get("tag", "").strip() or None
+
+    # Early allowlist checks before processing any files.
+    if vendor_override not in ("auto", *ALL_VENDORS):
+        return jsonify({"error": f"Unknown vendor '{vendor_override}'."}), 400
+    from .schedule_store import VALID_FRAMEWORKS
+    if compliance and compliance not in VALID_FRAMEWORKS:
+        return jsonify({"error": f"Unknown compliance framework '{compliance}'."}), 400
+
+    results = []
+
+    for upload in uploads:
+        if upload.filename == "":
+            continue
+
+        suffix    = Path(upload.filename).suffix or ".txt"
+        temp_name = f"{uuid.uuid4()}{suffix}"
+        temp_path = os.path.join(UPLOAD_FOLDER, temp_name)
+        upload.save(temp_path)
+
+        result_entry = {"filename": upload.filename, "status": "error", "findings": [],
+                        "summary": {}, "vendor": None, "archive_id": None, "error": None}
+
+        try:
+            with open(temp_path, "r", errors="ignore") as f:
+                sample = f.read(16384)
+
+            vendor = vendor_override
+            if vendor == "auto":
+                vendor = detect_vendor(sample, upload.filename) or ""
+
+            if vendor not in ALL_VENDORS:
+                result_entry["error"] = "Could not determine vendor"
+                results.append(result_entry)
+                continue
+
+            if vendor == "asa" and is_ftd_config(sample):
+                vendor = "ftd"
+
+            is_valid, validation_msg = validate_vendor_format(sample, upload.filename, vendor)
+            if not is_valid:
+                result_entry["error"] = validation_msg
+                results.append(result_entry)
+                continue
+
+            findings, parse, extra_data = run_vendor_audit(vendor, temp_path)
+
+            if compliance and vendor not in ("aws", "azure"):
+                licensed, _ = check_license()
+                if licensed:
+                    raw = run_compliance_checks(vendor, compliance, parse, extra_data)
+                    findings += [_wrap_compliance(c) for c in raw]
+
+            findings = _sort_findings(findings)
+            summary  = _build_summary(findings)
+
+            archive_id = None
+            if archive_it:
+                tag = f"{tag_prefix}/{upload.filename}" if tag_prefix else upload.filename
+                archive_id, _ = save_audit(
+                    upload.filename, vendor, _findings_to_strings(findings),
+                    summary, config_path=temp_path, tag=tag,
+                )
+
+            log_activity(
+                ACTION_FILE_AUDIT, upload.filename, vendor=vendor, success=True,
+                details={"bulk": True, "total": summary.get("total", 0),
+                         "high": summary.get("high", 0), "archived": archive_id is not None},
+            )
+
+            result_entry.update({
+                "status":          "ok",
+                "vendor":          vendor,
+                "findings":        _findings_to_strings(findings),
+                "enriched_findings": findings,
+                "summary":         summary,
+                "archive_id":      archive_id,
+            })
+
+        except Exception as e:
+            result_entry["error"] = str(e)
+            log_activity(ACTION_FILE_AUDIT, upload.filename, vendor=vendor_override,
+                         success=False, error=str(e), details={"bulk": True})
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+
+        results.append(result_entry)
+
+    return jsonify(results)
+
+
+# ── Scheduled audits API ───────────────────────────────────────────────────────
+
+@app.route("/schedules", methods=["GET"])
+def schedules_list():
+    return jsonify(list_schedules())
+
+
+@app.route("/schedules", methods=["POST"])
+def schedules_create():
+    data = request.get_json(silent=True) or {}
+    if not data.get("host") or not data.get("username"):
+        return jsonify({"error": "host and username are required"}), 400
+    try:
+        schedule = create_schedule(data)
+    except ScheduleValidationError as exc:
+        return jsonify({"error": str(exc)}), 400
+    reload_job(schedule["id"], get_schedule(schedule["id"], include_password=True))
+    return jsonify(schedule), 201
+
+
+@app.route("/schedules/<schedule_id>", methods=["GET"])
+def schedules_get(schedule_id):
+    schedule = get_schedule(schedule_id)
+    if not schedule:
+        return jsonify({"error": "Not found"}), 404
+    return jsonify(schedule)
+
+
+@app.route("/schedules/<schedule_id>", methods=["PUT"])
+def schedules_update(schedule_id):
+    data = request.get_json(silent=True) or {}
+    try:
+        schedule = update_schedule(schedule_id, data)
+    except ScheduleValidationError as exc:
+        return jsonify({"error": str(exc)}), 400
+    if not schedule:
+        return jsonify({"error": "Not found"}), 404
+    reload_job(schedule_id, get_schedule(schedule_id, include_password=True))
+    return jsonify(schedule)
+
+
+@app.route("/schedules/<schedule_id>", methods=["DELETE"])
+def schedules_delete(schedule_id):
+    deleted = delete_schedule(schedule_id)
+    if deleted:
+        reload_job(schedule_id, None)  # removes the job from the scheduler
+    return jsonify({"deleted": deleted})
+
+
+@app.route("/schedules/<schedule_id>/run", methods=["POST"])
+def schedules_run_now(schedule_id):
+    """Trigger an immediate on-demand run of a scheduled audit."""
+    schedule = get_schedule(schedule_id)
+    if not schedule:
+        return jsonify({"error": "Not found"}), 404
+    scheduler_run_now(schedule_id)
+    return jsonify({"queued": True, "id": schedule_id})
+
+
+@app.route("/schedules/status", methods=["GET"])
+def schedules_status():
+    return jsonify({"scheduler_available": scheduler_available()})
+
+
+# ── Reports / License ─────────────────────────────────────────────────────────
+
+@app.route("/reports", methods=["GET"])
+def reports_list():
+    """List all saved PDF reports."""
+    reports = []
+    for fname in sorted(os.listdir(REPORTS_FOLDER), reverse=True):
+        if fname.endswith(".pdf"):
+            path = os.path.join(REPORTS_FOLDER, fname)
+            reports.append({
+                "filename": fname,
+                "size":     os.path.getsize(path),
+                "mtime":    os.path.getmtime(path),
+            })
+    return jsonify(reports)
+
+
+@app.route("/reports/<filename>")
+def download_report(filename):
+    if ".." in filename or "/" in filename:
+        return "Not found", 404
+    path = os.path.join(REPORTS_FOLDER, filename)
+    if not os.path.exists(path):
+        return "Report not found", 404
+    return send_file(path, as_attachment=True, download_name=filename)
+
+
+@app.route("/reports/<filename>/view")
+def view_report(filename):
+    """Serve PDF inline for in-browser viewing."""
+    if ".." in filename or "/" in filename:
+        return "Not found", 404
+    path = os.path.join(REPORTS_FOLDER, filename)
+    if not os.path.exists(path):
+        return "Report not found", 404
+    return send_file(path, as_attachment=False, mimetype="application/pdf")
+
+
+@app.route("/license/activate", methods=["POST"])
+def license_activate():
+    key = request.form.get("key", "").strip()
+    success, message = activate_license(key)
+    return jsonify({"success": success, "message": message})
+
+
+@app.route("/license/deactivate", methods=["POST"])
+def license_deactivate():
+    success, message = deactivate_license()
+    return jsonify({"success": success, "message": message})
+
+
+@app.route("/license/status")
+def license_status():
+    licensed, info = check_license()
+    return jsonify({"licensed": licensed, "info": info})
+
+
+# ── Settings API ──────────────────────────────────────────────────────────────
+
+@app.route("/settings", methods=["GET"])
+def settings_get():
+    return jsonify(get_settings())
+
+
+@app.route("/settings", methods=["POST"])
+def settings_save():
+    data = request.get_json(silent=True) or {}
+    saved = save_settings(data)
+    # Reconfigure syslog immediately when settings are changed.
+    configure_syslog(saved)
+    return jsonify(saved)
+
+
+@app.route("/settings/test-smtp", methods=["POST"])
+def settings_test_smtp():
+    """Attempt a live SMTP connection and send a test email.
+
+    Accepts the same SMTP fields as /settings POST so the user can test
+    before saving.  Returns {ok: bool, message: str}.
+    """
+    import smtplib
+    import ssl
+    from email.mime.text import MIMEText
+
+    data          = request.get_json(silent=True) or {}
+    smtp_host     = (data.get("smtp_host") or "").strip()
+    smtp_port     = int(data.get("smtp_port") or 587)
+    smtp_user     = (data.get("smtp_user") or "").strip()
+    smtp_password = data.get("smtp_password") or ""
+    smtp_from     = (data.get("smtp_from") or smtp_user or "").strip()
+    smtp_tls      = bool(data.get("smtp_tls", True))
+    to_address    = (data.get("to_address") or smtp_from or smtp_user or "").strip()
+
+    if not smtp_host:
+        return jsonify({"ok": False, "message": "SMTP host is required."}), 400
+    if not to_address:
+        return jsonify({"ok": False, "message": "Could not determine a recipient address — set smtp_from or smtp_user."}), 400
+
+    msg = MIMEText(
+        "This is a test message from Cashel.\n\n"
+        "If you received this, your SMTP settings are configured correctly.",
+        "plain", "utf-8",
+    )
+    msg["Subject"] = "[Cashel] SMTP test"
+    msg["From"]    = smtp_from or to_address
+    msg["To"]      = to_address
+
+    try:
+        context = ssl.create_default_context()
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as server:
+            if smtp_tls:
+                server.starttls(context=context)
+            if smtp_user:
+                server.login(smtp_user, smtp_password)
+            server.sendmail(smtp_from or to_address, [to_address], msg.as_string())
+        return jsonify({"ok": True, "message": f"Test email sent successfully to {to_address}."})
+    except smtplib.SMTPAuthenticationError:
+        return jsonify({"ok": False, "message": "Authentication failed — check username and password."})
+    except smtplib.SMTPConnectError as exc:
+        return jsonify({"ok": False, "message": f"Could not connect to {smtp_host}:{smtp_port} — {exc}"})
+    except smtplib.SMTPException as exc:
+        return jsonify({"ok": False, "message": f"SMTP error: {exc}"})
+    except OSError as exc:
+        return jsonify({"ok": False, "message": f"Connection error: {exc}"})
+
+
+def main():
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
+
+
+# Start scheduler on import — covers both WSGI servers (gunicorn/uwsgi)
+# and direct `cashel-web` invocation. The scheduler has an internal
+# guard that prevents double-start if this module is reloaded.
+start_scheduler()
+atexit.register(stop_scheduler)
+configure_syslog(get_settings())
+
+
+if __name__ == "__main__":
+    main()

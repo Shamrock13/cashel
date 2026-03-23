@@ -1,0 +1,15 @@
+services:
+  cashel:
+    build: .
+    ports:
+      - "8080:5000"
+    volumes:
+      - cashel_data:/data
+    environment:
+      # Change this to a strong secret before deploying to production
+      - CASHEL_SECRET=${CASHEL_SECRET:-change-me-in-production}
+    restart: unless-stopped
+
+volumes:
+  cashel_data:
+    driver: local

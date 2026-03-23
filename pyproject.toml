@@ -1,0 +1,29 @@
+[project]
+name = "cashel"
+version = "1.0.0"
+description = "Firewall configuration auditing tool"
+authors = [
+    {name = "Your Name", email = "you@example.com"}
+]
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "typer>=0.12",
+    "ciscoconfparse>=1.9",
+    "fpdf2>=2.7",
+    "flask>=3.0",
+    "paramiko>=3.0",
+    "apscheduler>=3.10",
+    "defusedxml>=0.7",
+]
+
+[tool.poetry]
+packages = [{include = "cashel", from = "src"}]
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[project.scripts]
+cashel = "cashel.main:app"
+cashel-web = "cashel.web:main"
