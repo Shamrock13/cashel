@@ -1,0 +1,154 @@
+# nftables ruleset output
+# Host: linux-fw-02 | Kernel: 6.1.55 | nftables 1.0.7
+# Generated: nft list ruleset
+# Timestamp: 2024-11-15 10:30:00 UTC
+#
+# This config intentionally contains several audit findings:
+#   - Default accept policy on input and forward hooks
+#   - Any-any accept rules
+#   - Internet-accessible sensitive ports
+#   - Unrestricted ICMP
+#   - Missing log statements before accept on some rules
+
+table inet filter {
+
+    # --- Sets for address management ---
+
+    set mgmt_hosts {
+        type ipv4_addr
+        flags interval
+        elements = {
+            10.70.99.0/24,
+            192.168.1.0/24
+        }
+    }
+
+    set monitoring_hosts {
+        type ipv4_addr
+        flags interval
+        elements = {
+            10.70.99.10,
+            10.70.99.11
+        }
+    }
+
+    set web_servers {
+        type ipv4_addr
+        flags interval
+        elements = {
+            172.16.70.10,
+            172.16.70.11
+        }
+    }
+
+    # --- INPUT chain ---
+    # FINDING: Default accept policy on input — AUDIT WILL FLAG THIS
+    chain input {
+        type filter hook input priority filter; policy accept;
+
+        # Loopback — always allow
+        iif lo accept
+
+        # Established / related
+        ct state established,related accept
+
+        # FINDING: Unrestricted ICMP from any — AUDIT WILL FLAG THIS
+        ip protocol icmp accept
+        ip6 nexthdr ipv6-icmp accept
+
+        # SSH — restricted to management hosts with logging
+        ip saddr @mgmt_hosts tcp dport 22 ct state new log prefix "NFT_SSH_MGMT: " level info accept
+
+        # FINDING: SSH also open to internet without source restriction — AUDIT WILL FLAG THIS
+        tcp dport 22 ct state new accept
+
+        # HTTP/HTTPS inbound to web servers
+        ip daddr @web_servers tcp dport { 80, 443 } ct state new log prefix "NFT_WEB: " level info accept
+
+        # Monitoring — node exporter, restricted to monitoring hosts
+        ip saddr @monitoring_hosts tcp dport 9100 ct state new log prefix "NFT_PROM: " level info accept
+
+        # FINDING: Internet-accessible MySQL — AUDIT WILL FLAG THIS
+        tcp dport 3306 ct state new accept
+
+        # FINDING: Internet-accessible Redis — AUDIT WILL FLAG THIS
+        tcp dport 6379 ct state new accept
+
+        # FINDING: Any-any accept rule — AUDIT WILL FLAG THIS
+        accept
+
+        # Final drop with logging (dead code due to policy accept above)
+        limit rate 10/minute log prefix "NFT_INPUT_DROP: " level warn
+        drop
+    }
+
+    # --- FORWARD chain ---
+    # FINDING: Default accept policy on forward — AUDIT WILL FLAG THIS
+    chain forward {
+        type filter hook forward priority filter; policy accept;
+
+        ct state established,related accept
+        ct state invalid drop
+
+        # Permit LAN to internet through NAT gateway
+        iif eth1 oif eth0 accept
+
+        # Logging on forward drops (dead code due to policy accept)
+        limit rate 5/minute log prefix "NFT_FWD_DROP: " level warn
+        drop
+    }
+
+    # --- OUTPUT chain ---
+    chain output {
+        type filter hook output priority filter; policy accept;
+
+        oif lo accept
+        ct state established,related accept
+
+        # Allow DNS, NTP, HTTPS out
+        udp dport 53 accept
+        tcp dport 53 accept
+        udp dport 123 accept
+        tcp dport { 80, 443 } accept
+
+        # SMTP outbound
+        tcp dport { 25, 587 } accept
+    }
+}
+
+table inet nat {
+
+    chain prerouting {
+        type nat hook prerouting priority dstnat;
+
+        # DNAT: internet port 80/443 → internal web server
+        iif eth0 tcp dport 80  dnat ip to 172.16.70.10:80
+        iif eth0 tcp dport 443 dnat ip to 172.16.70.10:443
+    }
+
+    chain postrouting {
+        type nat hook postrouting priority srcnat;
+
+        # Masquerade LAN and DMZ traffic going to internet
+        oif eth0 ip saddr 10.70.0.0/16 masquerade
+        oif eth0 ip saddr 172.16.70.0/24 masquerade
+    }
+}
+
+table inet mangle {
+
+    chain prerouting {
+        type filter hook prerouting priority mangle;
+
+        # TTL normalization — prevent fingerprinting
+        ip ttl set 64
+    }
+
+    chain postrouting {
+        type filter hook postrouting priority mangle;
+
+        # DSCP marking for SSH and web
+        tcp dport 22  ip dscp set cs3
+        tcp dport 443 ip dscp set cs1
+    }
+}

@@ -1,0 +1,219 @@
+[
+  {
+    "name": "fw-allow-https-ingress",
+    "description": "Allow HTTPS inbound to web tier (tagged instances)",
+    "network": "projects/my-project/global/networks/prod-vpc",
+    "priority": 1000,
+    "direction": "INGRESS",
+    "selfLink": "projects/my-project/global/firewalls/fw-allow-https-ingress",
+    "kind": "compute#firewall",
+    "disabled": false,
+    "sourceRanges": ["0.0.0.0/0"],
+    "targetTags": ["web-tier"],
+    "allowed": [
+      { "IPProtocol": "tcp", "ports": ["443"] }
+    ],
+    "logConfig": { "enable": true, "metadata": "INCLUDE_ALL_METADATA" }
+  },
+  {
+    "name": "fw-allow-http-ingress",
+    "description": "Allow HTTP inbound — handled by load balancer, redirect to HTTPS",
+    "network": "projects/my-project/global/networks/prod-vpc",
+    "priority": 1010,
+    "direction": "INGRESS",
+    "selfLink": "projects/my-project/global/firewalls/fw-allow-http-ingress",
+    "kind": "compute#firewall",
+    "disabled": false,
+    "sourceRanges": ["0.0.0.0/0"],
+    "targetTags": ["web-tier"],
+    "allowed": [
+      { "IPProtocol": "tcp", "ports": ["80"] }
+    ],
+    "logConfig": { "enable": true, "metadata": "INCLUDE_ALL_METADATA" }
+  },
+  {
+    "name": "fw-allow-ssh-iap",
+    "description": "Allow SSH only through Identity-Aware Proxy (35.235.240.0/20)",
+    "network": "projects/my-project/global/networks/prod-vpc",
+    "priority": 1100,
+    "direction": "INGRESS",
+    "selfLink": "projects/my-project/global/firewalls/fw-allow-ssh-iap",
+    "kind": "compute#firewall",
+    "disabled": false,
+    "sourceRanges": ["35.235.240.0/20"],
+    "targetTags": ["allow-iap-ssh"],
+    "allowed": [
+      { "IPProtocol": "tcp", "ports": ["22"] }
+    ],
+    "logConfig": { "enable": true, "metadata": "INCLUDE_ALL_METADATA" }
+  },
+  {
+    "name": "fw-allow-internal-app",
+    "description": "Allow app tier to receive from web tier (tag-based)",
+    "network": "projects/my-project/global/networks/prod-vpc",
+    "priority": 1200,
+    "direction": "INGRESS",
+    "selfLink": "projects/my-project/global/firewalls/fw-allow-internal-app",
+    "kind": "compute#firewall",
+    "disabled": false,
+    "sourceTags": ["web-tier"],
+    "targetTags": ["app-tier"],
+    "allowed": [
+      { "IPProtocol": "tcp", "ports": ["8080", "8443"] }
+    ],
+    "logConfig": { "enable": true, "metadata": "INCLUDE_ALL_METADATA" }
+  },
+  {
+    "name": "fw-allow-internal-db",
+    "description": "Allow database tier to receive from app tier only",
+    "network": "projects/my-project/global/networks/prod-vpc",
+    "priority": 1300,
+    "direction": "INGRESS",
+    "selfLink": "projects/my-project/global/firewalls/fw-allow-internal-db",
+    "kind": "compute#firewall",
+    "disabled": false,
+    "sourceTags": ["app-tier"],
+    "targetTags": ["db-tier"],
+    "allowed": [
+      { "IPProtocol": "tcp", "ports": ["5432", "1433"] }
+    ],
+    "logConfig": { "enable": true, "metadata": "INCLUDE_ALL_METADATA" }
+  },
+  {
+    "name": "fw-allow-health-checks",
+    "description": "Allow GCP health check ranges for load balancers",
+    "network": "projects/my-project/global/networks/prod-vpc",
+    "priority": 1400,
+    "direction": "INGRESS",
+    "selfLink": "projects/my-project/global/firewalls/fw-allow-health-checks",
+    "kind": "compute#firewall",
+    "disabled": false,
+    "sourceRanges": ["130.211.0.0/22", "35.191.0.0/16"],
+    "targetTags": ["web-tier", "app-tier"],
+    "allowed": [
+      { "IPProtocol": "tcp", "ports": ["80", "443", "8080"] }
+    ],
+    "logConfig": { "enable": false }
+  },
+  {
+    "name": "fw-allow-monitoring",
+    "description": "Allow Prometheus scrape from monitoring subnet",
+    "network": "projects/my-project/global/networks/prod-vpc",
+    "priority": 1500,
+    "direction": "INGRESS",
+    "selfLink": "projects/my-project/global/firewalls/fw-allow-monitoring",
+    "kind": "compute#firewall",
+    "disabled": false,
+    "sourceRanges": ["10.80.99.0/24"],
+    "allowed": [
+      { "IPProtocol": "tcp", "ports": ["9100", "9090"] }
+    ],
+    "logConfig": { "enable": true, "metadata": "INCLUDE_ALL_METADATA" }
+  },
+  {
+    "name": "fw-allow-icmp-internal",
+    "description": "Allow ICMP ping within VPC for diagnostics",
+    "network": "projects/my-project/global/networks/prod-vpc",
+    "priority": 1600,
+    "direction": "INGRESS",
+    "selfLink": "projects/my-project/global/firewalls/fw-allow-icmp-internal",
+    "kind": "compute#firewall",
+    "disabled": false,
+    "sourceRanges": ["10.80.0.0/16"],
+    "allowed": [
+      { "IPProtocol": "icmp" }
+    ],
+    "logConfig": { "enable": false }
+  },
+  {
+    "name": "fw-finding-allow-ssh-internet",
+    "description": "AUDIT FINDING: SSH open to internet — should be restricted to IAP range",
+    "network": "projects/my-project/global/networks/prod-vpc",
+    "priority": 2000,
+    "direction": "INGRESS",
+    "selfLink": "projects/my-project/global/firewalls/fw-finding-allow-ssh-internet",
+    "kind": "compute#firewall",
+    "disabled": false,
+    "sourceRanges": ["0.0.0.0/0"],
+    "targetTags": ["legacy-bastion"],
+    "allowed": [
+      { "IPProtocol": "tcp", "ports": ["22"] }
+    ],
+    "logConfig": { "enable": true, "metadata": "INCLUDE_ALL_METADATA" }
+  },
+  {
+    "name": "fw-finding-allow-rdp-internet",
+    "description": "AUDIT FINDING: RDP open to internet — high severity",
+    "network": "projects/my-project/global/networks/prod-vpc",
+    "priority": 2010,
+    "direction": "INGRESS",
+    "selfLink": "projects/my-project/global/firewalls/fw-finding-allow-rdp-internet",
+    "kind": "compute#firewall",
+    "disabled": false,
+    "sourceRanges": ["0.0.0.0/0"],
+    "allowed": [
+      { "IPProtocol": "tcp", "ports": ["3389"] }
+    ],
+    "logConfig": { "enable": false }
+  },
+  {
+    "name": "fw-finding-icmp-any",
+    "description": "AUDIT FINDING: Unrestricted ICMP from 0.0.0.0/0 — internet-facing ICMP",
+    "network": "projects/my-project/global/networks/prod-vpc",
+    "priority": 2100,
+    "direction": "INGRESS",
+    "selfLink": "projects/my-project/global/firewalls/fw-finding-icmp-any",
+    "kind": "compute#firewall",
+    "disabled": false,
+    "sourceRanges": ["0.0.0.0/0"],
+    "allowed": [
+      { "IPProtocol": "icmp" }
+    ],
+    "logConfig": { "enable": false }
+  },
+  {
+    "name": "fw-finding-default-network-rule",
+    "description": "AUDIT FINDING: Rule applied to default network — instances should use custom VPC",
+    "network": "projects/my-project/global/networks/default",
+    "priority": 65534,
+    "direction": "INGRESS",
+    "selfLink": "projects/my-project/global/firewalls/fw-finding-default-network-rule",
+    "kind": "compute#firewall",
+    "disabled": false,
+    "sourceRanges": ["0.0.0.0/0"],
+    "allowed": [
+      { "IPProtocol": "icmp" }
+    ],
+    "logConfig": { "enable": false }
+  },
+  {
+    "name": "fw-finding-unrestricted-egress",
+    "description": "AUDIT FINDING: Unrestricted egress to 0.0.0.0/0 — no egress filtering",
+    "network": "projects/my-project/global/networks/prod-vpc",
+    "priority": 65534,
+    "direction": "EGRESS",
+    "selfLink": "projects/my-project/global/firewalls/fw-finding-unrestricted-egress",
+    "kind": "compute#firewall",
+    "disabled": false,
+    "destinationRanges": ["0.0.0.0/0"],
+    "allowed": [
+      { "IPProtocol": "all" }
+    ],
+    "logConfig": { "enable": false }
+  },
+  {
+    "name": "fw-deny-all-ingress",
+    "description": "Explicit deny-all ingress at lowest priority — supplements implied GCP deny",
+    "network": "projects/my-project/global/networks/prod-vpc",
+    "priority": 65500,
+    "direction": "INGRESS",
+    "selfLink": "projects/my-project/global/firewalls/fw-deny-all-ingress",
+    "kind": "compute#firewall",
+    "disabled": false,
+    "sourceRanges": ["0.0.0.0/0"],
+    "denied": [
+      { "IPProtocol": "all" }
+    ],
+    "logConfig": { "enable": true, "metadata": "INCLUDE_ALL_METADATA" }
+  }
+]

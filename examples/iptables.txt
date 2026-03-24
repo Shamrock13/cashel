@@ -1,0 +1,115 @@
+# iptables-save Output Example
+# Host: linux-fw-01 | Kernel: 6.1.55 | iptables 1.8.9
+# Generated: iptables-save
+# Timestamp: 2024-11-15 10:30:00 UTC
+#
+# This config intentionally contains several audit findings:
+#   - Default ACCEPT policy on INPUT and FORWARD chains
+#   - Any-any ACCEPT rules
+#   - Missing LOG rules before ACCEPT for sensitive services
+#   - Permissive FORWARD chain
+#   - Unrestricted ICMP
+#   - Internet-accessible sensitive ports
+
+*filter
+
+# FINDING: Default ACCEPT on INPUT — AUDIT WILL FLAG THIS
+# FINDING: Default ACCEPT on FORWARD — AUDIT WILL FLAG THIS
+:INPUT ACCEPT [0:0]
+:FORWARD ACCEPT [0:0]
+:OUTPUT ACCEPT [0:0]
+
+# --- Loopback ---
+-A INPUT -i lo -j ACCEPT
+-A OUTPUT -o lo -j ACCEPT
+
+# --- Established / Related (connection tracking) ---
+-A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+-A FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+# --- ICMP ---
+# FINDING: Unrestricted ICMP from any source — AUDIT WILL FLAG THIS
+-A INPUT -p icmp -j ACCEPT
+# Well-scoped ICMP examples (commented out — replace above with these):
+# -A INPUT -p icmp --icmp-type echo-request -s 10.60.0.0/16 -j ACCEPT
+# -A INPUT -p icmp --icmp-type echo-reply -j ACCEPT
+# -A INPUT -p icmp --icmp-type destination-unreachable -j ACCEPT
+# -A INPUT -p icmp --icmp-type time-exceeded -j ACCEPT
+
+# --- SSH management (restricted to management subnet) ---
+-A INPUT -p tcp --dport 22 -s 10.60.99.0/24 -m state --state NEW -j LOG --log-prefix "IPTABLES_SSH_ALLOW: " --log-level 6
+-A INPUT -p tcp --dport 22 -s 10.60.99.0/24 -m state --state NEW -j ACCEPT
+# FINDING: SSH also open to internet (0.0.0.0/0) below — AUDIT WILL FLAG THIS
+-A INPUT -p tcp --dport 22 -m state --state NEW -j LOG --log-prefix "IPTABLES_SSH_INET: " --log-level 4
+-A INPUT -p tcp --dport 22 -m state --state NEW -j ACCEPT
+
+# --- HTTP/HTTPS web services ---
+-A INPUT -p tcp --dport 80 -m state --state NEW -j LOG --log-prefix "IPTABLES_HTTP_ALLOW: " --log-level 6
+-A INPUT -p tcp --dport 80 -m state --state NEW -j ACCEPT
+-A INPUT -p tcp --dport 443 -m state --state NEW -j LOG --log-prefix "IPTABLES_HTTPS_ALLOW: " --log-level 6
+-A INPUT -p tcp --dport 443 -m state --state NEW -j ACCEPT
+
+# --- DNS (outbound only from this host) ---
+-A OUTPUT -p udp --dport 53 -j ACCEPT
+-A OUTPUT -p tcp --dport 53 -j ACCEPT
+
+# --- NTP ---
+-A OUTPUT -p udp --dport 123 -j ACCEPT
+
+# --- Monitoring (Prometheus node exporter) ---
+-A INPUT -p tcp --dport 9100 -s 10.60.99.0/24 -m state --state NEW -j LOG --log-prefix "IPTABLES_PROM_ALLOW: " --log-level 6
+-A INPUT -p tcp --dport 9100 -s 10.60.99.0/24 -m state --state NEW -j ACCEPT
+
+# FINDING: Internet-accessible sensitive port (MySQL 3306) — AUDIT WILL FLAG THIS
+-A INPUT -p tcp --dport 3306 -m state --state NEW -j ACCEPT
+
+# FINDING: Internet-accessible RDP 3389 — AUDIT WILL FLAG THIS
+-A INPUT -p tcp --dport 3389 -m state --state NEW -j LOG --log-prefix "IPTABLES_RDP: " --log-level 4
+-A INPUT -p tcp --dport 3389 -m state --state NEW -j ACCEPT
+
+# --- FORWARD chain (routing / NAT gateway) ---
+# FINDING: Permissive FORWARD without interface scoping — default policy ACCEPT above makes this redundant
+-A FORWARD -i eth1 -o eth0 -j ACCEPT
+-A FORWARD -i eth0 -o eth1 -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+# --- OUTPUT: allow established, permit management ---
+-A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+-A OUTPUT -p tcp --dport 443 -j ACCEPT
+-A OUTPUT -p tcp --dport 80 -j ACCEPT
+
+# --- Logging and final DROP ---
+# Note: with default ACCEPT policy, these LOG+DROP rules are dead code
+-A INPUT -m limit --limit 5/min -j LOG --log-prefix "IPTABLES_INPUT_DROP: " --log-level 4
+-A INPUT -j DROP
+-A FORWARD -m limit --limit 5/min -j LOG --log-prefix "IPTABLES_FWD_DROP: " --log-level 4
+-A FORWARD -j DROP
+
+COMMIT
+
+*nat
+:PREROUTING ACCEPT [0:0]
+:INPUT ACCEPT [0:0]
+:OUTPUT ACCEPT [0:0]
+:POSTROUTING ACCEPT [0:0]
+
+# SNAT / masquerade for LAN clients
+-A POSTROUTING -s 10.60.0.0/16 -o eth0 -j MASQUERADE
+
+# DNAT port forward: external port 80 → internal web server
+-A PREROUTING -i eth0 -p tcp --dport 80 -j DNAT --to-destination 10.60.10.10:80
+-A PREROUTING -i eth0 -p tcp --dport 443 -j DNAT --to-destination 10.60.10.10:443
+
+COMMIT
+
+*mangle
+:PREROUTING ACCEPT [0:0]
+:INPUT ACCEPT [0:0]
+:FORWARD ACCEPT [0:0]
+:OUTPUT ACCEPT [0:0]
+:POSTROUTING ACCEPT [0:0]
+
+# DSCP marking for QoS
+-A POSTROUTING -p tcp --dport 22 -j DSCP --set-dscp-class CS3
+-A POSTROUTING -p tcp --dport 443 -j DSCP --set-dscp-class CS1
+
+COMMIT
