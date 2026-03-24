@@ -62,7 +62,7 @@
           <input type="text" id="licenseKey" name="key" placeholder="CSL-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX" maxlength="48" autocomplete="off" />
           <button type="submit" class="btn-secondary">Activate</button>
         </form>
-        <form id="deactivateForm" class="modal-form mt-sm">
+        <form id="deactivateForm" class="modal-form mt-sm{% if not licensed %} hidden{% endif %}">
           <button type="submit" class="btn-danger">Deactivate License</button>
         </form>
         <div id="licenseMsg" class="license-msg hidden"></div>
@@ -964,6 +964,7 @@
       badge.innerHTML = "&#9888; Unlicensed";
       status.innerHTML = `<p class="status-warn">No active license. Compliance checks require a valid key.</p>`;
     }
+    document.getElementById("deactivateForm").classList.toggle("hidden", !licensed);
   }
 
   // ═══════════════════════════════════════════════════════════════ TABS ══
@@ -1047,6 +1048,18 @@
     return null;
   }
 
+  const COMPLIANCE_UNSUPPORTED = new Set(["aws", "azure", "gcp", "iptables", "nftables"]);
+
+  function syncComplianceSelector() {
+    const vendor = document.getElementById("vendor").value;
+    const sel    = document.getElementById("compliance");
+    const unsupported = COMPLIANCE_UNSUPPORTED.has(vendor);
+    sel.disabled = unsupported;
+    if (unsupported) sel.value = "";
+  }
+
+  document.getElementById("vendor").addEventListener("change", syncComplianceSelector);
+
   document.getElementById("config").addEventListener("change", function () {
     document.getElementById("fileLabel").textContent =
       this.files.length ? this.files[0].name : "Choose a file\u2026";
@@ -1056,7 +1069,7 @@
     const reader = new FileReader();
     reader.onload = e => {
       const detected = detectVendorFromContent(e.target.result, file.name);
-      if (detected) vendorSel.value = detected;
+      if (detected) { vendorSel.value = detected; syncComplianceSelector(); }
     };
     reader.readAsText(file.slice(0, 32768));
   });
@@ -1182,6 +1195,12 @@
     } catch (_) {}
   }
 
+  // Normalize stored vendor tokens to a canonical display key for the trends filter.
+  // ASA and FTD are both shown as a single "Cisco" entry.
+  function normTrendsVendor(v) {
+    return (v === "asa" || v === "ftd") ? "cisco" : v;
+  }
+
   function renderTrends(data) {
     // Populate vendor dropdown from full trendsData
     const vendorSel  = document.getElementById("trendsVendorFilter");
@@ -1189,19 +1208,19 @@
     const selVendor  = vendorSel.value;
     const selDevice  = deviceSel.value;
 
-    const allVendors = [...new Set(trendsData.map(e => e.vendor).filter(Boolean))].sort();
+    const allVendors = [...new Set(trendsData.map(e => normTrendsVendor(e.vendor)).filter(Boolean))].sort();
     vendorSel.innerHTML = `<option value="">All vendors</option>` +
       allVendors.map(v => `<option value="${escHtml(v)}" ${v === selVendor ? "selected" : ""}>${escHtml(VENDOR_LABELS[v] || v)}</option>`).join("");
 
     // Populate device dropdown (filtered by vendor if selected)
-    const deviceSource = selVendor ? trendsData.filter(e => e.vendor === selVendor) : trendsData;
+    const deviceSource = selVendor ? trendsData.filter(e => normTrendsVendor(e.vendor) === selVendor) : trendsData;
     const allDevices = [...new Set(deviceSource.map(e => e.tag || e.filename).filter(Boolean))].sort();
     deviceSel.innerHTML = `<option value="">All devices</option>` +
       allDevices.map(d => `<option value="${escHtml(d)}" ${d === selDevice ? "selected" : ""}>${escHtml(d)}</option>`).join("");
 
     // Apply filters
     let scored = data.filter(e => e.score !== null && e.score !== undefined);
-    if (selVendor) scored = scored.filter(e => e.vendor === selVendor);
+    if (selVendor) scored = scored.filter(e => normTrendsVendor(e.vendor) === selVendor);
     const effectiveDevice = allDevices.includes(selDevice) ? selDevice : "";
     if (effectiveDevice) scored = scored.filter(e => (e.tag || e.filename) === effectiveDevice);
 
