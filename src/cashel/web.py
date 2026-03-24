@@ -413,7 +413,7 @@ def run_audit():
 
         # Compliance checks (license-gated; not applicable for AWS/Azure)
         license_warning = None
-        if compliance and vendor not in ("aws", "azure"):
+        if compliance and vendor not in ("aws", "azure", "gcp", "iptables", "nftables"):
             licensed, _ = check_license()
             if not licensed:
                 license_warning = (
@@ -569,7 +569,7 @@ def live_connect():
     try:
         findings, parse, extra_data = run_vendor_audit(vendor, temp_path)
 
-        if compliance:
+        if compliance and vendor not in ("aws", "azure", "gcp", "iptables", "nftables"):
             licensed, _ = check_license()
             if licensed:
                 raw = run_compliance_checks(vendor, compliance, parse, extra_data)
@@ -790,7 +790,7 @@ def bulk_audit():
 
             findings, parse, extra_data = run_vendor_audit(vendor, temp_path)
 
-            if compliance and vendor not in ("aws", "azure"):
+            if compliance and vendor not in ("aws", "azure", "gcp", "iptables", "nftables"):
                 licensed, _ = check_license()
                 if licensed:
                     raw = run_compliance_checks(vendor, compliance, parse, extra_data)
