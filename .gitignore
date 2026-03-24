@@ -27,11 +27,7 @@ build/
 *.egg-info/
 
 # Private tools
-keygen.py.claude/
+keygen.py
 CNAME
 .claude/
 .wrangler/
-
-# Claude-only internal docs (not for public repo)
-CLAUDE.md
-PLAN.md

@@ -8,7 +8,7 @@ from defusedxml import ElementTree as ET
 from pathlib import Path
 from flask import Flask, render_template, request, jsonify, send_file
 
-from .license import check_license, activate_license, deactivate_license
+from .license import check_license, activate_license, deactivate_license, mask_key
 from .ftd import is_ftd_config
 from .reporter import generate_report
 from .audit_engine import (
@@ -87,8 +87,9 @@ def _err(exc: Exception, generic_msg: str = "An internal error occurred.") -> st
 
 
 VENDOR_DISPLAY = {
-    "asa":      "Cisco ASA",
-    "ftd":      "Cisco FTD",
+    "asa":      "Cisco",
+    "ftd":      "Cisco",
+    "cisco":    "Cisco",
     "paloalto": "Palo Alto Networks",
     "fortinet": "Fortinet",
     "pfsense":  "pfSense",
@@ -349,6 +350,8 @@ def extract_hostname(vendor: str, content: str) -> str | None:
 @app.route("/")
 def index():
     licensed, license_info = check_license()
+    if licensed:
+        license_info = mask_key(license_info)
     return render_template("index.html", licensed=licensed, license_info=license_info)
 
 
@@ -391,9 +394,9 @@ def run_audit():
         os.remove(temp_path)
         return jsonify({"error": "Could not determine vendor. Please select one manually."}), 400
 
-    # When user selects "Cisco" (asa) manually, check if file is actually FTD
-    if vendor == "asa" and is_ftd_config(sample):
-        vendor = "ftd"
+    # Resolve "cisco" (user-facing) or re-route "asa" to "ftd" if file is FTD
+    if vendor in ("cisco", "asa"):
+        vendor = "ftd" if is_ftd_config(sample) else "asa"
 
     detected_hostname = extract_hostname(vendor, sample)
 
@@ -489,11 +492,14 @@ def run_diff():
     upload_b.save(path_b)
 
     try:
-        # Auto-detect from the first file if needed
-        if vendor == "auto":
+        # Auto-detect or resolve cisco from the first file if needed
+        if vendor in ("auto", "cisco", "asa"):
             with open(path_a, "r", errors="ignore") as f:
                 sample = f.read(16384)
-            vendor = detect_vendor(sample, upload_a.filename) or ""
+            if vendor == "auto":
+                vendor = detect_vendor(sample, upload_a.filename) or ""
+            else:
+                vendor = "ftd" if is_ftd_config(sample) else "asa"
 
         if vendor not in ALL_VENDORS:
             return jsonify({"error": "Could not determine vendor. Please select one manually."}), 400
@@ -536,8 +542,10 @@ def live_connect():
 
     if not host or not username or not vendor:
         return jsonify({"error": "host, username, and vendor are required"}), 400
-    if vendor not in ("asa", "ftd", "fortinet", "paloalto"):
-        return jsonify({"error": f"Live SSH not supported for vendor '{vendor}'. Supported: Cisco (ASA/FTD), Fortinet, Palo Alto Networks"}), 400
+    if vendor not in ("asa", "ftd", "cisco", "fortinet", "paloalto"):
+        return jsonify({"error": f"Live SSH not supported for vendor '{vendor}'. Supported: Cisco, Fortinet, Palo Alto Networks"}), 400
+    if vendor == "cisco":
+        vendor = "asa"
 
     label = f"{vendor.upper()}@{host}"
 

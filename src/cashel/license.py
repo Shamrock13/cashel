@@ -49,6 +49,15 @@ def activate_license(key: str) -> tuple:
         return False, f"Failed to save license: {e}"
 
 
+def mask_key(key: str) -> str:
+    """Return an obfuscated version of a license key showing only the first segment."""
+    parts = key.split("-")
+    if len(parts) >= 2:
+        masked = "-".join([parts[0], parts[1]] + ["\u2022" * len(p) for p in parts[2:]])
+        return masked
+    return key[:4] + "\u2022" * (len(key) - 4)
+
+
 def check_license() -> tuple:
     """Check if a valid license is activated"""
     if not os.path.exists(LICENSE_FILE):

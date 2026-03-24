@@ -131,8 +131,7 @@
                 <option value="auto" selected>Auto-detect (recommended)</option>
                 <option value="aws">AWS Security Group</option>
                 <option value="azure">Azure NSG</option>
-                <option value="asa">Cisco ASA</option>
-                <option value="ftd">Cisco FTD</option>
+                <option value="cisco">Cisco</option>
                 <option value="fortinet">Fortinet</option>
                 <option value="gcp">GCP VPC Firewall</option>
                 <option value="iptables">iptables (Linux)</option>
@@ -176,24 +175,33 @@
       <div class="card hidden" id="resultsSection">
         <div class="results-header">
           <h2 class="card-title" style="margin-bottom:0">Results</h2>
-          <span class="detected-vendor hidden" id="detectedVendorTag"></span>
+          <div style="display:flex;align-items:center;gap:0.75rem;">
+            <span class="detected-vendor hidden" id="detectedVendorTag"></span>
+            <div class="view-toggle" id="findingsViewToggle" title="Toggle compact view">
+              <button class="view-btn view-btn-active" id="viewDetailed" onclick="setFindingsView('detailed')">Detailed</button>
+              <button class="view-btn" id="viewCompact" onclick="setFindingsView('compact')">Compact</button>
+            </div>
+          </div>
         </div>
         <div class="alert alert-warning hidden" id="licenseWarning"></div>
         <div class="summary-grid" id="summaryGrid"></div>
         <div id="findingsList"></div>
-        <div class="pdf-row hidden" id="pdfRow">
-          <a id="pdfLink" class="btn-download" href="#" download>&#8681; Download PDF</a>
-          <a id="pdfViewLink" class="btn-secondary" href="#" target="_blank" rel="noopener">&#128196; View PDF</a>
-        </div>
-        <div class="export-row hidden" id="exportRow">
-          <button id="exportJsonBtn" class="btn-secondary">&#8681; JSON</button>
-          <button id="exportCsvBtn"  class="btn-secondary">&#8681; CSV</button>
-          <button id="exportSarifBtn" class="btn-secondary">&#8681; SARIF</button>
-        </div>
-        <div class="archive-row hidden" id="archiveRow">
-          <span class="archive-saved-msg">&#10003; Saved to Audit History &mdash;
-            <button class="link-btn" id="viewHistoryBtn">View History</button>
-          </span>
+        <div id="findingsPagination" class="findings-pagination hidden"></div>
+        <div class="actions-row">
+          <div class="pdf-row hidden" id="pdfRow">
+            <a id="pdfLink" class="btn-download" href="#" download>&#8681; Download PDF</a>
+            <a id="pdfViewLink" class="btn-secondary" href="#" target="_blank" rel="noopener">&#128196; View PDF</a>
+          </div>
+          <div class="export-row hidden" id="exportRow">
+            <button id="exportJsonBtn" class="btn-secondary">&#8681; JSON</button>
+            <button id="exportCsvBtn"  class="btn-secondary">&#8681; CSV</button>
+            <button id="exportSarifBtn" class="btn-secondary">&#8681; SARIF</button>
+          </div>
+          <div class="archive-row hidden" id="archiveRow">
+            <span class="archive-saved-msg">&#10003; Saved to Audit History &mdash;
+              <button class="link-btn" id="viewHistoryBtn">View History</button>
+            </span>
+          </div>
         </div>
       </div>
       </div><!-- /audit-mode-single -->
@@ -218,8 +226,7 @@
                 <option value="auto" selected>Auto-detect (recommended)</option>
                 <option value="aws">AWS Security Group</option>
                 <option value="azure">Azure NSG</option>
-                <option value="asa">Cisco ASA</option>
-                <option value="ftd">Cisco FTD</option>
+                <option value="cisco">Cisco</option>
                 <option value="fortinet">Fortinet</option>
                 <option value="gcp">GCP VPC Firewall</option>
                 <option value="iptables">iptables (Linux)</option>
@@ -290,8 +297,7 @@
                 <option value="auto" selected>Auto-detect (recommended)</option>
                 <option value="aws">AWS Security Group</option>
                 <option value="azure">Azure NSG</option>
-                <option value="asa">Cisco ASA</option>
-                <option value="ftd">Cisco FTD</option>
+                <option value="cisco">Cisco</option>
                 <option value="fortinet">Fortinet</option>
                 <option value="gcp">GCP VPC Firewall</option>
                 <option value="iptables">iptables (Linux)</option>
@@ -339,8 +345,7 @@
             <div class="form-group">
               <label for="connVendor">Vendor</label>
               <select id="connVendor" name="vendor">
-                <option value="asa">Cisco ASA</option>
-                <option value="ftd">Cisco FTD</option>
+                <option value="cisco">Cisco</option>
                 <option value="fortinet">Fortinet</option>
                 <option value="iptables">iptables (Linux)</option>
                 <option value="juniper">Juniper SRX</option>
@@ -425,8 +430,7 @@
               <option value="">All vendors</option>
               <option value="aws">AWS Security Group</option>
               <option value="azure">Azure NSG</option>
-              <option value="asa">Cisco ASA</option>
-              <option value="ftd">Cisco FTD</option>
+              <option value="cisco">Cisco</option>
               <option value="fortinet">Fortinet</option>
               <option value="gcp">GCP VPC Firewall</option>
               <option value="iptables">iptables (Linux)</option>
@@ -534,8 +538,7 @@
             <div class="form-group">
               <label for="schedVendor">Vendor</label>
               <select id="schedVendor" name="vendor">
-                <option value="asa">Cisco ASA</option>
-                <option value="ftd">Cisco FTD</option>
+                <option value="cisco">Cisco</option>
                 <option value="fortinet">Fortinet</option>
                 <option value="iptables">iptables (Linux)</option>
                 <option value="juniper">Juniper SRX</option>
@@ -910,6 +913,14 @@
     applyTheme(cur === "light" ? "dark" : cur === "dark" ? "auto" : "light");
   });
 
+  function maskLicenseKey(key) {
+    const parts = key.split("-");
+    if (parts.length >= 2) {
+      return [parts[0], parts[1], ...parts.slice(2).map(p => "\u2022".repeat(p.length))].join("-");
+    }
+    return key.slice(0, 4) + "\u2022".repeat(key.length - 4);
+  }
+
   // ═══════════════════════════════════════════════════════ LICENSE MODAL ══
   const modal = document.getElementById("licenseModal");
   const openModal  = () => { modal.classList.remove("hidden"); document.body.style.overflow = "hidden"; document.getElementById("licenseKey").focus(); };
@@ -925,7 +936,7 @@
     const res  = await fetch("/license/activate", { method: "POST", body: new URLSearchParams({ key }) });
     const data = await res.json();
     showLicenseMsg(data.message, data.success ? "ok" : "error");
-    if (data.success) refreshLicenseBadge(true, key.toUpperCase());
+    if (data.success) { document.getElementById("licenseKey").value = ""; refreshLicenseBadge(true, key.toUpperCase()); }
   });
   document.getElementById("deactivateForm").addEventListener("submit", async function (e) {
     e.preventDefault();
@@ -946,7 +957,7 @@
     if (licensed) {
       badge.className = "badge badge-active";
       badge.innerHTML = "&#10003; Licensed";
-      status.innerHTML = `<p class="status-ok">&#10003; Active license: <code>${escHtml(key)}</code></p>`;
+      status.innerHTML = `<p class="status-ok">&#10003; Active license: <code>${escHtml(maskLicenseKey(key))}</code></p>`;
     } else {
       badge.className = "badge badge-unlicensed";
       badge.innerHTML = "&#9888; Unlicensed";
@@ -989,46 +1000,157 @@
 
   // ═════════════════════════════════════════════════════ FILE AUDIT ══════
   const VENDOR_LABELS = {
-    asa: "Cisco ASA", ftd: "Cisco FTD", paloalto: "Palo Alto Networks", fortinet: "Fortinet",
+    asa: "Cisco", ftd: "Cisco", cisco: "Cisco", paloalto: "Palo Alto Networks", fortinet: "Fortinet",
     pfsense: "pfSense", aws: "AWS Security Group", azure: "Azure NSG",
     juniper: "Juniper SRX", gcp: "GCP VPC Firewall",
     iptables: "iptables (Linux)", nftables: "nftables (Linux)"
   };
 
+  function detectVendorFromContent(text, filename) {
+    const lower = text.toLowerCase();
+    const fname = filename.toLowerCase();
+    try {
+      const j = JSON.parse(text);
+      const arr = Array.isArray(j) ? j : [j];
+      const first = arr[0] || {};
+      if ("GroupId" in first || "SecurityGroups" in first || "IpPermissions" in first) return "aws";
+      if ("securityRules" in first || (first.properties && "securityRules" in first.properties)) return "azure";
+      const keys = Object.keys(first);
+      if (keys.includes("direction") && (keys.includes("allowed") || keys.includes("denied"))) return "gcp";
+      if (fname.endsWith(".json")) return null;
+    } catch (_) {}
+    const stripped = text.trim();
+    if (stripped.startsWith("<")) {
+      if (/<pfsense[\s>]/i.test(stripped) || (/<filter[\s>]/i.test(stripped) && /<rule[\s>]/i.test(stripped))) return "pfsense";
+      if (/<devices[\s>]/i.test(stripped) || /<vsys[\s>]/i.test(stripped) || /<rulebase[\s>]/i.test(stripped)) return "paloalto";
+    }
+    if (lower.includes("config firewall policy") && lower.includes("set srcintf") && lower.includes("set dstintf")) return "fortinet";
+    if (lower.includes("access-control-policy") || lower.includes("firepower threat defense") || lower.includes("intrusion-policy")) return "cisco";
+    if ((lower.includes("from-zone") || lower.includes("to-zone")) && lower.includes("set security")) return "juniper";
+    if (/\btable\b.*\bchain\b/s.test(lower) || lower.includes("type filter hook input")) return "nftables";
+    if (/^\*filter/m.test(lower) || /^-A\s+\w+/m.test(lower)) return "iptables";
+    if (lower.includes("access-list") && (lower.includes(" permit ") || lower.includes(" deny "))) return "cisco";
+    return null;
+  }
+
   document.getElementById("config").addEventListener("change", function () {
     document.getElementById("fileLabel").textContent =
       this.files.length ? this.files[0].name : "Choose a file\u2026";
+    if (!this.files.length) return;
+    const file = this.files[0];
+    const vendorSel = document.getElementById("vendor");
+    const reader = new FileReader();
+    reader.onload = e => {
+      const detected = detectVendorFromContent(e.target.result, file.name);
+      if (detected) vendorSel.value = detected;
+    };
+    reader.readAsText(file.slice(0, 32768));
   });
 
-  // Filter state for audit results
+  // ── Findings display state ─────────────────────────────────────────────────
+  let allFindings  = [];
   let activeFilter = null;
+  let currentPage  = 1;
+  let pageSize     = 10;
+  let compactView  = false;
+
+  // Return findings matching the active filter (uses findingClass which is defined below)
+  function getFilteredFindings() {
+    if (!activeFilter) return allFindings;
+    return allFindings.filter(f => {
+      const cls = findingClass(f);
+      if (activeFilter === "high")       return cls === "finding-high";
+      if (activeFilter === "medium")     return cls === "finding-medium";
+      if (activeFilter === "compliance") return cls === "finding-compliance-high" || cls === "finding-compliance-medium";
+      return true;
+    });
+  }
+
+  // Single render entry point — call any time state changes
+  function renderFindingsUI() {
+    const filtered   = getFilteredFindings();
+    const total      = filtered.length;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    currentPage      = Math.min(currentPage, totalPages);
+
+    const start = (currentPage - 1) * pageSize;
+    const page  = filtered.slice(start, start + pageSize);
+
+    document.getElementById("findingsList").innerHTML = page.length
+      ? page.map(f => buildFindingHTML(f)).join("")
+      : allFindings.length === 0
+        ? `<div class="finding finding-pass">[PASS] No issues found</div>`
+        : `<div class="finding finding-info">No findings match the selected filter.</div>`;
+
+    renderPaginationBar(total, totalPages);
+  }
+
+  function renderPaginationBar(total, totalPages) {
+    const el = document.getElementById("findingsPagination");
+    // Show the bar whenever total > 10 (so page size selector is always accessible)
+    if (allFindings.length <= 10) { el.classList.add("hidden"); return; }
+    el.classList.remove("hidden");
+
+    const start = (currentPage - 1) * pageSize + 1;
+    const end   = Math.min(currentPage * pageSize, total);
+    const pageSizeOpts = [10, 25, 50, 75, 100].map(n =>
+      `<option value="${n}"${n === pageSize ? " selected" : ""}>${n} per page</option>`
+    ).join("");
+
+    // Page nav only meaningful when more than one page
+    const navHTML = totalPages > 1 ? `
+      <div class="pagination-controls">
+        <button class="btn-page"${currentPage === 1 ? " disabled" : ""} onclick="goToPage(${currentPage - 1})">&#8592;</button>
+        ${buildPageButtons(totalPages)}
+        <button class="btn-page"${currentPage === totalPages ? " disabled" : ""} onclick="goToPage(${currentPage + 1})">&#8594;</button>
+      </div>
+      <span class="pagination-info">Showing ${start}–${end} of ${total}</span>` : `
+      <span class="pagination-info">${total} findings</span>`;
+
+    el.innerHTML = `${navHTML}
+      <select class="page-size-select" onchange="window.changePageSize(+this.value)">${pageSizeOpts}</select>`;
+  }
+
+  function buildPageButtons(totalPages) {
+    const btns = [];
+    for (let p = 1; p <= totalPages; p++) {
+      if (p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1) {
+        btns.push(`<button class="btn-page${p === currentPage ? " btn-page-active" : ""}" onclick="goToPage(${p})">${p}</button>`);
+      } else if (btns[btns.length - 1] !== "…") {
+        btns.push("…");
+      }
+    }
+    return btns.join("");
+  }
+
+  window.goToPage = function(p) {
+    currentPage = Math.max(1, Math.min(p, Math.max(1, Math.ceil(getFilteredFindings().length / pageSize))));
+    renderFindingsUI();
+  };
+  window.changePageSize = function(n) {
+    pageSize = n; currentPage = 1;
+    renderFindingsUI();
+  };
+  window.setFindingsView = function(mode) {
+    compactView = mode === "compact";
+    document.getElementById("viewDetailed").classList.toggle("view-btn-active", !compactView);
+    document.getElementById("viewCompact").classList.toggle("view-btn-active", compactView);
+    document.getElementById("findingsList").classList.toggle("findings-compact", compactView);
+    renderFindingsUI();
+  };
+
   document.getElementById("summaryGrid").addEventListener("click", function (e) {
     const box = e.target.closest(".summary-box[data-filter]");
     if (!box) return;
     const filter = box.dataset.filter;
-    if (activeFilter === filter && filter !== "all") {
-      activeFilter = null; applyFindingFilter(null);
-      document.querySelectorAll("#summaryGrid .summary-box").forEach(b => b.classList.remove("filter-active"));
-    } else {
-      activeFilter = filter === "all" ? null : filter;
-      applyFindingFilter(activeFilter);
-      document.querySelectorAll("#summaryGrid .summary-box").forEach(b =>
-        b.classList.toggle("filter-active", b === box)
-      );
-    }
+    const newFilter = (filter === "all" || activeFilter === filter) ? null : filter;
+    activeFilter = newFilter;
+    currentPage  = 1;
+    document.querySelectorAll("#summaryGrid .summary-box").forEach(b =>
+      b.classList.toggle("filter-active", b === box && newFilter !== null)
+    );
+    renderFindingsUI();
   });
-
-  function applyFindingFilter(filter) {
-    document.querySelectorAll("#findingsList .finding").forEach(f => {
-      if (!filter) { f.style.display = ""; return; }
-      const show =
-        filter === "high"       ? f.classList.contains("finding-high") :
-        filter === "medium"     ? f.classList.contains("finding-medium") :
-        filter === "compliance" ? (f.classList.contains("finding-compliance-high") || f.classList.contains("finding-compliance-medium")) :
-        true;
-      f.style.display = show ? "" : "none";
-    });
-  }
 
   // ═══════════════════════════════════════════════ TRENDS CHART ══
   let trendsChartInstance = null;
@@ -1197,13 +1319,12 @@
     if (data.license_warning) { warn.innerHTML = data.license_warning; warn.classList.remove("hidden"); }
     else { warn.classList.add("hidden"); }
 
-    activeFilter = null; applyFindingFilter(null);
+    activeFilter = null; currentPage = 1;
+    document.querySelectorAll("#summaryGrid .summary-box").forEach(b => b.classList.remove("filter-active"));
     document.getElementById("summaryGrid").innerHTML = buildSummaryHTML(data.summary);
 
-    const enriched = data.enriched_findings || data.findings.map(f => ({ message: f, category: null, remediation: null }));
-    document.getElementById("findingsList").innerHTML = enriched.length
-      ? enriched.map(f => buildFindingHTML(f)).join("")
-      : `<div class="finding finding-pass">[PASS] No issues found</div>`;
+    allFindings = data.enriched_findings || data.findings.map(f => ({ message: f, category: null, remediation: null }));
+    renderFindingsUI();
 
     const pdfRow = document.getElementById("pdfRow");
     if (data.report) {
@@ -1426,7 +1547,7 @@
     const search       = document.getElementById("historySearch").value.trim().toLowerCase();
 
     let entries = historyData.slice();
-    if (vendorFilter) entries = entries.filter(e => e.vendor === vendorFilter);
+    if (vendorFilter) entries = entries.filter(e => vendorFilter === "cisco" ? (e.vendor === "asa" || e.vendor === "ftd") : e.vendor === vendorFilter);
     if (search)       entries = entries.filter(e => (e.filename || "").toLowerCase().includes(search) || (e.tag || "").toLowerCase().includes(search));
 
     if (sortMode === "newest")  entries.sort((a, b) => (b.timestamp || "").localeCompare(a.timestamp || ""));
@@ -1724,7 +1845,7 @@
     const cls        = findingClass(f);
     const catInfo    = category ? (CATEGORY_LABELS[category] || { label: category, cls: "cat-hygiene" }) : null;
     const catBadge   = catInfo ? `<span class="finding-cat-badge ${catInfo.cls}">${catInfo.label}</span>` : "";
-    const remDiv     = remediation
+    const remDiv     = (!compactView && remediation)
       ? `<div class="finding-remediation">&#8618; ${escHtml(remediation)}</div>`
       : "";
     return `<div class="finding ${cls}">${catBadge}<span class="finding-msg">${escHtml(msg)}</span>${remDiv}</div>`;
@@ -1880,7 +2001,7 @@
     document.getElementById("scheduleFormTitle").textContent = "Edit Schedule";
     document.getElementById("scheduleId").value        = s.id;
     document.getElementById("schedName").value         = s.name || "";
-    document.getElementById("schedVendor").value       = s.vendor || "asa";
+    document.getElementById("schedVendor").value       = s.vendor || "cisco";
     document.getElementById("schedHost").value         = s.host || "";
     document.getElementById("schedPort").value         = s.port || 22;
     document.getElementById("schedUser").value         = s.username || "";
