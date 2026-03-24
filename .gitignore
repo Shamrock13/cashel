@@ -31,3 +31,7 @@ keygen.py.claude/
 CNAME
 .claude/
 .wrangler/
+
+# Claude-only internal docs (not for public repo)
+CLAUDE.md
+PLAN.md
