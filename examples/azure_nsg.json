@@ -1,0 +1,233 @@
+{
+  "name": "nsg-prod-edge",
+  "id": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-network-prod/providers/Microsoft.Network/networkSecurityGroups/nsg-prod-edge",
+  "location": "eastus",
+  "type": "Microsoft.Network/networkSecurityGroups",
+  "tags": {
+    "Environment": "production",
+    "Team": "platform-engineering",
+    "CostCenter": "CC-1234"
+  },
+  "properties": {
+    "provisioningState": "Succeeded",
+    "securityRules": [
+      {
+        "name": "Allow-HTTPS-Inbound",
+        "id": "...securityRules/Allow-HTTPS-Inbound",
+        "type": "Microsoft.Network/networkSecurityGroups/securityRules",
+        "properties": {
+          "description": "Allow inbound HTTPS from internet to web tier",
+          "protocol": "Tcp",
+          "sourcePortRange": "*",
+          "destinationPortRange": "443",
+          "sourceAddressPrefix": "*",
+          "destinationAddressPrefix": "10.80.10.0/24",
+          "access": "Allow",
+          "priority": 100,
+          "direction": "Inbound",
+          "provisioningState": "Succeeded"
+        }
+      },
+      {
+        "name": "Allow-HTTP-Inbound",
+        "id": "...securityRules/Allow-HTTP-Inbound",
+        "type": "Microsoft.Network/networkSecurityGroups/securityRules",
+        "properties": {
+          "description": "Allow inbound HTTP — redirect to HTTPS handled at load balancer",
+          "protocol": "Tcp",
+          "sourcePortRange": "*",
+          "destinationPortRange": "80",
+          "sourceAddressPrefix": "*",
+          "destinationAddressPrefix": "10.80.10.0/24",
+          "access": "Allow",
+          "priority": 110,
+          "direction": "Inbound",
+          "provisioningState": "Succeeded"
+        }
+      },
+      {
+        "name": "Allow-SSH-Mgmt",
+        "id": "...securityRules/Allow-SSH-Mgmt",
+        "type": "Microsoft.Network/networkSecurityGroups/securityRules",
+        "properties": {
+          "description": "SSH from management subnet only",
+          "protocol": "Tcp",
+          "sourcePortRange": "*",
+          "destinationPortRange": "22",
+          "sourceAddressPrefix": "10.80.99.0/24",
+          "destinationAddressPrefix": "*",
+          "access": "Allow",
+          "priority": 200,
+          "direction": "Inbound",
+          "provisioningState": "Succeeded"
+        }
+      },
+      {
+        "name": "Allow-RDP-Mgmt",
+        "id": "...securityRules/Allow-RDP-Mgmt",
+        "type": "Microsoft.Network/networkSecurityGroups/securityRules",
+        "properties": {
+          "description": "RDP from Azure Bastion subnet only",
+          "protocol": "Tcp",
+          "sourcePortRange": "*",
+          "destinationPortRange": "3389",
+          "sourceAddressPrefix": "10.80.100.0/27",
+          "destinationAddressPrefix": "*",
+          "access": "Allow",
+          "priority": 210,
+          "direction": "Inbound",
+          "provisioningState": "Succeeded"
+        }
+      },
+      {
+        "name": "Allow-AzureLoadBalancer",
+        "id": "...securityRules/Allow-AzureLoadBalancer",
+        "type": "Microsoft.Network/networkSecurityGroups/securityRules",
+        "properties": {
+          "description": "Required: allow Azure Load Balancer health probes",
+          "protocol": "*",
+          "sourcePortRange": "*",
+          "destinationPortRange": "*",
+          "sourceAddressPrefix": "AzureLoadBalancer",
+          "destinationAddressPrefix": "*",
+          "access": "Allow",
+          "priority": 300,
+          "direction": "Inbound",
+          "provisioningState": "Succeeded"
+        }
+      },
+      {
+        "name": "FINDING-Allow-Any-Inbound",
+        "id": "...securityRules/FINDING-Allow-Any-Inbound",
+        "type": "Microsoft.Network/networkSecurityGroups/securityRules",
+        "properties": {
+          "description": "AUDIT FINDING: Inbound Any-Any allow rule — overly permissive",
+          "protocol": "*",
+          "sourcePortRange": "*",
+          "destinationPortRange": "*",
+          "sourceAddressPrefix": "*",
+          "destinationAddressPrefix": "*",
+          "access": "Allow",
+          "priority": 400,
+          "direction": "Inbound",
+          "provisioningState": "Succeeded"
+        }
+      },
+      {
+        "name": "FINDING-Wide-Port-Range-Inbound",
+        "id": "...securityRules/FINDING-Wide-Port-Range-Inbound",
+        "type": "Microsoft.Network/networkSecurityGroups/securityRules",
+        "properties": {
+          "description": "AUDIT FINDING: Wide TCP port range 1024-65535 from internet",
+          "protocol": "Tcp",
+          "sourcePortRange": "*",
+          "destinationPortRange": "1024-65535",
+          "sourceAddressPrefix": "Internet",
+          "destinationAddressPrefix": "*",
+          "access": "Allow",
+          "priority": 450,
+          "direction": "Inbound",
+          "provisioningState": "Succeeded"
+        }
+      },
+      {
+        "name": "Deny-All-Inbound",
+        "id": "...securityRules/Deny-All-Inbound",
+        "type": "Microsoft.Network/networkSecurityGroups/securityRules",
+        "properties": {
+          "description": "Explicit deny-all at end of inbound chain",
+          "protocol": "*",
+          "sourcePortRange": "*",
+          "destinationPortRange": "*",
+          "sourceAddressPrefix": "*",
+          "destinationAddressPrefix": "*",
+          "access": "Deny",
+          "priority": 4000,
+          "direction": "Inbound",
+          "provisioningState": "Succeeded"
+        }
+      },
+      {
+        "name": "Allow-Outbound-HTTPS",
+        "id": "...securityRules/Allow-Outbound-HTTPS",
+        "type": "Microsoft.Network/networkSecurityGroups/securityRules",
+        "properties": {
+          "description": "Allow HTTPS egress to internet",
+          "protocol": "Tcp",
+          "sourcePortRange": "*",
+          "destinationPortRange": "443",
+          "sourceAddressPrefix": "*",
+          "destinationAddressPrefix": "Internet",
+          "access": "Allow",
+          "priority": 100,
+          "direction": "Outbound",
+          "provisioningState": "Succeeded"
+        }
+      },
+      {
+        "name": "Allow-Outbound-DNS",
+        "id": "...securityRules/Allow-Outbound-DNS",
+        "type": "Microsoft.Network/networkSecurityGroups/securityRules",
+        "properties": {
+          "description": "Allow DNS egress",
+          "protocol": "Udp",
+          "sourcePortRange": "*",
+          "destinationPortRange": "53",
+          "sourceAddressPrefix": "*",
+          "destinationAddressPrefix": "*",
+          "access": "Allow",
+          "priority": 110,
+          "direction": "Outbound",
+          "provisioningState": "Succeeded"
+        }
+      },
+      {
+        "name": "Allow-Outbound-to-AppTier",
+        "id": "...securityRules/Allow-Outbound-to-AppTier",
+        "type": "Microsoft.Network/networkSecurityGroups/securityRules",
+        "properties": {
+          "description": "Web tier to app tier port 8080",
+          "protocol": "Tcp",
+          "sourcePortRange": "*",
+          "destinationPortRange": "8080",
+          "sourceAddressPrefix": "10.80.10.0/24",
+          "destinationAddressPrefix": "10.80.20.0/24",
+          "access": "Allow",
+          "priority": 200,
+          "direction": "Outbound",
+          "provisioningState": "Succeeded"
+        }
+      }
+    ],
+    "defaultSecurityRules": [
+      {
+        "name": "AllowVnetInBound",
+        "properties": {
+          "description": "Allow inbound traffic from all VMs in VNET",
+          "protocol": "*",
+          "sourcePortRange": "*",
+          "destinationPortRange": "*",
+          "sourceAddressPrefix": "VirtualNetwork",
+          "destinationAddressPrefix": "VirtualNetwork",
+          "access": "Allow",
+          "priority": 65000,
+          "direction": "Inbound"
+        }
+      },
+      {
+        "name": "DenyAllInBound",
+        "properties": {
+          "description": "Deny all inbound traffic",
+          "protocol": "*",
+          "sourcePortRange": "*",
+          "destinationPortRange": "*",
+          "sourceAddressPrefix": "*",
+          "destinationAddressPrefix": "*",
+          "access": "Deny",
+          "priority": 65500,
+          "direction": "Inbound"
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,296 @@
+<?xml version="1.0"?>
+<!-- pfSense Configuration Export Example -->
+<!-- Device: PF-EDGE-01 | pfSense Plus 23.09.1 -->
+<!-- Export: Diagnostics > Backup & Restore > Download configuration XML -->
+<pfsense>
+  <version>23.9</version>
+  <lastchange/>
+  <system>
+    <hostname>PF-EDGE-01</hostname>
+    <domain>corp.example.com</domain>
+    <dnsserver>8.8.8.8</dnsserver>
+    <dnsserver>1.1.1.1</dnsserver>
+    <timezone>America/New_York</timezone>
+    <timeservers>0.pfsense.pool.ntp.org</timeservers>
+    <webgui>
+      <protocol>https</protocol>
+      <ssl-certref>cert-web-ui</ssl-certref>
+      <port>443</port>
+      <loginautocomplete/>
+      <max_procs>2</max_procs>
+    </webgui>
+    <ssh>
+      <enable>enabled</enable>
+      <sshdkeyonly>both</sshdkeyonly>
+      <sshport>22</sshport>
+    </ssh>
+    <bogons>
+      <interval>monthly</interval>
+    </bogons>
+  </system>
+
+  <interfaces>
+    <wan>
+      <enable/>
+      <if>em0</if>
+      <ipaddr>203.0.113.50</ipaddr>
+      <subnet>24</subnet>
+      <gateway>203.0.113.254</gateway>
+      <descr>WAN - Internet uplink</descr>
+      <blockbogons/>
+    </wan>
+    <lan>
+      <enable/>
+      <if>em1</if>
+      <ipaddr>10.50.0.1</ipaddr>
+      <subnet>16</subnet>
+      <descr>LAN - Internal network</descr>
+    </lan>
+    <opt1>
+      <enable/>
+      <if>em2</if>
+      <descr>DMZ</descr>
+      <ipaddr>172.16.50.1</ipaddr>
+      <subnet>24</subnet>
+    </opt1>
+  </interfaces>
+
+  <staticroutes>
+    <route>
+      <network>10.0.0.0/8</network>
+      <gateway>10.50.0.254</gateway>
+      <descr>RFC1918 summary route to internal router</descr>
+    </route>
+  </staticroutes>
+
+  <filter>
+    <!-- Rule 1: FINDING — WAN-facing pass any/any from any source — AUDIT WILL FLAG THIS -->
+    <rule>
+      <type>pass</type>
+      <interface>wan</interface>
+      <ipprotocol>inet</ipprotocol>
+      <protocol>any</protocol>
+      <source><any/></source>
+      <destination><any/></destination>
+      <log/>
+      <descr>INSECURE: Allow all inbound from internet</descr>
+    </rule>
+
+    <!-- Rule 2: Legitimate inbound HTTP/HTTPS to web servers -->
+    <rule>
+      <type>pass</type>
+      <interface>wan</interface>
+      <ipprotocol>inet</ipprotocol>
+      <protocol>tcp</protocol>
+      <source><any/></source>
+      <destination>
+        <address>172.16.50.10</address>
+        <port>80</port>
+      </destination>
+      <log/>
+      <descr>Allow HTTP inbound to web server</descr>
+    </rule>
+    <rule>
+      <type>pass</type>
+      <interface>wan</interface>
+      <ipprotocol>inet</ipprotocol>
+      <protocol>tcp</protocol>
+      <source><any/></source>
+      <destination>
+        <address>172.16.50.10</address>
+        <port>443</port>
+      </destination>
+      <log/>
+      <descr>Allow HTTPS inbound to web server</descr>
+    </rule>
+    <rule>
+      <type>pass</type>
+      <interface>wan</interface>
+      <ipprotocol>inet</ipprotocol>
+      <protocol>tcp</protocol>
+      <source><any/></source>
+      <destination>
+        <address>172.16.50.11</address>
+        <port>443</port>
+      </destination>
+      <log/>
+      <descr>Allow HTTPS inbound to secondary web server</descr>
+    </rule>
+
+    <!-- Rule 5: FINDING — duplicate of rule 2 — AUDIT WILL FLAG THIS -->
+    <rule>
+      <type>pass</type>
+      <interface>wan</interface>
+      <ipprotocol>inet</ipprotocol>
+      <protocol>tcp</protocol>
+      <source><any/></source>
+      <destination>
+        <address>172.16.50.10</address>
+        <port>80</port>
+      </destination>
+      <log/>
+      <descr>DUPLICATE: Allow HTTP inbound to web server</descr>
+    </rule>
+
+    <!-- Rule 6: FINDING — no description — AUDIT WILL FLAG THIS -->
+    <rule>
+      <type>pass</type>
+      <interface>wan</interface>
+      <ipprotocol>inet</ipprotocol>
+      <protocol>tcp</protocol>
+      <source><any/></source>
+      <destination>
+        <address>172.16.50.12</address>
+        <port>8080</port>
+      </destination>
+      <log/>
+    </rule>
+
+    <!-- LAN rules: outbound internet access -->
+    <rule>
+      <type>pass</type>
+      <interface>lan</interface>
+      <ipprotocol>inet</ipprotocol>
+      <protocol>tcp</protocol>
+      <source>
+        <network>lan</network>
+      </source>
+      <destination>
+        <any/>
+        <port>80</port>
+      </destination>
+      <log/>
+      <descr>LAN to internet HTTP</descr>
+    </rule>
+    <rule>
+      <type>pass</type>
+      <interface>lan</interface>
+      <ipprotocol>inet</ipprotocol>
+      <protocol>tcp</protocol>
+      <source>
+        <network>lan</network>
+      </source>
+      <destination>
+        <any/>
+        <port>443</port>
+      </destination>
+      <log/>
+      <descr>LAN to internet HTTPS</descr>
+    </rule>
+    <rule>
+      <type>pass</type>
+      <interface>lan</interface>
+      <ipprotocol>inet</ipprotocol>
+      <protocol>udp</protocol>
+      <source>
+        <network>lan</network>
+      </source>
+      <destination>
+        <any/>
+        <port>53</port>
+      </destination>
+      <log/>
+      <descr>LAN DNS outbound</descr>
+    </rule>
+
+    <!-- DMZ to App tier -->
+    <rule>
+      <type>pass</type>
+      <interface>opt1</interface>
+      <ipprotocol>inet</ipprotocol>
+      <protocol>tcp</protocol>
+      <source>
+        <network>opt1</network>
+      </source>
+      <destination>
+        <address>10.50.20.0/24</address>
+        <port>8080</port>
+      </destination>
+      <log/>
+      <descr>DMZ web servers to app tier</descr>
+    </rule>
+
+    <!-- Explicit deny-all on all interfaces -->
+    <rule>
+      <type>block</type>
+      <interface>wan</interface>
+      <ipprotocol>inet</ipprotocol>
+      <protocol>any</protocol>
+      <source><any/></source>
+      <destination><any/></destination>
+      <log/>
+      <descr>Explicit deny-all WAN inbound</descr>
+    </rule>
+    <rule>
+      <type>block</type>
+      <interface>opt1</interface>
+      <ipprotocol>inet</ipprotocol>
+      <protocol>any</protocol>
+      <source><any/></source>
+      <destination><any/></destination>
+      <log/>
+      <descr>Explicit deny-all DMZ</descr>
+    </rule>
+  </filter>
+
+  <nat>
+    <outbound>
+      <mode>automatic</mode>
+    </outbound>
+    <rule>
+      <source>
+        <network>10.50.0.0/16</network>
+      </source>
+      <destination><any/></destination>
+      <interface>wan</interface>
+      <target/>
+      <descr>Auto-NAT LAN to WAN</descr>
+    </rule>
+    <rule>
+      <source>
+        <address>172.16.50.10</address>
+      </source>
+      <destination>
+        <any/>
+        <port>80</port>
+      </destination>
+      <interface>wan</interface>
+      <target>203.0.113.50</target>
+      <local-port>80</local-port>
+      <descr>Port forward HTTP to web server</descr>
+    </rule>
+  </nat>
+
+  <ipsec>
+    <phase1>
+      <ikeid>1</ikeid>
+      <descr>VPN to branch office</descr>
+      <interface>wan</interface>
+      <remote-gateway>198.51.100.5</remote-gateway>
+      <authentication_method>pre_shared_key</authentication_method>
+      <ike-encryption>aes256</ike-encryption>
+      <ike-hash>sha256</ike-hash>
+      <dhgroup>20</dhgroup>
+      <lifetime>86400</lifetime>
+    </phase1>
+    <phase2>
+      <ikeid>1</ikeid>
+      <descr>Branch LAN subnet</descr>
+      <mode>tunnel</mode>
+      <localid>
+        <type>network</type>
+        <address>10.50.0.0</address>
+        <netbits>16</netbits>
+      </localid>
+      <remoteid>
+        <type>network</type>
+        <address>10.60.0.0</address>
+        <netbits>16</netbits>
+      </remoteid>
+      <enc-alg>aes256</enc-alg>
+      <hash-alg>sha256</hash-alg>
+      <pfsgroup>20</pfsgroup>
+      <lifetime>3600</lifetime>
+    </phase2>
+  </ipsec>
+</pfsense>

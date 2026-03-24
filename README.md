@@ -9,12 +9,15 @@
 
 ## Supported Vendors
 
+Cashel supports **10 vendor platforms** spanning on-premises firewalls and cloud security groups.
+
+> **Cisco note:** Cashel supports both **Cisco ASA** (Adaptive Security Appliance) and **Cisco FTD** (Firepower Threat Defense). Both share the same LINA/ASA CLI syntax. FTD is auto-detected from config markers (`access-control-policy`, `intrusion-policy`, `threat-detection`, etc.) and receives additional NGFW-specific checks on top of the standard ASA checks. Use `--vendor asa` for ASA configs and `--vendor ftd` for FTD, or leave on **Auto-detect** to let Cashel decide.
+
 | Vendor | Config Format | Live SSH | Notes |
 |---|---|---|---|
 | AWS Security Groups | JSON | — | `aws ec2 describe-security-groups` export |
 | Azure NSG | JSON | — | `az network nsg show` / `nsg list` export |
-| Cisco ASA | Text | ✓ | Running config (`show running-config`) |
-| Cisco FTD | Text | ✓ | LINA CLI; auto-detected from ASA uploads |
+| Cisco (ASA / FTD) | Text | ✓ | Running config (`show running-config`); FTD auto-detected |
 | Fortinet FortiGate | Text | ✓ | Running config (`show full-configuration`) |
 | GCP VPC Firewall | JSON | — | `gcloud compute firewall-rules list --format json` |
 | iptables (Linux) | Text | ✓ | `iptables-save` format |
@@ -83,7 +86,7 @@
 | Check | Severity | Vendors |
 |---|---|---|
 | Any/any permit rules | HIGH | All |
-| Missing deny-all rule | HIGH | Cisco, Juniper, Palo Alto, pfSense |
+| Missing deny-all rule | HIGH | Cisco (ASA/FTD), Juniper, Palo Alto, pfSense |
 | Open ingress to 0.0.0.0/0 | HIGH | AWS, GCP |
 | Internet-facing policy missing UTM | HIGH | Fortinet |
 | WAN-facing any-source pass rule | HIGH | pfSense |
@@ -99,14 +102,14 @@
 | Insecure services (Telnet/HTTP/FTP) | MEDIUM | Fortinet, Juniper |
 | Internet ingress on sensitive ports | MEDIUM | GCP, iptables, nftables |
 | Missing description | MEDIUM | GCP, Palo Alto, pfSense |
-| Missing logging | MEDIUM | Cisco, iptables, Juniper, nftables, Palo Alto |
+| Missing logging | MEDIUM | Cisco (ASA/FTD), iptables, Juniper, nftables, Palo Alto |
 | No deny-all across zone pairs | MEDIUM | Juniper |
 | Overly permissive NSG rules | MEDIUM | Azure |
-| Shadowed/duplicate rules | MEDIUM | Cisco, Fortinet, Juniper, Palo Alto |
-| Telnet management enabled | MEDIUM | Cisco, Juniper |
+| Shadowed/duplicate rules | MEDIUM | Cisco (ASA/FTD), Fortinet, Juniper, Palo Alto |
+| Telnet management enabled | MEDIUM | Cisco (ASA/FTD), Juniper |
 | SNMP community strings | MEDIUM | Juniper |
 | Unnamed policies | MEDIUM | Fortinet |
-| Unrestricted ICMP permit | MEDIUM | Cisco, GCP, iptables, nftables |
+| Unrestricted ICMP permit | MEDIUM | Cisco (ASA/FTD), GCP, iptables, nftables |
 | Unrestricted egress | MEDIUM | GCP |
 | Wide port range (>100 ports) | MEDIUM | AWS, Azure |
 
@@ -118,14 +121,45 @@ Compliance checks require a license key and map findings to specific control ref
 
 | Framework | Coverage | Vendors |
 |---|---|---|
-| CIS Benchmark | HIGH / MEDIUM | Cisco ASA/FTD, Fortinet, Juniper, Palo Alto, pfSense |
-| DISA STIG | CAT-I / CAT-II / CAT-III | Cisco ASA/FTD, Fortinet, Juniper, Palo Alto, pfSense |
-| HIPAA Security Rule (45 CFR §164) | HIGH / MEDIUM | Cisco ASA/FTD, Fortinet, Juniper, Palo Alto, pfSense |
-| NIST SP 800-41 | HIGH / MEDIUM | Cisco ASA/FTD, Fortinet, Juniper, Palo Alto, pfSense |
-| PCI-DSS | HIGH / MEDIUM | Cisco ASA/FTD, Fortinet, Juniper, Palo Alto, pfSense |
-| SOC2 | HIGH / MEDIUM | Cisco ASA/FTD, Fortinet, Juniper, Palo Alto, pfSense |
+| CIS Benchmark | HIGH / MEDIUM | Cisco (ASA/FTD), Fortinet, Juniper, Palo Alto, pfSense |
+| DISA STIG | CAT-I / CAT-II / CAT-III | Cisco (ASA/FTD), Fortinet, Juniper, Palo Alto, pfSense |
+| HIPAA Security Rule (45 CFR §164) | HIGH / MEDIUM | Cisco (ASA/FTD), Fortinet, Juniper, Palo Alto, pfSense |
+| NIST SP 800-41 | HIGH / MEDIUM | Cisco (ASA/FTD), Fortinet, Juniper, Palo Alto, pfSense |
+| PCI-DSS | HIGH / MEDIUM | Cisco (ASA/FTD), Fortinet, Juniper, Palo Alto, pfSense |
+| SOC2 | HIGH / MEDIUM | Cisco (ASA/FTD), Fortinet, Juniper, Palo Alto, pfSense |
 
 > 💳 **Purchase a license at [Gumroad](https://shamrock13.gumroad.com/l/cashel)**
+
+---
+
+## Example Config Files
+
+The `examples/` directory contains ready-to-use sample configurations for every supported vendor. Each file is a realistic representation of an enterprise firewall config and includes a mix of well-scoped rules and intentional misconfigurations that Cashel will detect and flag.
+
+| File | Vendor | Format |
+|---|---|---|
+| `examples/cisco_asa.txt` | Cisco ASA | Text (`show running-config`) |
+| `examples/cisco_ftd.txt` | Cisco FTD | Text (LINA CLI with FTD markers) |
+| `examples/fortinet_fortigate.txt` | Fortinet FortiGate | Text (`show full-configuration`) |
+| `examples/palo_alto.xml` | Palo Alto Networks | XML (candidate/running config) |
+| `examples/pfsense.xml` | pfSense | XML (`config.xml`) |
+| `examples/juniper_srx.txt` | Juniper SRX | Text (set format) |
+| `examples/iptables.txt` | iptables (Linux) | Text (`iptables-save`) |
+| `examples/nftables.txt` | nftables (Linux) | Text (`nft list ruleset`) |
+| `examples/aws_security_groups.json` | AWS Security Groups | JSON (`describe-security-groups`) |
+| `examples/azure_nsg.json` | Azure NSG | JSON (`az network nsg show`) |
+| `examples/gcp_vpc_firewall.json` | GCP VPC Firewall | JSON (`gcloud compute firewall-rules list`) |
+
+### Quick start with an example
+
+```bash
+# Web UI: upload any file from examples/ and select Auto-detect
+
+# CLI:
+PYTHONPATH=src python -m cashel.main --file examples/cisco_asa.txt --vendor asa
+PYTHONPATH=src python -m cashel.main --file examples/palo_alto.xml --vendor paloalto
+PYTHONPATH=src python -m cashel.main --file examples/aws_security_groups.json --vendor aws
+```
 
 ---
 
@@ -207,7 +241,7 @@ Upload two configs of the same vendor to see a diff — rules added, removed, an
 ### Live Connect
 Connect to a device over SSH to pull and audit its running configuration without touching a file.
 
-- **Supported vendors:** Cisco ASA, Cisco FTD, Fortinet, iptables (Linux), Juniper SRX, nftables (Linux), Palo Alto Networks, pfSense
+- **Supported vendors:** Cisco (ASA / FTD), Fortinet, iptables (Linux), Juniper SRX, nftables (Linux), Palo Alto Networks, pfSense
 - Credentials are used only for the single connection and are never stored
 - Successful audits are automatically saved to Audit History
 - Failed connections are recorded in the Activity Log only
@@ -216,7 +250,7 @@ Connect to a device over SSH to pull and audit its running configuration without
 
 | Vendor | Command issued |
 |---|---|
-| Cisco ASA / FTD | `terminal pager 0` → `show running-config` |
+| Cisco (ASA / FTD) | `terminal pager 0` → `show running-config` |
 | Fortinet | `show full-configuration firewall policy` |
 | iptables (Linux) | `iptables-save` (sudo fallback) |
 | Juniper SRX | `set cli screen-length 0` → `show configuration \| display set` |
@@ -238,7 +272,7 @@ Set up recurring SSH audits. Each schedule supports:
 ### History
 Two sub-tabs:
 
-**Audit History** — browse all saved audits. Filter by vendor (all 12 types), sort by date or issue count, search by tag or filename. Select any two entries and click **Compare Selected** to see a full diff. The Score Trends chart plots each device's security score over time.
+**Audit History** — browse all saved audits. Filter by vendor (all 11 types), sort by date or issue count, search by tag or filename. Select any two entries and click **Compare Selected** to see a full diff. The Score Trends chart plots each device's security score over time.
 
 **Activity Log** — a complete record of every file audit, SSH connection, config diff, and scheduled run — including failures. Entries can be deleted individually or cleared in bulk.
 
@@ -287,8 +321,8 @@ PYTHONPATH=src python -m cashel.main --file config.txt --vendor asa --report
 
 ### Supported vendors
 ```
---vendor asa        Cisco ASA
---vendor ftd        Cisco FTD (Firepower Threat Defense)
+--vendor asa        Cisco ASA (or leave on auto-detect)
+--vendor ftd        Cisco FTD / Firepower Threat Defense (auto-detected from config markers)
 --vendor fortinet   Fortinet FortiGate
 --vendor gcp        GCP VPC Firewall
 --vendor iptables   iptables (Linux)
@@ -360,7 +394,7 @@ Report saved to: report.pdf
 - [x] Bulk multi-device audit
 - [x] Category badges and remediation guidance
 - [x] CIS Benchmark compliance framework
-- [x] Cisco FTD (Firepower Threat Defense) support
+- [x] Cisco FTD / Firepower Threat Defense support (auto-detected alongside ASA)
 - [x] Clickable severity filters
 - [x] CSV and SARIF export
 - [x] Device tag system with auto-versioning

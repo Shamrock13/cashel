@@ -1,0 +1,229 @@
+## Juniper SRX Running Configuration — Set Format
+## Device: SRX-EDGE-01 | Platform: SRX345 | Junos 22.4R2
+## Export: show configuration | display set
+##
+## Both "set" format (flat) and hierarchical (brace) formats are supported.
+## This example uses set format. For hierarchical, see juniper_srx_hierarchical.txt.
+
+set version 22.4R2.8
+set system host-name SRX-EDGE-01
+set system domain-name corp.example.com
+set system time-zone America/New_York
+set system name-server 8.8.8.8
+set system name-server 1.1.1.1
+
+## --- Login / Authentication ---
+
+set system login user admin class super-user
+set system login user admin authentication encrypted-password "$6$rounds=100000$SaltHere$HashHere"
+set system login user admin authentication ssh-rsa "ssh-rsa AAAA... admin@bastion"
+
+set system login user svc-monitoring class read-only
+set system login user svc-monitoring authentication encrypted-password "$6$rounds=100000$SaltHere2$HashHere2"
+
+set system login retry-options tries-before-disconnect 5
+set system login retry-options backoff-threshold 2
+set system login retry-options minimum-time 30
+set system login retry-options maximum-time 120
+
+## --- SSH / Management plane ---
+
+set system services ssh root-login deny
+set system services ssh protocol-version v2
+set system services ssh max-sessions-per-connection 1
+set system services ssh client-alive-count-max 3
+set system services ssh client-alive-interval 30
+set system services ssh hostkey-algorithm prefer-ecdsa
+
+## FINDING: Telnet explicitly enabled — AUDIT WILL FLAG THIS
+set system services telnet connection-limit 5
+
+## Web management (HTTPS only)
+set system services web-management https system-generated-certificate
+set system services web-management https interface ge-0/0/2.0
+
+## --- SNMP ---
+
+## FINDING: SNMPv2c community string present — AUDIT WILL FLAG THIS
+set snmp community CORP-RO authorization read-only
+set snmp community CORP-RO clients 10.50.99.0/24
+
+set snmp v3 usm local-engine user snmpv3mon authentication-sha authentication-password "AuthP@ss456!"
+set snmp v3 usm local-engine user snmpv3mon privacy-aes128 privacy-password "PrivP@ss456!"
+set snmp v3 vacm access group snmpv3_group default-context-prefix security-model usm security-level privacy read-view all-view write-view none notify-view all-view
+set snmp v3 vacm security-to-group security-model usm security-name snmpv3mon group snmpv3_group
+set snmp contact "noc@corp.example.com"
+set snmp location "HQ-DataCenter-Rack-14"
+
+## --- Syslog ---
+
+set system syslog host 10.50.1.200 any info
+set system syslog host 10.50.1.200 kernel warning
+set system syslog host 10.50.1.200 interactive-commands any
+set system syslog host 10.50.1.200 explicit-priority
+set system syslog host 10.50.1.200 log-prefix "SRX-EDGE-01"
+set system syslog host 10.50.1.201 any info
+set system syslog file messages any info
+set system syslog file messages authorization info
+
+## --- Interfaces ---
+
+set interfaces ge-0/0/0 unit 0 family inet address 203.0.113.60/24
+set interfaces ge-0/0/0 description "WAN - Internet uplink"
+set interfaces ge-0/0/1 unit 0 family inet address 10.50.0.1/16
+set interfaces ge-0/0/1 description "LAN - Internal network"
+set interfaces ge-0/0/2 unit 0 family inet address 172.16.60.1/24
+set interfaces ge-0/0/2 description "DMZ"
+set interfaces lo0 unit 0 family inet address 127.0.0.1/32
+
+## --- Routing ---
+
+set routing-options static route 0.0.0.0/0 next-hop 203.0.113.254
+set routing-options static route 10.0.0.0/8 next-hop 10.50.0.254
+
+## --- Zones ---
+
+set security zones security-zone untrust interfaces ge-0/0/0.0
+set security zones security-zone untrust interfaces ge-0/0/0.0 host-inbound-traffic system-services ike
+set security zones security-zone untrust screen untrust-screen
+
+set security zones security-zone trust interfaces ge-0/0/1.0
+set security zones security-zone trust interfaces ge-0/0/1.0 host-inbound-traffic system-services dhcp
+set security zones security-zone trust interfaces ge-0/0/1.0 host-inbound-traffic system-services dns
+set security zones security-zone trust interfaces ge-0/0/1.0 host-inbound-traffic system-services ping
+set security zones security-zone trust interfaces ge-0/0/1.0 host-inbound-traffic system-services ntp
+set security zones security-zone trust interfaces ge-0/0/1.0 host-inbound-traffic system-services snmp
+
+set security zones security-zone dmz interfaces ge-0/0/2.0
+set security zones security-zone dmz interfaces ge-0/0/2.0 host-inbound-traffic system-services ping
+
+## --- Address Books ---
+
+set security address-book global address WEB-SERVER-01 172.16.60.10/32
+set security address-book global address WEB-SERVER-02 172.16.60.11/32
+set security address-book global address APP-NET 10.50.20.0/24
+set security address-book global address DB-NET 10.50.30.0/24
+set security address-book global address MGMT-HOSTS 10.50.99.0/24
+
+set security address-book global address-set GRP-WEB-SERVERS address WEB-SERVER-01
+set security address-book global address-set GRP-WEB-SERVERS address WEB-SERVER-02
+
+## --- Applications ---
+
+set applications application SVC-APP-8080 protocol tcp destination-port 8080
+set applications application SVC-APP-8443 protocol tcp destination-port 8443
+
+## --- IDP / Intrusion Detection ---
+
+set security idp active-policy Recommended
+set security idp idp-policy Recommended
+set security utm feature-profile web-filtering type juniper-enhanced
+
+## --- Security Policies ---
+
+## Policy 1: Internet to DMZ web servers
+set security policies from-zone untrust to-zone dmz policy Internet-to-DMZ-Web match source-address any
+set security policies from-zone untrust to-zone dmz policy Internet-to-DMZ-Web match destination-address GRP-WEB-SERVERS
+set security policies from-zone untrust to-zone dmz policy Internet-to-DMZ-Web match application junos-http
+set security policies from-zone untrust to-zone dmz policy Internet-to-DMZ-Web match application junos-https
+set security policies from-zone untrust to-zone dmz policy Internet-to-DMZ-Web then permit
+set security policies from-zone untrust to-zone dmz policy Internet-to-DMZ-Web then log session-close
+set security policies from-zone untrust to-zone dmz policy Internet-to-DMZ-Web then count
+
+## Policy 2: DMZ to App tier
+set security policies from-zone dmz to-zone trust policy DMZ-to-App match source-address GRP-WEB-SERVERS
+set security policies from-zone dmz to-zone trust policy DMZ-to-App match destination-address APP-NET
+set security policies from-zone dmz to-zone trust policy DMZ-to-App match application SVC-APP-8080
+set security policies from-zone dmz to-zone trust policy DMZ-to-App match application SVC-APP-8443
+set security policies from-zone dmz to-zone trust policy DMZ-to-App then permit
+set security policies from-zone dmz to-zone trust policy DMZ-to-App then log session-close
+
+## Policy 3: App to DB tier
+set security policies from-zone trust to-zone trust policy App-to-DB match source-address APP-NET
+set security policies from-zone trust to-zone trust policy App-to-DB match destination-address DB-NET
+set security policies from-zone trust to-zone trust policy App-to-DB match application junos-mssql
+set security policies from-zone trust to-zone trust policy App-to-DB then permit
+set security policies from-zone trust to-zone trust policy App-to-DB then log session-close
+
+## Policy 4: Trust to internet (egress)
+set security policies from-zone trust to-zone untrust policy Trust-to-Internet match source-address any
+set security policies from-zone trust to-zone untrust policy Trust-to-Internet match destination-address any
+set security policies from-zone trust to-zone untrust policy Trust-to-Internet match application junos-http
+set security policies from-zone trust to-zone untrust policy Trust-to-Internet match application junos-https
+set security policies from-zone trust to-zone untrust policy Trust-to-Internet match application junos-dns-udp
+set security policies from-zone trust to-zone untrust policy Trust-to-Internet match application junos-smtp
+set security policies from-zone trust to-zone untrust policy Trust-to-Internet then permit
+set security policies from-zone trust to-zone untrust policy Trust-to-Internet then log session-close
+
+## Policy 5: FINDING — any/any permit with insecure application (telnet) — AUDIT WILL FLAG THIS
+set security policies from-zone trust to-zone untrust policy Allow-Telnet-Out match source-address any
+set security policies from-zone trust to-zone untrust policy Allow-Telnet-Out match destination-address any
+set security policies from-zone trust to-zone untrust policy Allow-Telnet-Out match application junos-telnet
+set security policies from-zone trust to-zone untrust policy Allow-Telnet-Out then permit
+set security policies from-zone trust to-zone untrust policy Allow-Telnet-Out then log session-close
+
+## FINDING: No deny-all policy for untrust-to-trust zone pair — AUDIT WILL FLAG THIS
+
+## Policy 6: Deny-all for untrust to dmz (catch-all)
+set security policies from-zone untrust to-zone dmz policy Deny-All match source-address any
+set security policies from-zone untrust to-zone dmz policy Deny-All match destination-address any
+set security policies from-zone untrust to-zone dmz policy Deny-All match application any
+set security policies from-zone untrust to-zone dmz policy Deny-All then deny
+set security policies from-zone untrust to-zone dmz policy Deny-All then log session-close
+
+## Policy 7: Deny-all for dmz to trust (catch-all)
+set security policies from-zone dmz to-zone trust policy Deny-All match source-address any
+set security policies from-zone dmz to-zone trust policy Deny-All match destination-address any
+set security policies from-zone dmz to-zone trust policy Deny-All match application any
+set security policies from-zone dmz to-zone trust policy Deny-All then deny
+set security policies from-zone dmz to-zone trust policy Deny-All then log session-close
+
+## --- NAT ---
+
+set security nat source rule-set SNAT-to-Internet from zone trust
+set security nat source rule-set SNAT-to-Internet to zone untrust
+set security nat source rule-set SNAT-to-Internet rule SNAT-all match source-address 0.0.0.0/0
+set security nat source rule-set SNAT-to-Internet rule SNAT-all then source-nat interface
+
+set security nat destination pool DNAT-WEB-01 address 172.16.60.10/32
+set security nat destination rule-set DNAT-Inbound from zone untrust
+set security nat destination rule-set DNAT-Inbound rule DNAT-WEB-01 match destination-address 203.0.113.60/32 destination-port 80-443
+set security nat destination rule-set DNAT-Inbound rule DNAT-WEB-01 then destination-nat pool DNAT-WEB-01
+
+## --- IKE / VPN ---
+
+set security ike proposal IKE-PROP-AES256 authentication-method pre-shared-keys
+set security ike proposal IKE-PROP-AES256 dh-group group20
+set security ike proposal IKE-PROP-AES256 authentication-algorithm sha-256
+set security ike proposal IKE-PROP-AES256 encryption-algorithm aes-256-cbc
+set security ike proposal IKE-PROP-AES256 lifetime-seconds 86400
+
+set security ike policy IKE-POL-BRANCH mode main
+set security ike policy IKE-POL-BRANCH proposals IKE-PROP-AES256
+set security ike policy IKE-POL-BRANCH pre-shared-key ascii-text "$9$EncryptedPSK"
+
+set security ike gateway GW-BRANCH ike-policy IKE-POL-BRANCH
+set security ike gateway GW-BRANCH address 198.51.100.10
+set security ike gateway GW-BRANCH external-interface ge-0/0/0.0
+set security ike gateway GW-BRANCH version v2-only
+
+set security ipsec proposal IPSEC-PROP-AES256 protocol esp
+set security ipsec proposal IPSEC-PROP-AES256 authentication-algorithm hmac-sha-256-128
+set security ipsec proposal IPSEC-PROP-AES256 encryption-algorithm aes-256-cbc
+set security ipsec proposal IPSEC-PROP-AES256 lifetime-seconds 3600
+
+set security ipsec vpn VPN-TO-BRANCH ike gateway GW-BRANCH
+set security ipsec vpn VPN-TO-BRANCH ike ipsec-policy IPSEC-PROP-AES256
+set security ipsec vpn VPN-TO-BRANCH bind-interface st0.0
+
+## --- Screens (Zone protection) ---
+
+set security screen ids-option untrust-screen icmp ping-death
+set security screen ids-option untrust-screen ip source-route-option
+set security screen ids-option untrust-screen ip tear-drop
+set security screen ids-option untrust-screen tcp syn-flood alarm-threshold 1024
+set security screen ids-option untrust-screen tcp syn-flood attack-threshold 200
+set security screen ids-option untrust-screen tcp syn-flood source-threshold 1024
+set security screen ids-option untrust-screen tcp syn-flood destination-threshold 2048
+set security screen ids-option untrust-screen tcp land
+set security screen ids-option untrust-screen udp flood threshold 1000
