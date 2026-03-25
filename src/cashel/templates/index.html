@@ -847,7 +847,9 @@
                   <button class="btn-secondary" id="btnDismissKey" style="padding:0.2rem 0.6rem;font-size:0.78rem">Dismiss</button>
                 </div>
                 <div style="display:flex;align-items:center;gap:0.5rem">
-                  <code id="authNewKeyVal" style="flex:1;padding:0.5rem;background:var(--input-bg);border-radius:4px;word-break:break-all;font-size:0.88rem"></code>
+                  <input type="password" id="authNewKeyVal" readonly
+                         style="flex:1;padding:0.5rem;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;word-break:break-all;font-size:0.88rem;color:var(--text);font-family:monospace" />
+                  <button class="btn-secondary" id="btnRevealKey">Show</button>
                   <button class="btn-secondary" id="btnCopyKey">Copy</button>
                 </div>
               </div>
@@ -2386,14 +2388,27 @@
   function _maskApiKeyBox() {
     clearInterval(_keyCountdownTimer);
     document.getElementById("authNewKeyBox").classList.add("hidden");
-    document.getElementById("authNewKeyVal").textContent = "";
+    document.getElementById("authNewKeyVal").value = "";
     document.getElementById("authKeyCountdown").textContent = "60";
+    const revealBtn = document.getElementById("btnRevealKey");
+    if (revealBtn) { revealBtn.textContent = "Show"; document.getElementById("authNewKeyVal").type = "password"; }
   }
 
   document.getElementById("btnDismissKey").addEventListener("click", _maskApiKeyBox);
 
+  document.getElementById("btnRevealKey").addEventListener("click", function () {
+    const inp = document.getElementById("authNewKeyVal");
+    if (inp.type === "password") {
+      inp.type = "text";
+      this.textContent = "Hide";
+    } else {
+      inp.type = "password";
+      this.textContent = "Show";
+    }
+  });
+
   document.getElementById("btnCopyKey").addEventListener("click", function () {
-    const val = document.getElementById("authNewKeyVal").textContent;
+    const val = document.getElementById("authNewKeyVal").value;
     navigator.clipboard.writeText(val)
       .then(() => { this.textContent = "Copied!"; setTimeout(() => { this.textContent = "Copy"; }, 1500); })
       .catch(() => { this.textContent = "Error"; });
@@ -2409,7 +2424,7 @@
         alert("Failed to generate key: " + (data.error || "Unknown error"));
         return;
       }
-      document.getElementById("authNewKeyVal").textContent = data.api_key;
+      document.getElementById("authNewKeyVal").value = data.api_key;
       document.getElementById("authNewKeyBox").classList.remove("hidden");
       document.getElementById("authKeyHint").textContent   = data.api_key_hint || (data.api_key.slice(0, 8) + "…");
 

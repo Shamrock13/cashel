@@ -20,6 +20,9 @@ dependencies = [
     "defusedxml>=0.7",
 ]
 
+[project.optional-dependencies]
+dev = ["ruff", "mypy", "pytest"]
+
 [tool.poetry]
 packages = [{include = "cashel", from = "src"}]
 
