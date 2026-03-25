@@ -814,8 +814,14 @@
             <div class="settings-group">
               <h3 class="settings-group-title">Access Control</h3>
               <label class="settings-row">
-                <span class="settings-row-label">Enable Authentication</span>
-                <input type="checkbox" class="settings-toggle" id="setting-auth-enabled" />
+                <div class="settings-row-info">
+                  <span class="settings-row-label">Enable Authentication</span>
+                  <span class="settings-row-desc">Require an API key to access the web UI and all API endpoints.</span>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="setting-auth-enabled" />
+                  <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                </label>
               </label>
               <div class="settings-row">
                 <span class="settings-row-label">Session Lifetime</span>
@@ -836,10 +842,13 @@
                 <button class="btn-secondary" id="btnGenerateKey">Generate New Key</button>
               </div>
               <div id="authNewKeyBox" class="hidden" style="margin-top:1rem;background:var(--card-bg);border:1px solid var(--accent);border-radius:8px;padding:1rem">
-                <p style="font-size:0.82rem;color:var(--high);font-weight:600;margin-bottom:0.5rem">&#9888; Copy this key now — it will not be shown again.</p>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
+                  <p style="font-size:0.82rem;color:var(--high);font-weight:600;margin:0">&#9888; Copy this key now — it will not be shown again. Auto-hides in <span id="authKeyCountdown">60</span>s.</p>
+                  <button class="btn-secondary" id="btnDismissKey" style="padding:0.2rem 0.6rem;font-size:0.78rem">Dismiss</button>
+                </div>
                 <div style="display:flex;align-items:center;gap:0.5rem">
                   <code id="authNewKeyVal" style="flex:1;padding:0.5rem;background:var(--input-bg);border-radius:4px;word-break:break-all;font-size:0.88rem"></code>
-                  <button class="btn-secondary" onclick="navigator.clipboard.writeText(document.getElementById('authNewKeyVal').textContent).then(()=>this.textContent='Copied!').catch(()=>this.textContent='Error')">Copy</button>
+                  <button class="btn-secondary" id="btnCopyKey">Copy</button>
                 </div>
               </div>
               <p class="settings-pane-desc" style="margin-top:0.75rem">Use this key in the <code>X-API-Key</code> header for CLI or CI/CD access:<br><code>curl -H "X-API-Key: csh_..." https://your-cashel/api/v1/audit</code></p>
@@ -2372,6 +2381,24 @@
   });
 
   // ══════════════════════════════════════════════ GENERATE API KEY ══
+  let _keyCountdownTimer = null;
+
+  function _maskApiKeyBox() {
+    clearInterval(_keyCountdownTimer);
+    document.getElementById("authNewKeyBox").classList.add("hidden");
+    document.getElementById("authNewKeyVal").textContent = "";
+    document.getElementById("authKeyCountdown").textContent = "60";
+  }
+
+  document.getElementById("btnDismissKey").addEventListener("click", _maskApiKeyBox);
+
+  document.getElementById("btnCopyKey").addEventListener("click", function () {
+    const val = document.getElementById("authNewKeyVal").textContent;
+    navigator.clipboard.writeText(val)
+      .then(() => { this.textContent = "Copied!"; setTimeout(() => { this.textContent = "Copy"; }, 1500); })
+      .catch(() => { this.textContent = "Error"; });
+  });
+
   document.getElementById("btnGenerateKey").addEventListener("click", async function () {
     if (!confirm("Generate a new API key? The current key (if any) will be invalidated immediately.")) return;
     this.disabled = true;
@@ -2384,7 +2411,18 @@
       }
       document.getElementById("authNewKeyVal").textContent = data.api_key;
       document.getElementById("authNewKeyBox").classList.remove("hidden");
-      document.getElementById("authKeyHint").textContent   = data.api_key_hint || data.api_key.slice(0, 12) + "…";
+      document.getElementById("authKeyHint").textContent   = data.api_key_hint || (data.api_key.slice(0, 8) + "…");
+
+      // Countdown auto-mask
+      clearInterval(_keyCountdownTimer);
+      let secs = 60;
+      document.getElementById("authKeyCountdown").textContent = secs;
+      _keyCountdownTimer = setInterval(() => {
+        secs--;
+        const el = document.getElementById("authKeyCountdown");
+        if (el) el.textContent = secs;
+        if (secs <= 0) _maskApiKeyBox();
+      }, 1000);
     } catch (err) {
       alert("Request failed: " + err.message);
     } finally {

@@ -1154,9 +1154,10 @@ def settings_generate_api_key():
     """Generate a new random API key, store it encrypted, and return it once in plaintext.
     The caller must copy and store the key immediately — it cannot be retrieved again.
     """
-    new_key = "csh_" + secrets.token_urlsafe(32)
+    new_key  = "csh_" + secrets.token_urlsafe(32)
     save_api_key(new_key)
-    return jsonify({"ok": True, "api_key": new_key})
+    hint = ("csh_…" + new_key[-4:]) if len(new_key) >= 4 else ""
+    return jsonify({"ok": True, "api_key": new_key, "api_key_hint": hint})
 
 
 @app.route("/settings/test-smtp", methods=["POST"])

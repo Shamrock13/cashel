@@ -8,7 +8,9 @@ import os
 
 from .crypto import encrypt, decrypt
 
-SETTINGS_FILE = os.environ.get("SETTINGS_FILE", "/tmp/cashel_settings/settings.json")
+_DEFAULT_SETTINGS_DIR  = os.path.join(os.path.expanduser("~"), ".config", "cashel")
+_DEFAULT_SETTINGS_FILE = os.path.join(_DEFAULT_SETTINGS_DIR, "settings.json")
+SETTINGS_FILE = os.environ.get("SETTINGS_FILE", _DEFAULT_SETTINGS_FILE)
 
 # Valid values for enumerated security settings.
 VALID_SSH_KEY_POLICIES  = ("warn", "strict", "auto_add")
