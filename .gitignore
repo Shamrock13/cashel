@@ -37,5 +37,8 @@ CLAUDE.md
 PLAN.md
 DEMO_SETUP.md
 
-# Demo workflow lives in private repo only
+# Demo files — live in private cashel-demo repo only
 .github/workflows/demo-deploy.yml
+vercel.json
+api/
+Dockerfile.demo
