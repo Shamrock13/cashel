@@ -16,6 +16,15 @@
 </head>
 <body>
 
+  {% if demo_mode %}
+  <div class="demo-banner" id="demoBanner" role="banner">
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" style="width:16px;height:16px;flex-shrink:0"><circle cx="10" cy="10" r="8"/><path d="M10 7v3M10 13h.01"/></svg>
+    <span><strong>Live Demo</strong> &mdash; Sample configs are processed in memory and never stored. No account required.</span>
+    <a href="https://github.com/shamrock13/cashel" target="_blank" rel="noopener" class="demo-banner-link">Get Cashel &rarr;</a>
+    <button class="demo-banner-close" onclick="document.getElementById('demoBanner').remove()" aria-label="Dismiss">&times;</button>
+  </div>
+  {% endif %}
+
   <!-- Header -->
   <header class="header">
     <div class="header-inner">
@@ -111,6 +120,17 @@
 
       <!-- ── Single File mode ── -->
       <div id="audit-mode-single">
+
+      {% if demo_mode %}
+      <div class="card demo-picker-card">
+        <h2 class="card-title">Try a Sample Config</h2>
+        <p class="card-subtitle">Select a pre-loaded config to see a real audit &mdash; no upload needed.</p>
+        <div class="demo-config-grid" id="demoConfigGrid">
+          <div class="demo-loading">Loading samples&hellip;</div>
+        </div>
+      </div>
+      {% endif %}
+
       <div class="card">
         <h2 class="card-title">Run Audit</h2>
         <form id="auditForm" enctype="multipart/form-data">
@@ -2447,6 +2467,68 @@
 
   // Load settings on startup and apply defaults to the audit form
   loadSettings();
+
+  {% if demo_mode %}
+  // ── Demo mode: sample config picker ──────────────────────────────────────
+  (function () {
+    const grid = document.getElementById("demoConfigGrid");
+    if (!grid) return;
+
+    fetch("/demo/configs")
+      .then(r => r.json())
+      .then(configs => {
+        grid.innerHTML = "";
+        configs.forEach(cfg => {
+          const card = document.createElement("button");
+          card.type = "button";
+          card.className = "demo-config-card";
+          card.dataset.id = cfg.id;
+          card.dataset.vendor = cfg.vendor;
+          card.innerHTML = `
+            <span class="demo-config-label">${cfg.label}</span>
+            <span class="demo-config-desc">${cfg.description}</span>
+            <span class="demo-config-action">Load &amp; Audit &rarr;</span>
+          `;
+          card.addEventListener("click", () => loadDemoConfig(cfg));
+          grid.appendChild(card);
+        });
+      })
+      .catch(() => {
+        grid.innerHTML = '<p class="demo-error">Could not load sample configs.</p>';
+      });
+
+    async function loadDemoConfig(cfg) {
+      document.querySelectorAll(".demo-config-card").forEach(c => c.classList.remove("demo-config-selected"));
+      const btn = document.querySelector(`.demo-config-card[data-id="${cfg.id}"]`);
+      if (btn) btn.classList.add("demo-config-selected");
+
+      try {
+        const resp = await fetch(`/demo/load/${cfg.id}`);
+        if (!resp.ok) throw new Error("fetch failed");
+        const blob = await resp.blob();
+        const ext = cfg.vendor === "aws" ? ".json" : cfg.vendor === "paloalto" ? ".xml" : ".txt";
+        const file = new File([blob], cfg.label.replace(/[^a-z0-9.]/gi, "_") + ext, { type: "text/plain" });
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        const configInput = document.getElementById("config");
+        configInput.files = dt.files;
+        configInput.dispatchEvent(new Event("change"));
+
+        const vendorSel = document.getElementById("vendor");
+        if (vendorSel) vendorSel.value = cfg.vendor;
+
+        const tagInput = document.getElementById("deviceTag");
+        if (tagInput && !tagInput.value) tagInput.value = cfg.label.split(" \u2014")[0];
+
+        document.getElementById("auditForm").scrollIntoView({ behavior: "smooth", block: "start" });
+        setTimeout(() => document.getElementById("submitBtn").click(), 400);
+      } catch (err) {
+        alert("Could not load demo config: " + err.message);
+      }
+    }
+  })();
+  {% endif %}
+
   </script>
 </body>
 </html>

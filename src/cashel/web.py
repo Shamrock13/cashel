@@ -25,7 +25,7 @@ from flask_wtf.csrf import CSRFProtect
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
-from .license import check_license, activate_license, deactivate_license, mask_key
+from .license import check_license, activate_license, deactivate_license, mask_key, DEMO_MODE
 from .ftd import is_ftd_config
 from .reporter import generate_report
 from .audit_engine import (
@@ -167,6 +167,11 @@ _AUTH_EXEMPT_ENDPOINTS = {"login", "login_post", "logout", "health", "static"}
 
 @app.before_request
 def _require_auth():
+    # Demo mode: no authentication required at all.
+    if DEMO_MODE:
+        g.auth_method = "demo"
+        return
+
     settings = get_settings()
     if not settings.get("auth_enabled"):
         return
@@ -647,7 +652,73 @@ def index():
     licensed, license_info = check_license()
     if licensed:
         license_info = mask_key(license_info)
-    return render_template("index.html", licensed=licensed, license_info=license_info)
+    return render_template(
+        "index.html",
+        licensed=licensed,
+        license_info=license_info,
+        demo_mode=DEMO_MODE,
+    )
+
+
+# ── Demo mode: serve bundled sample configs ───────────────────────────────────
+_DEMO_SAMPLES_DIR = Path(__file__).parent / "demo_samples"
+
+_DEMO_CONFIGS = {
+    "cisco_asa": {
+        "label": "Cisco ASA — Enterprise Edge",
+        "filename": "cisco_asa.txt",
+        "vendor": "asa",
+        "description": "ASA 5525-X with ACL misconfigurations, SNMPv2, Telnet, and duplicate rules.",
+    },
+    "palo_alto": {
+        "label": "Palo Alto PA-3220 — PAN-OS 11.1",
+        "filename": "palo_alto.xml",
+        "vendor": "paloalto",
+        "description": "Any/any permit policy, missing log-end settings, and shadowed rules.",
+    },
+    "fortinet": {
+        "label": "Fortinet FortiGate — Edge Firewall",
+        "filename": "fortinet_fortigate.txt",
+        "vendor": "fortinet",
+        "description": "Unrestricted any/any policy with logging disabled and a duplicate rule.",
+    },
+    "aws": {
+        "label": "AWS Security Groups — VPC Production",
+        "filename": "aws_security_groups.json",
+        "vendor": "aws",
+        "description": "SSH/RDP open to 0.0.0.0/0 and a wildcard TCP 0-65535 rule.",
+    },
+}
+
+
+@app.route("/demo/configs")
+def demo_configs():
+    if not DEMO_MODE:
+        return jsonify({"error": "Not available outside demo mode."}), 404
+    return jsonify(
+        [
+            {"id": k, "label": v["label"], "vendor": v["vendor"], "description": v["description"]}
+            for k, v in _DEMO_CONFIGS.items()
+        ]
+    )
+
+
+@app.route("/demo/load/<config_id>")
+def demo_load(config_id):
+    if not DEMO_MODE:
+        return jsonify({"error": "Not available outside demo mode."}), 404
+    if config_id not in _DEMO_CONFIGS:
+        return jsonify({"error": "Unknown demo config."}), 404
+    cfg = _DEMO_CONFIGS[config_id]
+    file_path = _DEMO_SAMPLES_DIR / cfg["filename"]
+    if not file_path.exists():
+        return jsonify({"error": "Sample config file not found."}), 500
+    return send_file(
+        file_path,
+        as_attachment=True,
+        download_name=cfg["filename"],
+        mimetype="text/plain",
+    )
 
 
 @app.route("/audit", methods=["POST"])
@@ -747,9 +818,9 @@ def run_audit():
             )
             report_filename = report_name
 
-        # Optional archive save (store plain strings)
+        # Optional archive save — skipped in demo mode
         archive_id = None
-        if archive_it:
+        if archive_it and not DEMO_MODE:
             archive_id, _ = save_audit(
                 upload.filename,
                 vendor,
@@ -759,18 +830,19 @@ def run_audit():
                 tag=tag,
             )
 
-        # Always log activity
-        log_activity(
-            ACTION_FILE_AUDIT,
-            upload.filename,
-            vendor=vendor,
-            success=True,
-            details={
-                "total": summary.get("total", 0),
-                "high": summary.get("high", 0),
-                "archived": archive_id is not None,
-            },
-        )
+        # Activity log — skipped in demo mode
+        if not DEMO_MODE:
+            log_activity(
+                ACTION_FILE_AUDIT,
+                upload.filename,
+                vendor=vendor,
+                success=True,
+                details={
+                    "total": summary.get("total", 0),
+                    "high": summary.get("high", 0),
+                    "archived": archive_id is not None,
+                },
+            )
 
         return jsonify(
             {
@@ -786,13 +858,14 @@ def run_audit():
         )
 
     except Exception as e:
-        log_activity(
-            ACTION_FILE_AUDIT,
-            upload.filename,
-            vendor=vendor or "unknown",
-            success=False,
-            error=str(e),
-        )
+        if not DEMO_MODE:
+            log_activity(
+                ACTION_FILE_AUDIT,
+                upload.filename,
+                vendor=vendor or "unknown",
+                success=False,
+                error=str(e),
+            )
         return jsonify(
             {
                 "error": _err(
@@ -1450,6 +1523,8 @@ def settings_get():
 
 @app.route("/settings", methods=["POST"])
 def settings_save():
+    if DEMO_MODE:
+        return jsonify({"error": "Settings cannot be saved in demo mode."}), 403
     data = request.get_json(silent=True) or {}
     saved = save_settings(data)
     # Reconfigure syslog immediately when settings are changed.
