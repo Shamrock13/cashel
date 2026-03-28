@@ -794,63 +794,51 @@ def demo_compare(pair_id):
         return jsonify({"error": f"Comparison failed: {e}"}), 500
 
 
-# Pre-canned demo SSH audit result (Cisco ASA scenario)
+# Pre-canned demo SSH audit result (Cisco ASA scenario).
+# Must use "message" key (not "title") and include severity prefix so
+# findingClass() and buildFindingHTML() in index.html render correctly.
 _DEMO_SSH_FINDINGS = [
     {
-        "id": "DEMO-SSH-001",
-        "title": "Telnet Enabled on Management Interface",
         "severity": "critical",
-        "description": "Telnet is configured on the inside interface (10.10.0.0/16), transmitting credentials and session data in plaintext over the network.",
+        "category": "exposure",
+        "message": "[CRITICAL] Telnet enabled on inside interface — transmits credentials in plaintext",
         "remediation": "Disable Telnet with 'no telnet' and enforce SSH for all remote management access.",
-        "category": "Remote Access",
     },
     {
-        "id": "DEMO-SSH-002",
-        "title": "SNMPv2 Community String Configured",
         "severity": "high",
-        "description": "SNMPv2 is enabled with the well-known community string 'public'. SNMPv2 transmits community strings in plaintext and provides no per-user authentication.",
-        "remediation": "Migrate to SNMPv3 with authentication and privacy (authPriv). Remove SNMPv2 community strings.",
-        "category": "Network Management",
+        "category": "protocol",
+        "message": "[HIGH] SNMPv2 community string 'public' configured — no per-user auth, plaintext on wire",
+        "remediation": "Migrate to SNMPv3 with authPriv. Remove all SNMPv2 community strings.",
     },
     {
-        "id": "DEMO-SSH-003",
-        "title": "Overly Permissive ACL — Permit Any/Any",
         "severity": "high",
-        "description": "access-list OUTSIDE_IN contains a 'permit ip any any' rule, allowing unrestricted traffic from any source to any destination through the firewall.",
-        "remediation": "Replace with explicit permit rules matching only required source/destination pairs and services. Ensure a deny-all rule exists at the end of each ACL.",
-        "category": "Access Control",
+        "category": "exposure",
+        "message": "[HIGH] ACL OUTSIDE_IN contains 'permit ip any any' — unrestricted inbound traffic",
+        "remediation": "Replace with explicit permit rules scoped to required sources, destinations, and services. Ensure a deny-all terminator exists.",
     },
     {
-        "id": "DEMO-SSH-004",
-        "title": "HTTP Management Interface Exposed to Internet",
         "severity": "high",
-        "description": "The ASDM HTTP server is accessible from 0.0.0.0/0 (any source) on the outside interface. This exposes the management plane to the public internet.",
-        "remediation": "Restrict HTTP server access to specific management subnets only: 'http <mgmt-subnet> <mask> inside'. Remove the 0.0.0.0/0 outside entry.",
-        "category": "Management Plane",
+        "category": "exposure",
+        "message": "[HIGH] ASDM HTTP server accessible from 0.0.0.0/0 on outside interface",
+        "remediation": "Restrict HTTP server to management subnets only: 'http <mgmt-subnet> <mask> inside'. Remove the 0.0.0.0/0 outside entry.",
     },
     {
-        "id": "DEMO-SSH-005",
-        "title": "Duplicate Access-List Rules Detected",
         "severity": "medium",
-        "description": "OUTSIDE_IN contains duplicate entries for 'permit tcp any host 172.16.0.10 eq 80'. Duplicate rules increase config size, complicate auditing, and can mask policy intent.",
-        "remediation": "Remove duplicate access-list entries and review ACL hygiene. Use 'show access-list' to identify hit counts and consolidate rules.",
-        "category": "Policy Hygiene",
+        "category": "hygiene",
+        "message": "[MEDIUM] Duplicate ACL rule — 'permit tcp any host 172.16.0.10 eq 80' appears twice in OUTSIDE_IN",
+        "remediation": "Remove the duplicate entry. Use 'show access-list' hit counts to identify and consolidate redundant rules.",
     },
     {
-        "id": "DEMO-SSH-006",
-        "title": "NTP Not Configured",
         "severity": "medium",
-        "description": "No NTP servers are configured. Without time synchronisation, log timestamps will be unreliable, complicating incident response and compliance audits.",
+        "category": "hygiene",
+        "message": "[MEDIUM] NTP not configured — log timestamps will be unreliable",
         "remediation": "Configure at least two NTP servers: 'ntp server <ip> prefer'. Ensure NTP traffic is permitted by the management ACL.",
-        "category": "Time Synchronisation",
     },
     {
-        "id": "DEMO-SSH-007",
-        "title": "No Login Banner Configured",
         "severity": "low",
-        "description": "No MOTD or login banner is set. Banners are required by most compliance frameworks (CIS, STIG) to provide legal notice before authentication.",
-        "remediation": "Add a banner with 'banner login' or 'banner motd' containing an authorised-use warning.",
-        "category": "Compliance",
+        "category": "compliance",
+        "message": "[LOW] No login banner configured — required by CIS and STIG for legal notice",
+        "remediation": "Add 'banner login' or 'banner motd' with an authorised-use warning.",
     },
 ]
 
@@ -871,7 +859,7 @@ def demo_ssh_audit():
         return jsonify({"error": "Not available outside demo mode."}), 404
     return jsonify(
         {
-            "findings": [f["title"] for f in _DEMO_SSH_FINDINGS],
+            "findings": [f["message"] for f in _DEMO_SSH_FINDINGS],
             "enriched_findings": _DEMO_SSH_FINDINGS,
             "summary": _DEMO_SSH_SUMMARY,
             "detected_vendor": "asa",
