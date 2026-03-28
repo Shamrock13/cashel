@@ -8,6 +8,10 @@ SECRET_SALT = os.environ.get("CASHEL_SECRET", "fallback-for-dev-only")
 
 LICENSE_FILE = os.environ.get("LICENSE_PATH", os.path.expanduser("~/.cashel_license"))
 
+# Demo mode: set CASHEL_DEMO_MODE=true to bypass license checks and disable
+# all persistent write operations. Intended exclusively for the hosted demo.
+DEMO_MODE: bool = os.environ.get("CASHEL_DEMO_MODE", "false").lower() == "true"
+
 
 def generate_key(email: str) -> str:
     """Generate a license key from an email address - must match the Cashel license server algorithm"""
@@ -62,7 +66,12 @@ def mask_key(key: str) -> str:
 
 
 def check_license() -> tuple:
-    """Check if a valid license is activated"""
+    """Check if a valid license is activated.
+    In demo mode this always returns True so compliance features are available.
+    """
+    if DEMO_MODE:
+        return True, "DEMO-MODE-ACTIVE"
+
     if not os.path.exists(LICENSE_FILE):
         return False, "No license found."
 
