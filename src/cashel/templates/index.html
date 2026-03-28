@@ -293,7 +293,17 @@
 
     <!-- ═════════════════════════════════════════ COMPARE CONFIGS ══ -->
     <section class="tab-panel hidden" id="tab-diff">
-      <div class="card">
+      {% if demo_mode %}
+      <div class="card demo-picker-card">
+        <h2 class="card-title">Sample Comparisons</h2>
+        <p class="card-subtitle">Select a pre-loaded before/after pair to see a real config diff &mdash; no upload needed.</p>
+        <div class="demo-config-grid" id="demoCompareGrid">
+          <div class="demo-loading">Loading samples&hellip;</div>
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="card{% if demo_mode %} hidden{% endif %}" id="diffUploadCard">
         <h2 class="card-title">Compare Configs</h2>
         <p class="card-desc">Upload two firewall configs of the same vendor to see added, removed, and unchanged rules.</p>
         <form id="diffForm" enctype="multipart/form-data">
@@ -334,7 +344,7 @@
             <span id="diffSpinner" class="spinner hidden"></span>
           </button>
         </form>
-      </div>
+      </div><!-- /#diffUploadCard -->
 
       <div class="card hidden" id="diffResults">
         <div class="results-header">
@@ -353,20 +363,28 @@
       <div class="card">
         <h2 class="card-title">Live SSH Connection</h2>
         <p class="card-desc">Connect directly to a device to pull its running configuration and audit it in real time.</p>
+        {% if demo_mode %}
+        <div class="alert alert-info" style="display:flex;align-items:center;gap:0.6rem">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="width:15px;height:15px;flex-shrink:0" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><line x1="8" y1="5" x2="8" y2="8.5"/><circle cx="8" cy="11" r="0.6" fill="currentColor" stroke="none"/></svg>
+          <span><strong>Demo session active</strong> &mdash; a sample Cisco ASA (ASA01-EDGE) is pre-connected. Click <em>Connect &amp; Audit</em> to run the audit and see live findings.</span>
+        </div>
+        {% else %}
         <div class="alert alert-info">
           Supported: <strong>Cisco</strong>, <strong>Fortinet</strong>, <strong>Palo Alto Networks</strong> (SSH).
           Credentials are used only for the single connection and are never stored.
         </div>
+        {% endif %}
         <form id="connectForm">
           <div class="form-grid connect-grid">
             <div class="form-group" style="grid-column:1/-1">
               <label for="connDeviceTag">Device Tag</label>
-              <input type="text" id="connDeviceTag" name="tag" placeholder="e.g. ASA01, FortiGate-HQ&hellip;" autocomplete="off" maxlength="64" required />
+              <input type="text" id="connDeviceTag" name="tag" placeholder="e.g. ASA01, FortiGate-HQ&hellip;" autocomplete="off" maxlength="64" required
+                {% if demo_mode %}value="ASA01-EDGE" readonly{% endif %} />
             </div>
             <div class="form-group">
               <label for="connVendor">Vendor</label>
-              <select id="connVendor" name="vendor">
-                <option value="cisco">Cisco</option>
+              <select id="connVendor" name="vendor" {% if demo_mode %}disabled{% endif %}>
+                <option value="cisco" {% if demo_mode %}selected{% endif %}>Cisco</option>
                 <option value="fortinet">Fortinet</option>
                 <option value="iptables">iptables (Linux)</option>
                 <option value="juniper">Juniper SRX</option>
@@ -377,16 +395,20 @@
             </div>
             <div class="form-group">
               <label for="connHost">Host / IP</label>
-              <input type="text" id="connHost" name="host" placeholder="192.168.1.1" autocomplete="off" />
+              <input type="text" id="connHost" name="host" placeholder="192.168.1.1" autocomplete="off"
+                {% if demo_mode %}value="203.0.113.50" readonly{% endif %} />
             </div>
             <div class="form-group">
               <label for="connPort">SSH Port</label>
-              <input type="text" id="connPort" name="port" value="22" placeholder="22" autocomplete="off" />
+              <input type="text" id="connPort" name="port" value="22" placeholder="22" autocomplete="off"
+                {% if demo_mode %}readonly{% endif %} />
             </div>
             <div class="form-group">
               <label for="connUser">Username</label>
-              <input type="text" id="connUser" name="username" placeholder="admin" autocomplete="off" />
+              <input type="text" id="connUser" name="username" placeholder="admin" autocomplete="off"
+                {% if demo_mode %}value="auditor" readonly{% endif %} />
             </div>
+            {% if not demo_mode %}
             <div class="form-group" style="grid-column:1/-1">
               <label>Authentication Method</label>
               <div style="display:flex;gap:1.5rem;margin-top:0.35rem">
@@ -412,9 +434,10 @@
               <label for="connPemPassphrase">Key Passphrase <span class="optional">(if encrypted)</span></label>
               <input type="password" id="connPemPassphrase" name="pem_passphrase" autocomplete="new-password" />
             </div>
+            {% endif %}
             <div class="form-group">
               <label for="connCompliance">Compliance <span class="optional">(licensed)</span></label>
-              <select id="connCompliance" name="compliance">
+              <select id="connCompliance" name="compliance" {% if demo_mode %}disabled{% endif %}>
                 <option value="">None</option>
                 <option value="cis">CIS Benchmark</option>
                 <option value="stig">DISA STIG</option>
@@ -562,13 +585,18 @@
           <button class="btn-secondary" id="refreshSchedulesBtn" style="font-size:0.8rem;padding:0.3rem 0.75rem">&#8635; Refresh</button>
         </div>
         <p class="card-desc">Automatically run SSH audits on a recurring schedule. Results are saved to Audit History.</p>
+        {% if demo_mode %}
+        <div class="alert alert-info" style="margin-top:0.75rem">
+          <strong>Read-only demo view</strong> &mdash; Sample schedules are shown below. Creating, editing, and deleting schedules is disabled in demo mode.
+        </div>
+        {% endif %}
         <div id="schedulesList" class="schedules-list">
           <p class="text-muted">Loading&hellip;</p>
         </div>
       </div>
 
-      <!-- New / Edit Schedule Form -->
-      <div class="card" id="scheduleFormCard">
+      <!-- New / Edit Schedule Form — hidden in demo mode -->
+      <div class="card{% if demo_mode %} hidden{% endif %}" id="scheduleFormCard">
         <h2 class="card-title" id="scheduleFormTitle">New Schedule</h2>
         <form id="scheduleForm">
           <input type="hidden" id="scheduleId" value="" />
@@ -710,10 +738,12 @@
             Email (SMTP)
           </button>
 
+          {% if not demo_mode %}
           <button class="settings-nav-item" data-pane="auth">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="10" height="8" rx="1.5"/><path d="M5 7V5a3 3 0 0 1 6 0v2"/><circle cx="8" cy="11" r="1" fill="currentColor" stroke="none"/></svg>
             Authentication
           </button>
+          {% endif %}
 
           <button class="settings-nav-item" data-pane="security">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 1.5L2 4v4.5c0 3.5 2.5 6.7 6 7.5 3.5-.8 6-4 6-7.5V4L8 1.5z"/><path d="M5.5 8l2 2 3-3"/></svg>
@@ -824,7 +854,8 @@
             </div>
           </div>
 
-          <!-- Authentication pane -->
+          <!-- Authentication pane — hidden in demo mode -->
+          {% if not demo_mode %}
           <div class="settings-pane" id="spane-auth">
             <div class="settings-pane-header">
               <h2 class="settings-pane-title">Authentication</h2>
@@ -876,6 +907,7 @@
               <p class="settings-pane-desc" style="margin-top:0.75rem">Use this key in the <code>X-API-Key</code> header for CLI or CI/CD access:<br><code>curl -H "X-API-Key: csh_..." https://your-cashel/api/v1/audit</code></p>
             </div>
           </div>
+          {% endif %}
 
           <!-- Security pane -->
           <div class="settings-pane" id="spane-security">
@@ -1065,6 +1097,8 @@
     }
     document.getElementById("deactivateForm").classList.toggle("hidden", !licensed);
   }
+
+  const DEMO_MODE = {{ 'true' if demo_mode else 'false' }};
 
   // ═══════════════════════════════════════════════════════════════ TABS ══
   const tabBtns   = document.querySelectorAll(".tab-btn");
@@ -1632,9 +1666,10 @@
     e.preventDefault();
     setLoading("connectBtn", "connectText", "connectSpinner", "Connecting\u2026", true);
     try {
-      // Use raw FormData so PEM file uploads are included
-      const formData = new FormData(this);
-      const res  = await fetch("/connect", { method: "POST", body: formData });
+      // In demo mode, return pre-canned results from the demo SSH endpoint
+      const endpoint = DEMO_MODE ? "/demo/ssh-audit" : "/connect";
+      const body     = DEMO_MODE ? null : new FormData(this);
+      const res  = await fetch(endpoint, { method: "POST", body });
       const data = await res.json();
       if (data.error) {
         document.getElementById("connectResults").classList.remove("hidden");
@@ -2131,9 +2166,11 @@
         </div>
         <div class="schedule-entry-right">
           <span class="schedule-status-pill ${s.enabled ? "pill-enabled" : "pill-disabled"}">${s.enabled ? "Enabled" : "Disabled"}</span>
+          ${DEMO_MODE ? "" : `
           <button class="btn-secondary btn-sm" data-sched-run="${escHtml(s.id)}" title="Run now">&#9654; Run Now</button>
           <button class="btn-secondary btn-sm" data-sched-edit="${escHtml(s.id)}" title="Edit">&#9998; Edit</button>
           <button class="btn-danger btn-sm"    data-sched-del="${escHtml(s.id)}"  title="Delete">&#128465;</button>
+          `}
         </div>
       </div>`;
     }).join("");
@@ -2469,7 +2506,64 @@
   loadSettings();
 
   {% if demo_mode %}
-  // ── Demo mode: sample config picker ──────────────────────────────────────
+  // ── Demo mode: comparison picker (diff tab) ───────────────────────────────
+  (function () {
+    const grid = document.getElementById("demoCompareGrid");
+    if (!grid) return;
+
+    fetch("/demo/comparisons")
+      .then(r => r.json())
+      .then(pairs => {
+        grid.innerHTML = "";
+        pairs.forEach(pair => {
+          const card = document.createElement("button");
+          card.type = "button";
+          card.className = "demo-config-card";
+          card.dataset.id = pair.id;
+          card.innerHTML = `
+            <span class="demo-config-label">${pair.label}</span>
+            <span class="demo-config-desc">${pair.description}</span>
+            <span class="demo-config-action">Compare &rarr;</span>
+          `;
+          card.addEventListener("click", () => runDemoComparison(pair));
+          grid.appendChild(card);
+        });
+      })
+      .catch(() => {
+        grid.innerHTML = '<p class="demo-error">Could not load sample comparisons.</p>';
+      });
+
+    async function runDemoComparison(pair) {
+      document.querySelectorAll("#demoCompareGrid .demo-config-card").forEach(c => c.classList.remove("demo-config-selected"));
+      const btn = document.querySelector(`#demoCompareGrid .demo-config-card[data-id="${pair.id}"]`);
+      if (btn) btn.classList.add("demo-config-selected");
+
+      const diffResults = document.getElementById("diffResults");
+      diffResults.classList.remove("hidden");
+      document.getElementById("diffSummary").innerHTML = `<p class="text-muted">Running comparison\u2026</p>`;
+      document.getElementById("diffAdded").innerHTML = "";
+      document.getElementById("diffRemoved").innerHTML = "";
+      document.getElementById("diffUnchanged").innerHTML = "";
+
+      try {
+        const res = await fetch(`/demo/compare/${pair.id}`);
+        const data = await res.json();
+        if (data.error) {
+          document.getElementById("diffSummary").innerHTML = `<div class="alert alert-error">${escHtml(data.error)}</div>`;
+          return;
+        }
+        const tag = document.getElementById("diffVendorTag");
+        tag.textContent = (VENDOR_LABELS[data.vendor] || data.vendor) + " \u2014 " + escHtml(pair.label_a) + " vs " + escHtml(pair.label_b);
+        tag.classList.remove("hidden");
+        renderDiff(data);
+        diffResults.scrollIntoView({ behavior: "smooth", block: "start" });
+      } catch (err) {
+        document.getElementById("diffSummary").innerHTML = `<div class="alert alert-error">Comparison failed: ${escHtml(err.message)}</div>`;
+      }
+    }
+  })();
+
+  // ── Demo mode: sample config picker (audit tab) ───────────────────────────
   (function () {
     const grid = document.getElementById("demoConfigGrid");
     if (!grid) return;

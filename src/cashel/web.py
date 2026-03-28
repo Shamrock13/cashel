@@ -721,6 +721,229 @@ def demo_load(config_id):
     )
 
 
+_DEMO_COMPARISON_PAIRS = {
+    "asa_weekly": {
+        "label": "Cisco ASA — Week 1 vs Week 2",
+        "vendor": "asa",
+        "description": "Baseline with Telnet, any/any, and open HTTP management vs. hardened current config.",
+        "file_a": "cisco_asa_baseline.txt",
+        "file_b": "cisco_asa_current.txt",
+        "label_a": "Week 1 — Baseline",
+        "label_b": "Week 2 — Current",
+    },
+    "fortinet_patch": {
+        "label": "Fortinet FortiGate — Pre-patch vs Post-patch",
+        "vendor": "fortinet",
+        "description": "Broad any/any policies and logging disabled vs. tightened rules with full logging.",
+        "file_a": "fortinet_baseline.txt",
+        "file_b": "fortinet_current.txt",
+        "label_a": "Pre-patch — Baseline",
+        "label_b": "Post-patch — Current",
+    },
+}
+
+
+@app.route("/demo/comparisons")
+def demo_comparisons():
+    if not DEMO_MODE:
+        return jsonify({"error": "Not available outside demo mode."}), 404
+    return jsonify(
+        [
+            {
+                "id": k,
+                "label": v["label"],
+                "vendor": v["vendor"],
+                "description": v["description"],
+                "label_a": v["label_a"],
+                "label_b": v["label_b"],
+            }
+            for k, v in _DEMO_COMPARISON_PAIRS.items()
+        ]
+    )
+
+
+@app.route("/demo/compare/<pair_id>")
+def demo_compare(pair_id):
+    if not DEMO_MODE:
+        return jsonify({"error": "Not available outside demo mode."}), 404
+    if pair_id not in _DEMO_COMPARISON_PAIRS:
+        return jsonify({"error": "Unknown demo comparison."}), 404
+    pair = _DEMO_COMPARISON_PAIRS[pair_id]
+    path_a = str(_DEMO_SAMPLES_DIR / pair["file_a"])
+    path_b = str(_DEMO_SAMPLES_DIR / pair["file_b"])
+    if not Path(path_a).exists() or not Path(path_b).exists():
+        return jsonify({"error": "Sample config files not found."}), 500
+    try:
+        result = diff_configs(pair["vendor"], path_a, path_b)
+        result["vendor"] = pair["vendor"]
+        result["filename_a"] = pair["label_a"]
+        result["filename_b"] = pair["label_b"]
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": f"Comparison failed: {e}"}), 500
+
+
+# Pre-canned demo SSH audit result (Cisco ASA scenario)
+_DEMO_SSH_FINDINGS = [
+    {
+        "id": "DEMO-SSH-001",
+        "title": "Telnet Enabled on Management Interface",
+        "severity": "critical",
+        "description": "Telnet is configured on the inside interface (10.10.0.0/16), transmitting credentials and session data in plaintext over the network.",
+        "remediation": "Disable Telnet with 'no telnet' and enforce SSH for all remote management access.",
+        "category": "Remote Access",
+    },
+    {
+        "id": "DEMO-SSH-002",
+        "title": "SNMPv2 Community String Configured",
+        "severity": "high",
+        "description": "SNMPv2 is enabled with the well-known community string 'public'. SNMPv2 transmits community strings in plaintext and provides no per-user authentication.",
+        "remediation": "Migrate to SNMPv3 with authentication and privacy (authPriv). Remove SNMPv2 community strings.",
+        "category": "Network Management",
+    },
+    {
+        "id": "DEMO-SSH-003",
+        "title": "Overly Permissive ACL — Permit Any/Any",
+        "severity": "high",
+        "description": "access-list OUTSIDE_IN contains a 'permit ip any any' rule, allowing unrestricted traffic from any source to any destination through the firewall.",
+        "remediation": "Replace with explicit permit rules matching only required source/destination pairs and services. Ensure a deny-all rule exists at the end of each ACL.",
+        "category": "Access Control",
+    },
+    {
+        "id": "DEMO-SSH-004",
+        "title": "HTTP Management Interface Exposed to Internet",
+        "severity": "high",
+        "description": "The ASDM HTTP server is accessible from 0.0.0.0/0 (any source) on the outside interface. This exposes the management plane to the public internet.",
+        "remediation": "Restrict HTTP server access to specific management subnets only: 'http <mgmt-subnet> <mask> inside'. Remove the 0.0.0.0/0 outside entry.",
+        "category": "Management Plane",
+    },
+    {
+        "id": "DEMO-SSH-005",
+        "title": "Duplicate Access-List Rules Detected",
+        "severity": "medium",
+        "description": "OUTSIDE_IN contains duplicate entries for 'permit tcp any host 172.16.0.10 eq 80'. Duplicate rules increase config size, complicate auditing, and can mask policy intent.",
+        "remediation": "Remove duplicate access-list entries and review ACL hygiene. Use 'show access-list' to identify hit counts and consolidate rules.",
+        "category": "Policy Hygiene",
+    },
+    {
+        "id": "DEMO-SSH-006",
+        "title": "NTP Not Configured",
+        "severity": "medium",
+        "description": "No NTP servers are configured. Without time synchronisation, log timestamps will be unreliable, complicating incident response and compliance audits.",
+        "remediation": "Configure at least two NTP servers: 'ntp server <ip> prefer'. Ensure NTP traffic is permitted by the management ACL.",
+        "category": "Time Synchronisation",
+    },
+    {
+        "id": "DEMO-SSH-007",
+        "title": "No Login Banner Configured",
+        "severity": "low",
+        "description": "No MOTD or login banner is set. Banners are required by most compliance frameworks (CIS, STIG) to provide legal notice before authentication.",
+        "remediation": "Add a banner with 'banner login' or 'banner motd' containing an authorised-use warning.",
+        "category": "Compliance",
+    },
+]
+
+_DEMO_SSH_SUMMARY = {
+    "score": 34,
+    "total": 7,
+    "critical": 1,
+    "high": 3,
+    "medium": 2,
+    "low": 1,
+    "info": 0,
+}
+
+
+@app.route("/demo/ssh-audit", methods=["POST"])
+def demo_ssh_audit():
+    if not DEMO_MODE:
+        return jsonify({"error": "Not available outside demo mode."}), 404
+    return jsonify(
+        {
+            "findings": [f["title"] for f in _DEMO_SSH_FINDINGS],
+            "enriched_findings": _DEMO_SSH_FINDINGS,
+            "summary": _DEMO_SSH_SUMMARY,
+            "detected_vendor": "asa",
+            "host": "203.0.113.50",
+            "archive_id": None,
+        }
+    )
+
+
+# Demo schedules — shown read-only when DEMO_MODE is active
+_DEMO_SCHEDULES = [
+    {
+        "id": "demo-sched-1",
+        "name": "ASA01 — Daily Security Audit",
+        "vendor": "asa",
+        "host": "203.0.113.50",
+        "port": 22,
+        "username": "auditor",
+        "tag": "ASA01-EDGE",
+        "compliance": "cis",
+        "frequency": "daily",
+        "hour": 2,
+        "minute": 0,
+        "day_of_week": "mon",
+        "enabled": True,
+        "last_run": "2026-03-27T02:00:12Z",
+        "last_status": "ok",
+        "last_error": None,
+        "notify_on_finding": True,
+        "notify_on_error": True,
+        "notify_slack_webhook": "",
+        "notify_teams_webhook": "",
+        "notify_email": "security@corp.example.com",
+    },
+    {
+        "id": "demo-sched-2",
+        "name": "FortiGate-HQ — Weekly Review",
+        "vendor": "fortinet",
+        "host": "10.20.0.254",
+        "port": 22,
+        "username": "admin",
+        "tag": "FGT-EDGE-01",
+        "compliance": "",
+        "frequency": "weekly",
+        "hour": 3,
+        "minute": 30,
+        "day_of_week": "sun",
+        "enabled": True,
+        "last_run": "2026-03-23T03:30:08Z",
+        "last_status": "ok",
+        "last_error": None,
+        "notify_on_finding": False,
+        "notify_on_error": True,
+        "notify_slack_webhook": "https://hooks.slack.com/services/demo/webhook",
+        "notify_teams_webhook": "",
+        "notify_email": "",
+    },
+    {
+        "id": "demo-sched-3",
+        "name": "PA-3220-DMZ — Daily Audit",
+        "vendor": "paloalto",
+        "host": "172.16.0.254",
+        "port": 22,
+        "username": "audituser",
+        "tag": "PA-DMZ",
+        "compliance": "pci",
+        "frequency": "daily",
+        "hour": 1,
+        "minute": 15,
+        "day_of_week": "mon",
+        "enabled": False,
+        "last_run": "2026-03-20T01:15:44Z",
+        "last_status": "error",
+        "last_error": "Connection timed out",
+        "notify_on_finding": True,
+        "notify_on_error": True,
+        "notify_slack_webhook": "",
+        "notify_teams_webhook": "",
+        "notify_email": "security@corp.example.com",
+    },
+]
+
+
 @app.route("/audit", methods=["POST"])
 @limiter.limit("30/minute")
 def run_audit():
@@ -1386,11 +1609,15 @@ def bulk_audit():
 
 @app.route("/schedules", methods=["GET"])
 def schedules_list():
+    if DEMO_MODE:
+        return jsonify(_DEMO_SCHEDULES)
     return jsonify(list_schedules())
 
 
 @app.route("/schedules", methods=["POST"])
 def schedules_create():
+    if DEMO_MODE:
+        return jsonify({"error": "Schedules are read-only in demo mode."}), 403
     data = request.get_json(silent=True) or {}
     if not data.get("host") or not data.get("username"):
         return jsonify({"error": "host and username are required"}), 400
@@ -1412,6 +1639,8 @@ def schedules_get(schedule_id):
 
 @app.route("/schedules/<schedule_id>", methods=["PUT"])
 def schedules_update(schedule_id):
+    if DEMO_MODE:
+        return jsonify({"error": "Schedules are read-only in demo mode."}), 403
     data = request.get_json(silent=True) or {}
     try:
         schedule = update_schedule(schedule_id, data)
@@ -1425,6 +1654,8 @@ def schedules_update(schedule_id):
 
 @app.route("/schedules/<schedule_id>", methods=["DELETE"])
 def schedules_delete(schedule_id):
+    if DEMO_MODE:
+        return jsonify({"error": "Schedules are read-only in demo mode."}), 403
     deleted = delete_schedule(schedule_id)
     if deleted:
         reload_job(schedule_id, None)  # removes the job from the scheduler
@@ -1434,6 +1665,8 @@ def schedules_delete(schedule_id):
 @app.route("/schedules/<schedule_id>/run", methods=["POST"])
 def schedules_run_now(schedule_id):
     """Trigger an immediate on-demand run of a scheduled audit."""
+    if DEMO_MODE:
+        return jsonify({"error": "Schedules are read-only in demo mode."}), 403
     schedule = get_schedule(schedule_id)
     if not schedule:
         return jsonify({"error": "Not found"}), 404
