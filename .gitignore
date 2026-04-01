@@ -35,12 +35,5 @@ CNAME
 # Internal planning and ops docs — never publish
 CLAUDE.md
 PLAN.md
-DEMO_SETUP.md
-
-# Demo files — live in private cashel-demo repo only
-.github/workflows/demo-deploy.yml
-.github/workflows/ensure-demo-files.yml
 vercel.json
 api/
-Dockerfile.demo
-src/cashel/demo_samples/
