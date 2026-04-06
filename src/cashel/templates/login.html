@@ -97,7 +97,7 @@
       <div class="login-error">{{ error }}</div>
       {% endif %}
 
-      <form method="POST" action="{{ url_for('login_post', next=request.args.get('next', '')) }}">
+      <form method="POST" action="{{ url_for('auth.login_post', next=request.args.get('next', '')) }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
         <div class="login-field">
           <label for="api_key">API Key</label>
