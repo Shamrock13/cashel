@@ -162,6 +162,10 @@ app.register_blueprint(settings_bp)
 app.register_blueprint(reports_bp)
 app.register_blueprint(api_bp)
 
+from .db import init_db  # noqa: E402
+
+init_db()
+
 
 # ── Startup ───────────────────────────────────────────────────────────────────
 # When running under gunicorn with multiple workers, only the first worker
