@@ -1190,7 +1190,7 @@
     localStorage.setItem("cashel-theme", theme);
   }
   applyTheme(html.getAttribute("data-theme") || "auto");
-  document.getElementById("themeToggle").addEventListener("click", () => {
+  document.getElementById("themeToggle")?.addEventListener("click", () => {
     const cur = html.getAttribute("data-theme") || "auto";
     applyTheme(cur === "light" ? "dark" : cur === "dark" ? "auto" : "light");
   });
@@ -1226,11 +1226,11 @@
     document.body.style.overflow = "";
     document.removeEventListener("keydown", _modalKeyHandler);
   };
-  document.getElementById("licenseBadgeBtn").addEventListener("click", openModal);
-  document.getElementById("modalClose").addEventListener("click", closeModal);
+  document.getElementById("licenseBadgeBtn")?.addEventListener("click", openModal);
+  document.getElementById("modalClose")?.addEventListener("click", closeModal);
   modal.addEventListener("click", e => { if (e.target === modal) closeModal(); });
 
-  document.getElementById("activateForm").addEventListener("submit", async function (e) {
+  document.getElementById("activateForm")?.addEventListener("submit", async function (e) {
     e.preventDefault();
     const key  = document.getElementById("licenseKey").value.trim();
     const res  = await fetch("/license/activate", { method: "POST", body: new URLSearchParams({ key }) });
@@ -1238,7 +1238,7 @@
     showLicenseMsg(data.message, data.success ? "ok" : "error");
     if (data.success) { document.getElementById("licenseKey").value = ""; refreshLicenseBadge(true, key.toUpperCase()); }
   });
-  document.getElementById("deactivateForm").addEventListener("submit", async function (e) {
+  document.getElementById("deactivateForm")?.addEventListener("submit", async function (e) {
     e.preventDefault();
     const res  = await fetch("/license/deactivate", { method: "POST" });
     const data = await res.json();
@@ -1622,13 +1622,13 @@
     });
   }
 
-  document.getElementById("refreshTrendsBtn").addEventListener("click", loadTrends);
-  document.getElementById("trendsVendorFilter").addEventListener("change", () => {
+  document.getElementById("refreshTrendsBtn")?.addEventListener("click", loadTrends);
+  document.getElementById("trendsVendorFilter")?.addEventListener("change", () => {
     // Reset device filter when vendor changes, then re-render
     document.getElementById("trendsDeviceFilter").value = "";
     renderTrends(trendsData);
   });
-  document.getElementById("trendsDeviceFilter").addEventListener("change", () => renderTrends(trendsData));
+  document.getElementById("trendsDeviceFilter")?.addEventListener("change", () => renderTrends(trendsData));
 
   document.getElementById("auditForm")?.addEventListener("submit", async function (e) {
     e.preventDefault();
@@ -1788,14 +1788,14 @@
   document.getElementById("exportSarifBtn")?.addEventListener("click", exportSARIF);
 
   // ══════════════════════════════════════════════════ COMPARE CONFIGS ══
-  document.getElementById("config_a").addEventListener("change", function () {
+  document.getElementById("config_a")?.addEventListener("change", function () {
     document.getElementById("fileLabelA").textContent = this.files.length ? this.files[0].name : "Choose a file\u2026";
   });
-  document.getElementById("config_b").addEventListener("change", function () {
+  document.getElementById("config_b")?.addEventListener("change", function () {
     document.getElementById("fileLabelB").textContent = this.files.length ? this.files[0].name : "Choose a file\u2026";
   });
 
-  document.getElementById("diffForm").addEventListener("submit", async function (e) {
+  document.getElementById("diffForm")?.addEventListener("submit", async function (e) {
     e.preventDefault();
     if (DEMO_MODE) {
       document.getElementById("diffResults").classList.remove("hidden");
@@ -1862,7 +1862,7 @@
     });
   });
 
-  document.getElementById("connectForm").addEventListener("submit", async function (e) {
+  document.getElementById("connectForm")?.addEventListener("submit", async function (e) {
     e.preventDefault();
     setLoading("connectBtn", "connectText", "connectSpinner", "Connecting\u2026", true);
     try {
@@ -1952,10 +1952,10 @@
   }
 
   ["historyVendorFilter", "historySort"].forEach(id =>
-    document.getElementById(id).addEventListener("change", applyHistoryFilters)
+    document.getElementById(id)?.addEventListener("change", applyHistoryFilters)
   );
   let _historyDebounce;
-  document.getElementById("historySearch").addEventListener("input", () => {
+  document.getElementById("historySearch")?.addEventListener("input", () => {
     clearTimeout(_historyDebounce);
     _historyDebounce = setTimeout(applyHistoryFilters, 300);
   });
@@ -2050,7 +2050,7 @@
       });
     });
 
-    document.getElementById("compareBtn").addEventListener("click", runCompare);
+    document.getElementById("compareBtn")?.addEventListener("click", runCompare);
   }
 
   function updateCompareBar() {
@@ -2150,7 +2150,7 @@
       ` : ""}`;
   }
 
-  document.getElementById("refreshHistoryBtn").addEventListener("click", loadHistory);
+  document.getElementById("refreshHistoryBtn")?.addEventListener("click", loadHistory);
 
   // ════════════════════════════════════════════════ ACTIVITY LOG ══════
   const ACTION_LABELS = {
@@ -2380,7 +2380,7 @@
     document.getElementById("bulkResults").classList.remove("hidden");
 
     /* Attach remediation plan buttons for bulk results (event delegation) */
-    document.getElementById("bulkResultsList").addEventListener("click", (e) => {
+    document.getElementById("bulkResultsList")?.addEventListener("click", (e) => {
       const btn = e.target.closest(".bulk-rem-btn");
       if (!btn) return;
       const idx = parseInt(btn.dataset.remIdx, 10);
@@ -2486,11 +2486,11 @@
     document.getElementById("schedDowGroup").style.display  = freq === "weekly" ? ""     : "none";
   }
 
-  document.getElementById("schedFrequency").addEventListener("change", function () {
+  document.getElementById("schedFrequency")?.addEventListener("change", function () {
     toggleScheduleFreqFields(this.value);
   });
 
-  document.getElementById("schedCancelBtn").addEventListener("click", function () {
+  document.getElementById("schedCancelBtn")?.addEventListener("click", function () {
     document.getElementById("scheduleForm").reset();
     document.getElementById("scheduleId").value = "";
     document.getElementById("scheduleFormTitle").textContent = "New Schedule";
@@ -2499,7 +2499,7 @@
     toggleScheduleFreqFields("daily");
   });
 
-  document.getElementById("scheduleForm").addEventListener("submit", async function (e) {
+  document.getElementById("scheduleForm")?.addEventListener("submit", async function (e) {
     e.preventDefault();
     const schedId = document.getElementById("scheduleId").value.trim();
     const payload = {
@@ -2553,10 +2553,10 @@
     }
   });
 
-  document.getElementById("refreshSchedulesBtn").addEventListener("click", loadSchedules);
+  document.getElementById("refreshSchedulesBtn")?.addEventListener("click", loadSchedules);
 
   // Delegated event handler for schedule list — set up once, works across re-renders.
-  document.getElementById("schedulesList").addEventListener("click", async function (e) {
+  document.getElementById("schedulesList")?.addEventListener("click", async function (e) {
     const runBtn  = e.target.closest("[data-sched-run]");
     const editBtn = e.target.closest("[data-sched-edit]");
     const delBtn  = e.target.closest("[data-sched-del]");
@@ -2649,7 +2649,7 @@
     }
   }
 
-  document.getElementById("saveSettingsBtn").addEventListener("click", async function () {
+  document.getElementById("saveSettingsBtn")?.addEventListener("click", async function () {
     const data = {
       auto_pdf:             document.getElementById("setting-auto-pdf").checked,
       auto_archive:         document.getElementById("setting-auto-archive").checked,
@@ -2691,7 +2691,7 @@
   });
 
   // ══════════════════════════════════════════════════ TEST SMTP ══
-  document.getElementById("testSmtpBtn").addEventListener("click", async function () {
+  document.getElementById("testSmtpBtn")?.addEventListener("click", async function () {
     const btn    = this;
     const result = document.getElementById("smtpTestResult");
     btn.disabled = true;
@@ -2742,9 +2742,9 @@
   }
 
   {% if not demo_mode %}
-  document.getElementById("btnDismissKey").addEventListener("click", _maskApiKeyBox);
+  document.getElementById("btnDismissKey")?.addEventListener("click", _maskApiKeyBox);
 
-  document.getElementById("btnRevealKey").addEventListener("click", function () {
+  document.getElementById("btnRevealKey")?.addEventListener("click", function () {
     const inp = document.getElementById("authNewKeyVal");
     if (inp.type === "password") {
       inp.type = "text";
@@ -2755,14 +2755,14 @@
     }
   });
 
-  document.getElementById("btnCopyKey").addEventListener("click", function () {
+  document.getElementById("btnCopyKey")?.addEventListener("click", function () {
     const val = document.getElementById("authNewKeyVal").value;
     navigator.clipboard.writeText(val)
       .then(() => { this.textContent = "Copied!"; setTimeout(() => { this.textContent = "Copy"; }, 1500); })
       .catch(() => { this.textContent = "Error"; });
   });
 
-  document.getElementById("btnGenerateKey").addEventListener("click", async function () {
+  document.getElementById("btnGenerateKey")?.addEventListener("click", async function () {
     if (!confirm("Generate a new API key? The current key (if any) will be invalidated immediately.")) return;
     this.disabled = true;
     try {
@@ -2819,7 +2819,7 @@
   }
 
   // ══════════════════════════════════════════════ CHANGE PASSWORD ══
-  document.getElementById("btnChangePassword").addEventListener("click", async function () {
+  document.getElementById("btnChangePassword")?.addEventListener("click", async function () {
     const newPw  = document.getElementById("chpwNew").value;
     const confPw = document.getElementById("chpwConfirm").value;
     const msg    = document.getElementById("chpwMsg");
@@ -2903,7 +2903,7 @@
 
   loadUsers();
 
-  document.getElementById("btnAddUser").addEventListener("click", async function () {
+  document.getElementById("btnAddUser")?.addEventListener("click", async function () {
     const errEl = document.getElementById("addUserError");
     errEl.style.display = "none";
     errEl.textContent   = "";
@@ -3186,7 +3186,7 @@
 
     /* Download helpers (non-demo only) */
     {% if not demo_mode %}
-    document.getElementById("remPlanDownloadPdf").addEventListener("click", async () => {
+    document.getElementById("remPlanDownloadPdf")?.addEventListener("click", async () => {
       if (!lastPlanPayload) return;
       try {
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content
@@ -3205,7 +3205,7 @@
       } catch (err) { alert("PDF download failed: " + err.message); }
     });
 
-    document.getElementById("remPlanDownloadMd").addEventListener("click", async () => {
+    document.getElementById("remPlanDownloadMd")?.addEventListener("click", async () => {
       if (!lastPlanPayload) return;
       try {
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content
@@ -3245,7 +3245,7 @@
     let lastConnectData = null;
     window._setLastConnectData = function(d) { lastConnectData = d; };
 
-    document.getElementById("connRemediationPlanBtn").addEventListener("click", () => {
+    document.getElementById("connRemediationPlanBtn")?.addEventListener("click", () => {
       if (!lastConnectData) return;
       fetchAndShowPlan({
         findings: lastConnectData.enriched_findings || lastConnectData.findings || [],
