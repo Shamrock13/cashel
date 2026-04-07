@@ -216,7 +216,7 @@ body {
 
 /* ===== Header user / logout ===== */
 .header-username {
-  color: rgba(255,255,255,0.55);
+  color: rgba(255,255,255,0.7);
   font-size: 0.78rem;
   letter-spacing: 0.01em;
   white-space: nowrap;
