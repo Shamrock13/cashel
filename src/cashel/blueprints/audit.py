@@ -6,7 +6,7 @@ from pathlib import Path
 
 from flask import Blueprint, jsonify, request, send_file
 
-from cashel.web import limiter
+from cashel.extensions import limiter
 from cashel._vendor_helpers import (
     ALL_VENDORS,
     VENDOR_DISPLAY,

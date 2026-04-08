@@ -5,7 +5,7 @@ import uuid
 
 from flask import Blueprint, jsonify, request, send_file
 
-from cashel.web import limiter, csrf  # noqa: F401 (csrf imported for completeness)
+from cashel.extensions import limiter
 from cashel.remediation import generate_plan, plan_to_markdown, plan_to_pdf
 
 REPORTS_FOLDER = os.environ.get("REPORTS_FOLDER", "/tmp/cashel_reports")

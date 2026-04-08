@@ -5,10 +5,8 @@ import secrets
 import time
 
 from flask import Flask, g, jsonify, render_template
-from flask_wtf.csrf import CSRFProtect
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
 
+from .extensions import csrf, limiter
 from .license import check_license, mask_key, DEMO_MODE
 from .archive import list_archive
 from .settings import get_settings
@@ -47,14 +45,8 @@ app.config["SESSION_COOKIE_SECURE"] = (
     os.environ.get("CASHEL_SECURE_COOKIES", "false").lower() == "true"
 )
 
-csrf = CSRFProtect(app)
-
-limiter = Limiter(
-    app=app,
-    key_func=get_remote_address,
-    default_limits=[],
-    storage_uri="memory://",
-)
+csrf.init_app(app)
+limiter.init_app(app)
 
 _start_time = time.time()
 

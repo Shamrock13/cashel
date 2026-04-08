@@ -6,7 +6,6 @@ import uuid
 from flask import Blueprint, Response, jsonify, request, send_file
 
 from cashel._helpers import _require_role
-from cashel.web import limiter  # noqa: F401
 from cashel.archive import (
     save_audit,
     list_archive,
