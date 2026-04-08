@@ -1263,7 +1263,8 @@
       badge.innerHTML = "&#9888; Unlicensed";
       status.innerHTML = `<p class="status-warn">No active license. Compliance checks require a valid key.</p>`;
     }
-    document.getElementById("deactivateForm").classList.toggle("hidden", !licensed);
+    const deactForm = document.getElementById("deactivateForm");
+    if (deactForm) deactForm.classList.toggle("hidden", !licensed);
   }
 
   const DEMO_MODE = {{ 'true' if demo_mode else 'false' }};
@@ -1285,8 +1286,10 @@
   // ════════════════════════════════════════ AUDIT MODE TOGGLE (single/bulk) ══
   function switchAuditMode(mode) {
     document.querySelectorAll(".mode-btn").forEach(b => b.classList.toggle("mode-active", b.dataset.mode === mode));
-    document.getElementById("audit-mode-single").classList.toggle("hidden", mode !== "single");
-    document.getElementById("audit-mode-bulk").classList.toggle("hidden", mode !== "bulk");
+    const single = document.getElementById("audit-mode-single");
+    const bulk = document.getElementById("audit-mode-bulk");
+    if (single) single.classList.toggle("hidden", mode !== "single");
+    if (bulk) bulk.classList.toggle("hidden", mode !== "bulk");
   }
   document.querySelectorAll(".mode-btn").forEach(btn =>
     btn.addEventListener("click", () => switchAuditMode(btn.dataset.mode))
@@ -1295,8 +1298,10 @@
   // ═══════════════════════════════════════ HISTORY SUB-TABS (audits/activity) ══
   function switchHistorySubTab(subtab) {
     document.querySelectorAll(".sub-tab-btn").forEach(b => b.classList.toggle("sub-tab-active", b.dataset.subtab === subtab));
-    document.getElementById("sub-audits").classList.toggle("hidden", subtab !== "audits");
-    document.getElementById("sub-activity").classList.toggle("hidden", subtab !== "activity");
+    const subAudits = document.getElementById("sub-audits");
+    const subActivity = document.getElementById("sub-activity");
+    if (subAudits) subAudits.classList.toggle("hidden", subtab !== "audits");
+    if (subActivity) subActivity.classList.toggle("hidden", subtab !== "activity");
     if (subtab === "activity") loadActivity();
   }
   document.querySelectorAll(".sub-tab-btn").forEach(btn =>
@@ -1399,6 +1404,9 @@
 
   // Single render entry point — call any time state changes
   function renderFindingsUI() {
+    const listEl = document.getElementById("findingsList");
+    if (!listEl) return;
+
     const filtered   = getFilteredFindings();
     const total      = filtered.length;
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -1407,7 +1415,7 @@
     const start = (currentPage - 1) * pageSize;
     const page  = filtered.slice(start, start + pageSize);
 
-    document.getElementById("findingsList").innerHTML = page.length
+    listEl.innerHTML = page.length
       ? page.map(f => buildFindingHTML(f)).join("")
       : allFindings.length === 0
         ? `<div class="finding finding-pass">[PASS] No issues found</div>`
@@ -1418,6 +1426,7 @@
 
   function renderPaginationBar(total, totalPages) {
     const el = document.getElementById("findingsPagination");
+    if (!el) return;
     // Show the bar whenever total > 10 (so page size selector is always accessible)
     if (allFindings.length <= 10) { el.classList.add("hidden"); return; }
     el.classList.remove("hidden");
@@ -1464,22 +1473,27 @@
   };
   (function () {
     const paginationEl = document.getElementById("findingsPagination");
-    paginationEl.addEventListener("click", function (e) {
-      const btn = e.target.closest(".btn-page");
-      if (!btn || btn.disabled) return;
-      const page = parseInt(btn.dataset.page, 10);
-      if (!isNaN(page)) window.goToPage(page);
-    });
-    paginationEl.addEventListener("change", function (e) {
-      const sel = e.target.closest(".page-size-select");
-      if (sel) window.changePageSize(+sel.value);
-    });
+    if (paginationEl) {
+      paginationEl.addEventListener("click", function (e) {
+        const btn = e.target.closest(".btn-page");
+        if (!btn || btn.disabled) return;
+        const page = parseInt(btn.dataset.page, 10);
+        if (!isNaN(page)) window.goToPage(page);
+      });
+      paginationEl.addEventListener("change", function (e) {
+        const sel = e.target.closest(".page-size-select");
+        if (sel) window.changePageSize(+sel.value);
+      });
+    }
   })();
   window.setFindingsView = function(mode) {
     compactView = mode === "compact";
-    document.getElementById("viewDetailed").classList.toggle("view-btn-active", !compactView);
-    document.getElementById("viewCompact").classList.toggle("view-btn-active", compactView);
-    document.getElementById("findingsList").classList.toggle("findings-compact", compactView);
+    const det = document.getElementById("viewDetailed");
+    const cmp = document.getElementById("viewCompact");
+    const lst = document.getElementById("findingsList");
+    if (det) det.classList.toggle("view-btn-active", !compactView);
+    if (cmp) cmp.classList.toggle("view-btn-active", compactView);
+    if (lst) lst.classList.toggle("findings-compact", compactView);
     renderFindingsUI();
   };
   document.getElementById("viewDetailed")?.addEventListener("click", () => setFindingsView("detailed"));
@@ -1524,6 +1538,8 @@
     // Populate vendor dropdown from full trendsData
     const vendorSel  = document.getElementById("trendsVendorFilter");
     const deviceSel  = document.getElementById("trendsDeviceFilter");
+    if (!vendorSel || !deviceSel) return;
+
     const selVendor  = vendorSel.value;
     const selDevice  = deviceSel.value;
 
@@ -1648,57 +1664,79 @@
 
   function showAuditError(msg) {
     const section = document.getElementById("resultsSection");
+    if (!section) return;
     section.classList.remove("hidden");
-    ["summaryGrid"].forEach(id => document.getElementById(id).innerHTML = "");
-    document.getElementById("findingsList").innerHTML = `<div class="alert alert-error">${escHtml(msg)}</div>`;
-    ["pdfRow","exportRow","archiveRow","licenseWarning"].forEach(id => document.getElementById(id).classList.add("hidden"));
-    document.getElementById("detectedVendorTag").classList.add("hidden");
+    const grid = document.getElementById("summaryGrid");
+    const list = document.getElementById("findingsList");
+    if (grid) grid.innerHTML = "";
+    if (list) list.innerHTML = `<div class="alert alert-error">${escHtml(msg)}</div>`;
+    ["pdfRow","exportRow","archiveRow","licenseWarning"].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.classList.add("hidden");
+    });
+    const tag = document.getElementById("detectedVendorTag");
+    if (tag) tag.classList.add("hidden");
   }
 
   function renderResults(data) {
-    document.getElementById("resultsSection").classList.remove("hidden");
+    const section = document.getElementById("resultsSection");
+    if (!section) return;
+    section.classList.remove("hidden");
 
     const tag = document.getElementById("detectedVendorTag");
-    if (data.detected_vendor) {
-      tag.textContent = "Detected: " + (VENDOR_LABELS[data.detected_vendor] || data.detected_vendor);
-      tag.classList.remove("hidden");
-    } else { tag.classList.add("hidden"); }
+    if (tag) {
+      if (data.detected_vendor) {
+        tag.textContent = "Detected: " + (VENDOR_LABELS[data.detected_vendor] || data.detected_vendor);
+        tag.classList.remove("hidden");
+      } else { tag.classList.add("hidden"); }
+    }
 
     // Auto-fill device tag from config hostname if the field is still empty
     if (data.detected_hostname) {
       const tagField = document.getElementById("deviceTag");
-      if (!tagField.value.trim()) tagField.value = data.detected_hostname;
+      if (tagField && !tagField.value.trim()) tagField.value = data.detected_hostname;
     }
 
     const warn = document.getElementById("licenseWarning");
-    if (data.license_warning) { warn.textContent = data.license_warning; warn.classList.remove("hidden"); }
-    else { warn.classList.add("hidden"); }
+    if (warn) {
+      if (data.license_warning) { warn.textContent = data.license_warning; warn.classList.remove("hidden"); }
+      else { warn.classList.add("hidden"); }
+    }
 
     activeFilter = null; currentPage = 1;
     document.querySelectorAll("#summaryGrid .summary-box").forEach(b => b.classList.remove("filter-active"));
-    document.getElementById("summaryGrid").innerHTML = buildSummaryHTML(data.summary);
+    const grid = document.getElementById("summaryGrid");
+    if (grid) grid.innerHTML = buildSummaryHTML(data.summary);
 
     allFindings = data.enriched_findings || data.findings.map(f => ({ message: f, category: null, remediation: null }));
     renderFindingsUI();
 
     const pdfRow = document.getElementById("pdfRow");
-    if (data.report) {
-      document.getElementById("pdfLink").href     = "/reports/" + data.report;
-      document.getElementById("pdfViewLink").href = "/reports/" + data.report + "/view";
-      pdfRow.classList.remove("hidden");
-    } else { pdfRow.classList.add("hidden"); }
+    if (pdfRow) {
+      if (data.report) {
+        document.getElementById("pdfLink").href     = "/reports/" + data.report;
+        document.getElementById("pdfViewLink").href = "/reports/" + data.report + "/view";
+        pdfRow.classList.remove("hidden");
+      } else { pdfRow.classList.add("hidden"); }
+    }
 
-    if (data.archive_id) { document.getElementById("archiveRow").classList.remove("hidden"); }
-    else { document.getElementById("archiveRow").classList.add("hidden"); }
+    const archRow = document.getElementById("archiveRow");
+    if (archRow) {
+      if (data.archive_id) { archRow.classList.remove("hidden"); }
+      else { archRow.classList.add("hidden"); }
+    }
 
     lastAuditData = data;
-    document.getElementById("exportRow").classList.remove("hidden");
+    const expRow = document.getElementById("exportRow");
+    if (expRow) expRow.classList.remove("hidden");
 
     /* Show remediation plan button when there are findings */
     const remRow = document.getElementById("remediationRow");
-    const hasFindings = (data.enriched_findings || data.findings || []).length > 0;
-    if (hasFindings) { remRow.classList.remove("hidden"); }
-    else { remRow.classList.add("hidden"); }
+    if (remRow) {
+      const hasFindings = (data.enriched_findings || data.findings || []).length > 0;
+      if (hasFindings) { remRow.classList.remove("hidden"); }
+      else { remRow.classList.add("hidden"); }
+    }
   }
 
   document.getElementById("viewHistoryBtn")?.addEventListener("click", () => switchTab("history"));
@@ -1922,22 +1960,29 @@
   let compareSelections = [];
 
   async function loadHistory() {
-    document.getElementById("historyList").innerHTML = `<p class="text-muted">Loading&hellip;</p>`;
+    const el = document.getElementById("historyList");
+    if (!el) return;
+    el.innerHTML = `<p class="text-muted">Loading&hellip;</p>`;
     try {
       const res  = await fetch("/archive");
       historyData = await res.json();
       compareSelections = [];
       applyHistoryFilters();
     } catch (err) {
-      document.getElementById("historyList").innerHTML =
+      el.innerHTML =
         `<div class="alert alert-error">Failed to load history: ${escHtml(err.message)}</div>`;
     }
   }
 
   function applyHistoryFilters() {
-    const vendorFilter = document.getElementById("historyVendorFilter").value;
-    const sortMode     = document.getElementById("historySort").value;
-    const search       = document.getElementById("historySearch").value.trim().toLowerCase();
+    const vEl = document.getElementById("historyVendorFilter");
+    const sEl = document.getElementById("historySort");
+    const qEl = document.getElementById("historySearch");
+    if (!vEl || !sEl || !qEl) return;
+
+    const vendorFilter = vEl.value;
+    const sortMode     = sEl.value;
+    const search       = qEl.value.trim().toLowerCase();
 
     let entries = historyData.slice();
     if (vendorFilter) entries = entries.filter(e => vendorFilter === "cisco" ? (e.vendor === "asa" || e.vendor === "ftd") : e.vendor === vendorFilter);
@@ -2176,6 +2221,7 @@
 
   function renderActivity(events) {
     const el = document.getElementById("activityList");
+    if (!el) return;
     if (!events.length) {
       el.innerHTML = `<p class="text-muted">No activity yet.</p>`;
       return;
@@ -2401,13 +2447,15 @@
   let schedulesData = [];
 
   async function loadSchedules() {
-    document.getElementById("schedulesList").innerHTML = `<p class="text-muted">Loading\u2026</p>`;
+    const el = document.getElementById("schedulesList");
+    if (!el) return;
+    el.innerHTML = `<p class="text-muted">Loading\u2026</p>`;
     try {
       const res = await fetch("/schedules");
       schedulesData = await res.json();
       renderSchedules(schedulesData);
     } catch (err) {
-      document.getElementById("schedulesList").innerHTML =
+      el.innerHTML =
         `<div class="alert alert-error">Failed to load schedules: ${escHtml(err.message)}</div>`;
     }
   }
