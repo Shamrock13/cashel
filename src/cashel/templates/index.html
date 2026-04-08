@@ -48,6 +48,13 @@
             <span class="badge badge-unlicensed" id="licenseBadge">&#9888; Unlicensed</span>
           {% endif %}
         </button>
+        {% if current_user and not demo_mode %}
+        <span class="header-username">{{ current_user.username }}</span>
+        <form method="post" action="/logout" style="display:inline;margin:0">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn-logout">Logout</button>
+        </form>
+        {% endif %}
       </div>
     </div>
   </header>
@@ -92,10 +99,12 @@
         <svg class="tab-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="7" height="14" rx="1"/><rect x="11" y="3" width="7" height="14" rx="1"/><path d="M5.5 7h2M5.5 10h2M5.5 13h2M12.5 7h2M12.5 10h2M12.5 13h2"/></svg>
         Compare
       </button>
+      {% if not current_user or current_user.role in ('admin', 'auditor') %}
       <button class="tab-btn" data-tab="connect" role="tab">
         <svg class="tab-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="16" height="14" rx="2"/><path d="M2 7h16"/><path d="M6 11l3 2.5L6 16"/><path d="M12 15h3"/></svg>
         Live Connect
       </button>
+      {% endif %}
       <button class="tab-btn" data-tab="schedules" role="tab">
         <svg class="tab-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3.5" width="16" height="14" rx="2"/><path d="M2 8h16M7 2v3M13 2v3"/><circle cx="13.5" cy="13.5" r="3"/><path d="M13.5 12v1.5l1 1"/></svg>
         Schedules
@@ -104,15 +113,23 @@
         <svg class="tab-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10a6 6 0 1 0 1.5-4"/><path d="M2 8.5l1.5 2 2-1.5"/><path d="M10 7v4l2 1.5"/></svg>
         History
       </button>
+      {% if not current_user or current_user.role == 'admin' %}
       <button class="tab-btn" data-tab="settings" role="tab">
         <svg class="tab-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><line x1="3" y1="5" x2="17" y2="5"/><line x1="3" y1="10" x2="17" y2="10"/><line x1="3" y1="15" x2="17" y2="15"/><circle cx="7" cy="5" r="2"/><circle cx="13" cy="10" r="2"/><circle cx="8" cy="15" r="2"/></svg>
         Settings
       </button>
+      {% elif current_user and not demo_mode %}
+      <button class="tab-btn" data-tab="settings" role="tab">
+        <svg class="tab-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="7.5" r="3.5"/><path d="M3 18c0-3.3 3.1-6 7-6s7 2.7 7 6"/></svg>
+        My Account
+      </button>
+      {% endif %}
     </nav>
 
     <!-- ══════════════════════════════════════════════ AUDIT ══ -->
     <section class="tab-panel" id="tab-audit">
 
+      {% if not current_user or current_user.role in ('admin', 'auditor') %}
       <!-- Audit mode toggle: Single File / Bulk -->
       <div class="audit-mode-bar">
         <button class="mode-btn mode-active" data-mode="single">Single File</button>
@@ -319,6 +336,11 @@
         <div id="bulkResultsList"></div>
       </div>
       </div><!-- /audit-mode-bulk -->
+      {% else %}
+      <div class="card">
+        <p class="role-notice">Audit execution requires Auditor or Admin role. You can view results in the History tab.</p>
+      </div>
+      {% endif %}
 
     </section>
 
@@ -518,7 +540,9 @@
       <!-- History sub-tabs: Audit History / Activity Log -->
       <div class="sub-tab-nav">
         <button class="sub-tab-btn sub-tab-active" data-subtab="audits">&#128337; Audit History</button>
+        {% if not current_user or current_user.role == 'admin' %}
         <button class="sub-tab-btn" data-subtab="activity">&#128203; Activity Log</button>
+        {% endif %}
       </div>
 
       <!-- ── Audit History sub-tab ── -->
@@ -601,6 +625,7 @@
       </div><!-- /sub-audits -->
 
       <!-- ── Activity Log sub-tab ── -->
+      {% if not current_user or current_user.role == 'admin' %}
       <div id="sub-activity" class="hidden">
       <div class="card">
         <div class="results-header">
@@ -616,6 +641,9 @@
         </div>
       </div>
       </div><!-- /sub-activity -->
+      {% else %}
+      <div id="sub-activity" class="hidden"></div>
+      {% endif %}
 
     </section>
 
@@ -637,8 +665,8 @@
         </div>
       </div>
 
-      <!-- New / Edit Schedule Form — hidden in demo mode -->
-      <div class="card{% if demo_mode %} hidden{% endif %}" id="scheduleFormCard">
+      <!-- New / Edit Schedule Form — hidden in demo mode and for viewer role -->
+      <div class="card{% if demo_mode or (current_user and current_user.role == 'viewer') %} hidden{% endif %}" id="scheduleFormCard">
         <h2 class="card-title" id="scheduleFormTitle">New Schedule</h2>
         <form id="scheduleForm">
           <input type="hidden" id="scheduleId" value="" />
@@ -766,7 +794,8 @@
     <section class="tab-panel hidden" id="tab-settings">
       <div class="settings-shell">
 
-        <!-- ── Left sidebar ─────────────────────────────────────────────── -->
+        <!-- ── Left sidebar — admin only ─────────────────────────────────── -->
+        {% if not current_user or current_user.role == 'admin' %}
         <nav class="settings-sidebar" role="navigation" aria-label="Settings sections">
           <div class="settings-nav-group-label">Configuration</div>
 
@@ -797,10 +826,12 @@
             Syslog
           </button>
         </nav>
+        {% endif %}
 
         <!-- ── Right content ─────────────────────────────────────────────── -->
         <div class="settings-content">
 
+          {% if not current_user or current_user.role == 'admin' %}
           <!-- General pane -->
           <div class="settings-pane active" id="spane-general">
             <div class="settings-pane-header">
@@ -895,15 +926,17 @@
               <span id="smtpTestResult" style="font-size:0.85rem"></span>
             </div>
           </div>
+          {% endif %}{# /admin-only general+email panes #}
 
           <!-- Authentication pane — hidden in demo mode -->
           {% if not demo_mode %}
-          <div class="settings-pane" id="spane-auth">
+          <div class="settings-pane{% if current_user and current_user.role != 'admin' %} active{% endif %}" id="spane-auth">
             <div class="settings-pane-header">
-              <h2 class="settings-pane-title">Authentication</h2>
+              <h2 class="settings-pane-title">{% if current_user and current_user.role != 'admin' %}My Account{% else %}Authentication{% endif %}</h2>
               <p class="settings-pane-desc">Protect the Cashel web UI and API with an API key. When enabled, all routes require the key — via browser login or <code>X-API-Key</code> header for CI/CD clients.</p>
             </div>
 
+            {% if not current_user or current_user.role == 'admin' %}
             <div class="settings-group">
               <h3 class="settings-group-title">Access Control</h3>
               <label class="settings-row">
@@ -924,15 +957,65 @@
                 </div>
               </div>
             </div>
+            {% endif %}
 
+            <!-- Users table — admin only -->
+            {% if current_user and current_user.role == 'admin' %}
+            <div class="settings-group" id="authUsersGroup">
+              <h3 class="settings-group-title">Users</h3>
+              <table style="width:100%;border-collapse:collapse;font-size:0.88rem" id="authUsersTable">
+                <thead>
+                  <tr style="border-bottom:1px solid var(--border);text-align:left">
+                    <th style="padding:0.4rem 0.6rem;color:var(--text-muted);font-weight:600">Username</th>
+                    <th style="padding:0.4rem 0.6rem;color:var(--text-muted);font-weight:600">Role</th>
+                    <th style="padding:0.4rem 0.6rem;color:var(--text-muted);font-weight:600">API Key</th>
+                    <th style="padding:0.4rem 0.6rem;color:var(--text-muted);font-weight:600">Created</th>
+                    <th style="padding:0.4rem 0.6rem;color:var(--text-muted);font-weight:600">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="authUsersTbody">
+                  <tr><td colspan="5" style="padding:0.6rem;color:var(--text-muted)">Loading…</td></tr>
+                </tbody>
+              </table>
+
+              <div style="margin-top:1.25rem;padding:1rem;background:var(--input-bg);border:1px solid var(--border);border-radius:8px">
+                <h4 style="margin:0 0 0.75rem;font-size:0.88rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px">Add User</h4>
+                <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:flex-end">
+                  <div style="display:flex;flex-direction:column;gap:0.3rem">
+                    <label style="font-size:0.78rem;color:var(--text-muted)">Username</label>
+                    <input type="text" id="newUserUsername" placeholder="username" style="padding:0.45rem 0.65rem;font-size:0.88rem" autocomplete="off" />
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:0.3rem">
+                    <label style="font-size:0.78rem;color:var(--text-muted)">Password</label>
+                    <input type="password" id="newUserPassword" placeholder="12+ chars" style="padding:0.45rem 0.65rem;font-size:0.88rem" autocomplete="new-password" />
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:0.3rem">
+                    <label style="font-size:0.78rem;color:var(--text-muted)">Role</label>
+                    <select id="newUserRole" style="padding:0.45rem 0.65rem;font-size:0.88rem">
+                      <option value="viewer">Viewer</option>
+                      <option value="auditor">Auditor</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  </div>
+                  <button class="btn-secondary" id="btnAddUser" style="padding:0.45rem 0.9rem">Add User</button>
+                </div>
+                <div id="addUserError" style="margin-top:0.5rem;font-size:0.82rem;color:var(--high);display:none"></div>
+              </div>
+            </div>
+            {% endif %}
+
+            <!-- Per-user API key — all roles -->
             <div class="settings-group">
-              <h3 class="settings-group-title">API Key</h3>
+              <h3 class="settings-group-title">Your API Key</h3>
               <div class="settings-row">
-                <span class="settings-row-label">Current Key</span>
-                <span class="text-muted" id="authKeyHint" style="font-family:monospace;font-size:0.88rem">not set</span>
+                <span class="settings-row-label">Status</span>
+                <span class="text-muted" id="authKeyHint" style="font-family:monospace;font-size:0.88rem">
+                  {% if current_user and current_user.has_api_key %}key active{% else %}not set{% endif %}
+                </span>
               </div>
               <div style="margin-top:0.75rem;display:flex;gap:0.75rem;flex-wrap:wrap">
                 <button class="btn-secondary" id="btnGenerateKey">Generate New Key</button>
+                <button class="btn-secondary" id="btnRevokeKey" style="{% if not current_user or not current_user.has_api_key %}display:none{% endif %}">Revoke Key</button>
               </div>
               <div id="authNewKeyBox" class="hidden" style="margin-top:1rem;background:var(--card-bg);border:1px solid var(--accent);border-radius:8px;padding:1rem">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
@@ -948,9 +1031,31 @@
               </div>
               <p class="settings-pane-desc" style="margin-top:0.75rem">Use this key in the <code>X-API-Key</code> header for CLI or CI/CD access:<br><code>curl -H "X-API-Key: csh_..." https://your-cashel/api/v1/audit</code></p>
             </div>
+
+            <!-- Change password — all roles -->
+            <div class="settings-group">
+              <h3 class="settings-group-title">Change Password</h3>
+              <div style="display:flex;flex-direction:column;gap:0.75rem;max-width:360px">
+                <div style="display:flex;flex-direction:column;gap:0.3rem">
+                  <label style="font-size:0.78rem;color:var(--text-muted)">New Password</label>
+                  <input type="password" id="chpwNew" placeholder="12+ characters" autocomplete="new-password"
+                         style="padding:0.55rem 0.75rem;font-size:0.88rem" />
+                </div>
+                <div style="display:flex;flex-direction:column;gap:0.3rem">
+                  <label style="font-size:0.78rem;color:var(--text-muted)">Confirm New Password</label>
+                  <input type="password" id="chpwConfirm" placeholder="Repeat password" autocomplete="new-password"
+                         style="padding:0.55rem 0.75rem;font-size:0.88rem" />
+                </div>
+                <div>
+                  <button class="btn-secondary" id="btnChangePassword">Update Password</button>
+                  <span id="chpwMsg" style="margin-left:0.75rem;font-size:0.82rem"></span>
+                </div>
+              </div>
+            </div>
           </div>
           {% endif %}
 
+          {% if not current_user or current_user.role == 'admin' %}
           <!-- Security pane -->
           <div class="settings-pane" id="spane-security">
             <div class="settings-pane-header">
@@ -1055,12 +1160,15 @@
               </div>
             </div>
           </div>
+          {% endif %}{# /admin-only security+syslog panes #}
 
-          <!-- Shared footer -->
+          <!-- Shared footer — admin only -->
+          {% if not current_user or current_user.role == 'admin' %}
           <div class="settings-footer">
             <button class="btn-primary" id="saveSettingsBtn">Save Settings</button>
             <span class="settings-saved-msg hidden" id="settingsSavedMsg">&#10003; Saved</span>
           </div>
+          {% endif %}
 
         </div><!-- /.settings-content -->
       </div><!-- /.settings-shell -->
@@ -1069,7 +1177,7 @@
   </main>
 
   <footer class="footer">
-    <p>Cashel v1.3 &mdash; Firewall Security Auditor</p>
+    <p>Cashel v1.4 &mdash; Firewall Security Auditor</p>
   </footer>
 
   <script nonce="{{ g.csp_nonce }}">
@@ -1082,7 +1190,7 @@
     localStorage.setItem("cashel-theme", theme);
   }
   applyTheme(html.getAttribute("data-theme") || "auto");
-  document.getElementById("themeToggle").addEventListener("click", () => {
+  document.getElementById("themeToggle")?.addEventListener("click", () => {
     const cur = html.getAttribute("data-theme") || "auto";
     applyTheme(cur === "light" ? "dark" : cur === "dark" ? "auto" : "light");
   });
@@ -1118,11 +1226,11 @@
     document.body.style.overflow = "";
     document.removeEventListener("keydown", _modalKeyHandler);
   };
-  document.getElementById("licenseBadgeBtn").addEventListener("click", openModal);
-  document.getElementById("modalClose").addEventListener("click", closeModal);
+  document.getElementById("licenseBadgeBtn")?.addEventListener("click", openModal);
+  document.getElementById("modalClose")?.addEventListener("click", closeModal);
   modal.addEventListener("click", e => { if (e.target === modal) closeModal(); });
 
-  document.getElementById("activateForm").addEventListener("submit", async function (e) {
+  document.getElementById("activateForm")?.addEventListener("submit", async function (e) {
     e.preventDefault();
     const key  = document.getElementById("licenseKey").value.trim();
     const res  = await fetch("/license/activate", { method: "POST", body: new URLSearchParams({ key }) });
@@ -1130,7 +1238,7 @@
     showLicenseMsg(data.message, data.success ? "ok" : "error");
     if (data.success) { document.getElementById("licenseKey").value = ""; refreshLicenseBadge(true, key.toUpperCase()); }
   });
-  document.getElementById("deactivateForm").addEventListener("submit", async function (e) {
+  document.getElementById("deactivateForm")?.addEventListener("submit", async function (e) {
     e.preventDefault();
     const res  = await fetch("/license/deactivate", { method: "POST" });
     const data = await res.json();
@@ -1159,6 +1267,8 @@
   }
 
   const DEMO_MODE = {{ 'true' if demo_mode else 'false' }};
+  const userRole = {{ (current_user.role if current_user else 'admin') | tojson }};
+  const canManageSchedules = (userRole === 'admin' || userRole === 'auditor');
 
   // ═══════════════════════════════════════════════════════════════ TABS ══
   const tabBtns   = document.querySelectorAll(".tab-btn");
@@ -1251,9 +1361,9 @@
     if (unsupported) sel.value = "";
   }
 
-  document.getElementById("vendor").addEventListener("change", syncComplianceSelector);
+  document.getElementById("vendor")?.addEventListener("change", syncComplianceSelector);
 
-  document.getElementById("config").addEventListener("change", function () {
+  document.getElementById("config")?.addEventListener("change", function () {
     document.getElementById("fileLabel").textContent =
       this.files.length ? this.files[0].name : "Choose a file\u2026";
     if (!this.files.length) return;
@@ -1308,6 +1418,7 @@
 
   function renderPaginationBar(total, totalPages) {
     const el = document.getElementById("findingsPagination");
+    if (!el) return;
     // Show the bar whenever total > 10 (so page size selector is always accessible)
     if (allFindings.length <= 10) { el.classList.add("hidden"); return; }
     el.classList.remove("hidden");
@@ -1354,16 +1465,18 @@
   };
   (function () {
     const paginationEl = document.getElementById("findingsPagination");
-    paginationEl.addEventListener("click", function (e) {
-      const btn = e.target.closest(".btn-page");
-      if (!btn || btn.disabled) return;
-      const page = parseInt(btn.dataset.page, 10);
-      if (!isNaN(page)) window.goToPage(page);
-    });
-    paginationEl.addEventListener("change", function (e) {
-      const sel = e.target.closest(".page-size-select");
-      if (sel) window.changePageSize(+sel.value);
-    });
+    if (paginationEl) {
+      paginationEl.addEventListener("click", function (e) {
+        const btn = e.target.closest(".btn-page");
+        if (!btn || btn.disabled) return;
+        const page = parseInt(btn.dataset.page, 10);
+        if (!isNaN(page)) window.goToPage(page);
+      });
+      paginationEl.addEventListener("change", function (e) {
+        const sel = e.target.closest(".page-size-select");
+        if (sel) window.changePageSize(+sel.value);
+      });
+    }
   })();
   window.setFindingsView = function(mode) {
     compactView = mode === "compact";
@@ -1372,10 +1485,10 @@
     document.getElementById("findingsList").classList.toggle("findings-compact", compactView);
     renderFindingsUI();
   };
-  document.getElementById("viewDetailed").addEventListener("click", () => setFindingsView("detailed"));
-  document.getElementById("viewCompact").addEventListener("click", () => setFindingsView("compact"));
+  document.getElementById("viewDetailed")?.addEventListener("click", () => setFindingsView("detailed"));
+  document.getElementById("viewCompact")?.addEventListener("click", () => setFindingsView("compact"));
 
-  document.getElementById("summaryGrid").addEventListener("click", function (e) {
+  document.getElementById("summaryGrid")?.addEventListener("click", function (e) {
     const box = e.target.closest(".summary-box[data-filter]");
     if (!box) return;
     const filter = box.dataset.filter;
@@ -1512,15 +1625,15 @@
     });
   }
 
-  document.getElementById("refreshTrendsBtn").addEventListener("click", loadTrends);
-  document.getElementById("trendsVendorFilter").addEventListener("change", () => {
+  document.getElementById("refreshTrendsBtn")?.addEventListener("click", loadTrends);
+  document.getElementById("trendsVendorFilter")?.addEventListener("change", () => {
     // Reset device filter when vendor changes, then re-render
     document.getElementById("trendsDeviceFilter").value = "";
     renderTrends(trendsData);
   });
-  document.getElementById("trendsDeviceFilter").addEventListener("change", () => renderTrends(trendsData));
+  document.getElementById("trendsDeviceFilter")?.addEventListener("change", () => renderTrends(trendsData));
 
-  document.getElementById("auditForm").addEventListener("submit", async function (e) {
+  document.getElementById("auditForm")?.addEventListener("submit", async function (e) {
     e.preventDefault();
     if (DEMO_MODE) { showAuditError("File uploads are not available in demo mode. Use the sample configs above."); return; }
     setLoading("submitBtn", "submitText", "submitSpinner", "Running\u2026", true);
@@ -1591,7 +1704,7 @@
     else { remRow.classList.add("hidden"); }
   }
 
-  document.getElementById("viewHistoryBtn").addEventListener("click", () => switchTab("history"));
+  document.getElementById("viewHistoryBtn")?.addEventListener("click", () => switchTab("history"));
 
   // ══════════════════════════════════════════════════════ EXPORT ══
   let lastAuditData = null;
@@ -1613,7 +1726,7 @@
   function exportJSON() {
     if (!lastAuditData) return;
     const payload = {
-      tool: "Cashel", version: "1.3",
+      tool: "Cashel", version: "1.4",
       filename:  lastAuditData.filename  || "",
       vendor:    lastAuditData.vendor    || "",
       timestamp: new Date().toISOString(),
@@ -1666,26 +1779,26 @@
       version: "2.1.0",
       "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
       runs: [{
-        tool: {driver: {name:"Cashel", version:"1.2", informationUri:"https://github.com/Shamrock13/cashel", rules: Object.values(seenRules)}},
+        tool: {driver: {name:"Cashel", version:"1.4", informationUri:"https://github.com/Shamrock13/cashel", rules: Object.values(seenRules)}},
         results,
       }],
     };
     _downloadBlob(JSON.stringify(sarif, null, 2), _exportBasename() + "_cashel.sarif", "application/json");
   }
 
-  document.getElementById("exportJsonBtn").addEventListener("click",  exportJSON);
-  document.getElementById("exportCsvBtn").addEventListener("click",   exportCSV);
-  document.getElementById("exportSarifBtn").addEventListener("click", exportSARIF);
+  document.getElementById("exportJsonBtn")?.addEventListener("click",  exportJSON);
+  document.getElementById("exportCsvBtn")?.addEventListener("click",   exportCSV);
+  document.getElementById("exportSarifBtn")?.addEventListener("click", exportSARIF);
 
   // ══════════════════════════════════════════════════ COMPARE CONFIGS ══
-  document.getElementById("config_a").addEventListener("change", function () {
+  document.getElementById("config_a")?.addEventListener("change", function () {
     document.getElementById("fileLabelA").textContent = this.files.length ? this.files[0].name : "Choose a file\u2026";
   });
-  document.getElementById("config_b").addEventListener("change", function () {
+  document.getElementById("config_b")?.addEventListener("change", function () {
     document.getElementById("fileLabelB").textContent = this.files.length ? this.files[0].name : "Choose a file\u2026";
   });
 
-  document.getElementById("diffForm").addEventListener("submit", async function (e) {
+  document.getElementById("diffForm")?.addEventListener("submit", async function (e) {
     e.preventDefault();
     if (DEMO_MODE) {
       document.getElementById("diffResults").classList.remove("hidden");
@@ -1752,7 +1865,7 @@
     });
   });
 
-  document.getElementById("connectForm").addEventListener("submit", async function (e) {
+  document.getElementById("connectForm")?.addEventListener("submit", async function (e) {
     e.preventDefault();
     setLoading("connectBtn", "connectText", "connectSpinner", "Connecting\u2026", true);
     try {
@@ -1805,7 +1918,7 @@
     if (connHasFindings) { connRemRow.classList.remove("hidden"); }
     else { connRemRow.classList.add("hidden"); }
   }
-  document.getElementById("connViewHistoryBtn").addEventListener("click", () => switchTab("history"));
+  document.getElementById("connViewHistoryBtn")?.addEventListener("click", () => switchTab("history"));
 
   // ════════════════════════════════════════════════ AUDIT HISTORY ══════
   let historyData = [];
@@ -1842,10 +1955,10 @@
   }
 
   ["historyVendorFilter", "historySort"].forEach(id =>
-    document.getElementById(id).addEventListener("change", applyHistoryFilters)
+    document.getElementById(id)?.addEventListener("change", applyHistoryFilters)
   );
   let _historyDebounce;
-  document.getElementById("historySearch").addEventListener("input", () => {
+  document.getElementById("historySearch")?.addEventListener("input", () => {
     clearTimeout(_historyDebounce);
     _historyDebounce = setTimeout(applyHistoryFilters, 300);
   });
@@ -1880,7 +1993,10 @@
           <a class="btn-secondary btn-sm" href="/archive/${escHtml(e.id)}/export?fmt=json"  download title="Download JSON">JSON</a>
           <a class="btn-secondary btn-sm" href="/archive/${escHtml(e.id)}/export?fmt=csv"   download title="Download CSV">CSV</a>
           <a class="btn-secondary btn-sm" href="/archive/${escHtml(e.id)}/export?fmt=sarif" download title="Download SARIF">SARIF</a>
-          <button class="btn-danger btn-sm" data-delete="${escHtml(e.id)}" title="Delete">&#128465;</button>
+          ${userRole === 'admin'
+            ? `<button class="btn-danger btn-sm" data-delete="${escHtml(e.id)}" title="Delete">&#128465;</button>`
+            : `<button class="btn-danger btn-sm" disabled title="Deletion requires Admin role" style="opacity:0.4;cursor:not-allowed">&#128465;</button>`
+          }
         </div>
       </div>`;
     }).join("") + `
@@ -1937,7 +2053,7 @@
       });
     });
 
-    document.getElementById("compareBtn").addEventListener("click", runCompare);
+    document.getElementById("compareBtn")?.addEventListener("click", runCompare);
   }
 
   function updateCompareBar() {
@@ -2037,7 +2153,7 @@
       ` : ""}`;
   }
 
-  document.getElementById("refreshHistoryBtn").addEventListener("click", loadHistory);
+  document.getElementById("refreshHistoryBtn")?.addEventListener("click", loadHistory);
 
   // ════════════════════════════════════════════════ ACTIVITY LOG ══════
   const ACTION_LABELS = {
@@ -2048,13 +2164,15 @@
   };
 
   async function loadActivity() {
-    document.getElementById("activityList").innerHTML = `<p class="text-muted">Loading&hellip;</p>`;
+    const activityList = document.getElementById("activityList");
+    if (!activityList) return;
+    activityList.innerHTML = `<p class="text-muted">Loading&hellip;</p>`;
     try {
       const res    = await fetch("/activity");
       const events = await res.json();
       renderActivity(events);
     } catch (err) {
-      document.getElementById("activityList").innerHTML =
+      activityList.innerHTML =
         `<div class="alert alert-error">Failed to load activity: ${escHtml(err.message)}</div>`;
     }
   }
@@ -2095,8 +2213,10 @@
     });
   }
 
-  document.getElementById("refreshActivityBtn").addEventListener("click", loadActivity);
-  document.getElementById("clearActivityBtn").addEventListener("click", async function () {
+  const _refreshActivityBtn = document.getElementById("refreshActivityBtn");
+  if (_refreshActivityBtn) _refreshActivityBtn.addEventListener("click", loadActivity);
+  const _clearActivityBtn = document.getElementById("clearActivityBtn");
+  if (_clearActivityBtn) _clearActivityBtn.addEventListener("click", async function () {
     if (!confirm("Clear all activity log entries?")) return;
     await fetch("/activity/clear", { method: "POST" });
     await loadActivity();
@@ -2180,14 +2300,14 @@
   }
 
   // ══════════════════════════════════════════════════════ BULK AUDIT ══
-  document.getElementById("bulkConfigs").addEventListener("change", function () {
+  document.getElementById("bulkConfigs")?.addEventListener("change", function () {
     const n = this.files.length;
     document.getElementById("bulkFileLabel").textContent =
       n === 0 ? "Choose one or more files\u2026" :
       n === 1 ? this.files[0].name : n + " files selected";
   });
 
-  document.getElementById("bulkForm").addEventListener("submit", async function (e) {
+  document.getElementById("bulkForm")?.addEventListener("submit", async function (e) {
     e.preventDefault();
     if (DEMO_MODE) {
       document.getElementById("bulkResults").classList.remove("hidden");
@@ -2263,7 +2383,7 @@
     document.getElementById("bulkResults").classList.remove("hidden");
 
     /* Attach remediation plan buttons for bulk results (event delegation) */
-    document.getElementById("bulkResultsList").addEventListener("click", (e) => {
+    document.getElementById("bulkResultsList")?.addEventListener("click", (e) => {
       const btn = e.target.closest(".bulk-rem-btn");
       if (!btn) return;
       const idx = parseInt(btn.dataset.remIdx, 10);
@@ -2327,11 +2447,11 @@
         </div>
         <div class="schedule-entry-right">
           <span class="schedule-status-pill ${s.enabled ? "pill-enabled" : "pill-disabled"}">${s.enabled ? "Enabled" : "Disabled"}</span>
-          ${DEMO_MODE ? "" : `
+          ${(!DEMO_MODE && canManageSchedules) ? `
           <button class="btn-secondary btn-sm" data-sched-run="${escHtml(s.id)}" title="Run now">&#9654; Run Now</button>
           <button class="btn-secondary btn-sm" data-sched-edit="${escHtml(s.id)}" title="Edit">&#9998; Edit</button>
           <button class="btn-danger btn-sm"    data-sched-del="${escHtml(s.id)}"  title="Delete">&#128465;</button>
-          `}
+          ` : ""}
         </div>
       </div>`;
     }).join("");
@@ -2369,11 +2489,11 @@
     document.getElementById("schedDowGroup").style.display  = freq === "weekly" ? ""     : "none";
   }
 
-  document.getElementById("schedFrequency").addEventListener("change", function () {
+  document.getElementById("schedFrequency")?.addEventListener("change", function () {
     toggleScheduleFreqFields(this.value);
   });
 
-  document.getElementById("schedCancelBtn").addEventListener("click", function () {
+  document.getElementById("schedCancelBtn")?.addEventListener("click", function () {
     document.getElementById("scheduleForm").reset();
     document.getElementById("scheduleId").value = "";
     document.getElementById("scheduleFormTitle").textContent = "New Schedule";
@@ -2382,7 +2502,7 @@
     toggleScheduleFreqFields("daily");
   });
 
-  document.getElementById("scheduleForm").addEventListener("submit", async function (e) {
+  document.getElementById("scheduleForm")?.addEventListener("submit", async function (e) {
     e.preventDefault();
     const schedId = document.getElementById("scheduleId").value.trim();
     const payload = {
@@ -2436,10 +2556,10 @@
     }
   });
 
-  document.getElementById("refreshSchedulesBtn").addEventListener("click", loadSchedules);
+  document.getElementById("refreshSchedulesBtn")?.addEventListener("click", loadSchedules);
 
   // Delegated event handler for schedule list — set up once, works across re-renders.
-  document.getElementById("schedulesList").addEventListener("click", async function (e) {
+  document.getElementById("schedulesList")?.addEventListener("click", async function (e) {
     const runBtn  = e.target.closest("[data-sched-run]");
     const editBtn = e.target.closest("[data-sched-edit]");
     const delBtn  = e.target.closest("[data-sched-del]");
@@ -2465,6 +2585,7 @@
   async function loadSettings() {
     try {
       const res = await fetch("/settings");
+      if (!res.ok) return;  // viewer (and other non-admin roles) get 403 — skip silently
       appSettings = await res.json();
       applySettingsToUI();
       applySettingsToForm();
@@ -2472,30 +2593,42 @@
   }
 
   function applySettingsToUI() {
-    document.getElementById("setting-auto-pdf").checked              = !!appSettings.auto_pdf;
-    document.getElementById("setting-auto-archive").checked          = !!appSettings.auto_archive;
-    document.getElementById("setting-default-compliance").value      = appSettings.default_compliance  || "";
-    document.getElementById("setting-smtp-host").value               = appSettings.smtp_host            || "";
-    document.getElementById("setting-smtp-port").value               = appSettings.smtp_port            || 587;
-    document.getElementById("setting-smtp-user").value               = appSettings.smtp_user            || "";
-    document.getElementById("setting-smtp-password").value           = "";  // never pre-fill password
-    document.getElementById("setting-smtp-from").value               = appSettings.smtp_from            || "";
-    document.getElementById("setting-smtp-tls").checked              = appSettings.smtp_tls !== false;
-    // Security settings
-    document.getElementById("setting-ssh-host-key-policy").value     = appSettings.ssh_host_key_policy || "warn";
-    document.getElementById("setting-error-detail").value            = appSettings.error_detail         || "sanitized";
-    document.getElementById("setting-webhook-allowlist").value       = appSettings.webhook_allowlist    || "";
-    // Syslog settings
-    document.getElementById("setting-syslog-enabled").checked        = !!appSettings.syslog_enabled;
-    document.getElementById("setting-syslog-host").value             = appSettings.syslog_host          || "localhost";
-    document.getElementById("setting-syslog-port").value             = appSettings.syslog_port          || 514;
-    document.getElementById("setting-syslog-protocol").value         = appSettings.syslog_protocol      || "udp";
-    document.getElementById("setting-syslog-facility").value         = appSettings.syslog_facility      || "local0";
-    // Auth settings
-    document.getElementById("setting-auth-enabled").checked          = !!appSettings.auth_enabled;
-    document.getElementById("setting-session-lifetime").value        = appSettings.session_lifetime_minutes || 480;
-    const hint = appSettings.api_key_hint || (appSettings.api_key_set ? "(key set — hint unavailable)" : "not set");
-    document.getElementById("authKeyHint").textContent               = hint;
+    // Settings pane elements only exist for admin — guard each access
+    const _set = (id, prop, fallback) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (typeof el.checked !== "undefined" && prop !== "value") {
+        el.checked = !!appSettings[prop];
+      } else {
+        el.value = appSettings[prop] !== undefined ? appSettings[prop] : fallback;
+      }
+    };
+    _set("setting-auto-pdf",             "auto_pdf",              false);
+    _set("setting-auto-archive",         "auto_archive",          false);
+    _set("setting-default-compliance",   "default_compliance",    "");
+    _set("setting-smtp-host",            "smtp_host",             "");
+    _set("setting-smtp-port",            "smtp_port",             587);
+    _set("setting-smtp-user",            "smtp_user",             "");
+    _set("setting-smtp-from",            "smtp_from",             "");
+    const smtpTls = document.getElementById("setting-smtp-tls");
+    if (smtpTls) smtpTls.checked = appSettings.smtp_tls !== false;
+    _set("setting-ssh-host-key-policy",  "ssh_host_key_policy",   "warn");
+    _set("setting-error-detail",         "error_detail",          "sanitized");
+    _set("setting-webhook-allowlist",    "webhook_allowlist",      "");
+    const syslogEnabled = document.getElementById("setting-syslog-enabled");
+    if (syslogEnabled) syslogEnabled.checked = !!appSettings.syslog_enabled;
+    _set("setting-syslog-host",          "syslog_host",           "localhost");
+    _set("setting-syslog-port",          "syslog_port",           514);
+    _set("setting-syslog-protocol",      "syslog_protocol",       "udp");
+    _set("setting-syslog-facility",      "syslog_facility",       "local0");
+    if (document.getElementById("setting-auth-enabled")) {
+      document.getElementById("setting-auth-enabled").checked        = !!appSettings.auth_enabled;
+    }
+    if (document.getElementById("setting-session-lifetime")) {
+      document.getElementById("setting-session-lifetime").value      = appSettings.session_lifetime_minutes || 480;
+    }
+    const smtpPass = document.getElementById("setting-smtp-password");
+    if (smtpPass) smtpPass.value = "";  // never pre-fill password
   }
 
   // ── Settings sidebar navigation ──────────────────────────────────────────
@@ -2511,16 +2644,20 @@
   });
 
   function applySettingsToForm() {
-    document.getElementById("report").checked  = !!appSettings.auto_pdf;
-    document.getElementById("archive").checked = !!appSettings.auto_archive;
+    const reportEl  = document.getElementById("report");
+    const archiveEl = document.getElementById("archive");
+    if (reportEl)  reportEl.checked  = !!appSettings.auto_pdf;
+    if (archiveEl) archiveEl.checked = !!appSettings.auto_archive;
     const comp = appSettings.default_compliance || "";
     if (comp) {
-      document.getElementById("compliance").value     = comp;
-      document.getElementById("connCompliance").value = comp;
+      const compEl     = document.getElementById("compliance");
+      const connCompEl = document.getElementById("connCompliance");
+      if (compEl)     compEl.value     = comp;
+      if (connCompEl) connCompEl.value = comp;
     }
   }
 
-  document.getElementById("saveSettingsBtn").addEventListener("click", async function () {
+  document.getElementById("saveSettingsBtn")?.addEventListener("click", async function () {
     const data = {
       auto_pdf:             document.getElementById("setting-auto-pdf").checked,
       auto_archive:         document.getElementById("setting-auto-archive").checked,
@@ -2541,8 +2678,8 @@
       syslog_protocol:      document.getElementById("setting-syslog-protocol").value,
       syslog_facility:      document.getElementById("setting-syslog-facility").value,
       // Auth settings
-      auth_enabled:             document.getElementById("setting-auth-enabled").checked,
-      session_lifetime_minutes: parseInt(document.getElementById("setting-session-lifetime").value) || 480,
+      auth_enabled:             document.getElementById("setting-auth-enabled") ? document.getElementById("setting-auth-enabled").checked : undefined,
+      session_lifetime_minutes: document.getElementById("setting-session-lifetime") ? (parseInt(document.getElementById("setting-session-lifetime").value) || 480) : undefined,
       ...(document.getElementById("setting-smtp-password").value
           ? {smtp_password: document.getElementById("setting-smtp-password").value}
           : {}),
@@ -2562,7 +2699,7 @@
   });
 
   // ══════════════════════════════════════════════════ TEST SMTP ══
-  document.getElementById("testSmtpBtn").addEventListener("click", async function () {
+  document.getElementById("testSmtpBtn")?.addEventListener("click", async function () {
     const btn    = this;
     const result = document.getElementById("smtpTestResult");
     btn.disabled = true;
@@ -2600,7 +2737,7 @@
     }
   });
 
-  // ══════════════════════════════════════════════ GENERATE API KEY ══
+  // ══════════════════════════════════════════════ API KEY (per-user) ══
   let _keyCountdownTimer = null;
 
   function _maskApiKeyBox() {
@@ -2613,9 +2750,9 @@
   }
 
   {% if not demo_mode %}
-  document.getElementById("btnDismissKey").addEventListener("click", _maskApiKeyBox);
+  document.getElementById("btnDismissKey")?.addEventListener("click", _maskApiKeyBox);
 
-  document.getElementById("btnRevealKey").addEventListener("click", function () {
+  document.getElementById("btnRevealKey")?.addEventListener("click", function () {
     const inp = document.getElementById("authNewKeyVal");
     if (inp.type === "password") {
       inp.type = "text";
@@ -2626,18 +2763,18 @@
     }
   });
 
-  document.getElementById("btnCopyKey").addEventListener("click", function () {
+  document.getElementById("btnCopyKey")?.addEventListener("click", function () {
     const val = document.getElementById("authNewKeyVal").value;
     navigator.clipboard.writeText(val)
       .then(() => { this.textContent = "Copied!"; setTimeout(() => { this.textContent = "Copy"; }, 1500); })
       .catch(() => { this.textContent = "Error"; });
   });
 
-  document.getElementById("btnGenerateKey").addEventListener("click", async function () {
+  document.getElementById("btnGenerateKey")?.addEventListener("click", async function () {
     if (!confirm("Generate a new API key? The current key (if any) will be invalidated immediately.")) return;
     this.disabled = true;
     try {
-      const res  = await fetch("/settings/generate-api-key", { method: "POST" });
+      const res  = await fetch("/auth/generate-api-key", { method: "POST", headers: {"X-CSRFToken": document.querySelector('meta[name="csrf-token"]').content} });
       const data = await res.json();
       if (!data.ok) {
         alert("Failed to generate key: " + (data.error || "Unknown error"));
@@ -2645,7 +2782,9 @@
       }
       document.getElementById("authNewKeyVal").value = data.api_key;
       document.getElementById("authNewKeyBox").classList.remove("hidden");
-      document.getElementById("authKeyHint").textContent   = data.api_key_hint || (data.api_key.slice(0, 8) + "…");
+      document.getElementById("authKeyHint").textContent = "key active";
+      const revokeBtn = document.getElementById("btnRevokeKey");
+      if (revokeBtn) revokeBtn.style.display = "";
 
       // Countdown auto-mask
       clearInterval(_keyCountdownTimer);
@@ -2663,10 +2802,159 @@
       this.disabled = false;
     }
   });
+
+  const _revokeBtn = document.getElementById("btnRevokeKey");
+  if (_revokeBtn) {
+    _revokeBtn.addEventListener("click", async function () {
+      if (!confirm("Revoke your API key? Any scripts using it will lose access immediately.")) return;
+      this.disabled = true;
+      try {
+        const res  = await fetch("/auth/revoke-api-key", { method: "POST", headers: {"X-CSRFToken": document.querySelector('meta[name="csrf-token"]').content} });
+        const data = await res.json();
+        if (data.ok) {
+          document.getElementById("authKeyHint").textContent = "not set";
+          this.style.display = "none";
+          _maskApiKeyBox();
+        } else {
+          alert("Failed to revoke key: " + (data.error || "Unknown error"));
+        }
+      } catch (err) {
+        alert("Request failed: " + err.message);
+      } finally {
+        this.disabled = false;
+      }
+    });
+  }
+
+  // ══════════════════════════════════════════════ CHANGE PASSWORD ══
+  document.getElementById("btnChangePassword")?.addEventListener("click", async function () {
+    const newPw  = document.getElementById("chpwNew").value;
+    const confPw = document.getElementById("chpwConfirm").value;
+    const msg    = document.getElementById("chpwMsg");
+    msg.textContent = "";
+    msg.style.color = "";
+    if (!newPw) { msg.textContent = "New password is required."; msg.style.color = "var(--high)"; return; }
+    if (newPw !== confPw) { msg.textContent = "Passwords do not match."; msg.style.color = "var(--high)"; return; }
+    this.disabled = true;
+    try {
+      const res  = await fetch("/auth/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-CSRFToken": document.querySelector('meta[name="csrf-token"]').content },
+        body: JSON.stringify({ new_password: newPw }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        msg.textContent = "Password updated.";
+        msg.style.color = "var(--color-pass, #16a34a)";
+        document.getElementById("chpwNew").value    = "";
+        document.getElementById("chpwConfirm").value = "";
+      } else {
+        msg.textContent = data.error || "Failed to update password.";
+        msg.style.color = "var(--high)";
+      }
+    } catch (err) {
+      msg.textContent = "Request failed: " + err.message;
+      msg.style.color = "var(--high)";
+    } finally {
+      this.disabled = false;
+    }
+  });
+
+  // ══════════════════════════════════════════════ USER MANAGEMENT ══
+  {% if current_user and current_user.role == 'admin' %}
+  async function loadUsers() {
+    try {
+      const res  = await fetch("/auth/users");
+      const users = await res.json();
+      const tbody = document.getElementById("authUsersTbody");
+      if (!tbody) return;
+      tbody.innerHTML = "";
+      {% if current_user %}
+      const selfId = {{ current_user.id | tojson }};
+      {% else %}
+      const selfId = null;
+      {% endif %}
+      users.forEach(u => {
+        const tr = document.createElement("tr");
+        tr.style.borderBottom = "1px solid var(--border)";
+        const created = u.created_at ? u.created_at.slice(0, 10) : "—";
+        const isSelf  = u.id === selfId;
+        tr.innerHTML = `
+          <td style="padding:0.45rem 0.6rem">${u.username}${isSelf ? ' <span style="font-size:0.75rem;color:var(--text-muted)">(you)</span>' : ""}</td>
+          <td style="padding:0.45rem 0.6rem;text-transform:capitalize">${u.role}</td>
+          <td style="padding:0.45rem 0.6rem;font-size:0.82rem">${u.has_api_key ? "&#10003; set" : "—"}</td>
+          <td style="padding:0.45rem 0.6rem;font-size:0.82rem;color:var(--text-muted)">${created}</td>
+          <td style="padding:0.45rem 0.6rem">
+            <button class="btn-secondary btn-delete-user" data-id="${u.id}" data-name="${u.username}"
+                    style="padding:0.2rem 0.55rem;font-size:0.78rem"
+                    ${isSelf ? "disabled title='Cannot delete your own account'" : ""}>Delete</button>
+          </td>`;
+        tbody.appendChild(tr);
+      });
+      tbody.querySelectorAll(".btn-delete-user").forEach(btn => {
+        btn.addEventListener("click", async function () {
+          if (!confirm(`Delete user "${this.dataset.name}"? This cannot be undone.`)) return;
+          this.disabled = true;
+          try {
+            const r = await fetch(`/auth/users/${this.dataset.id}`, {
+              method: "DELETE",
+              headers: { "X-CSRFToken": document.querySelector('meta[name="csrf-token"]').content },
+            });
+            const d = await r.json();
+            if (d.deleted) { loadUsers(); }
+            else { alert(d.error || "Failed to delete user."); this.disabled = false; }
+          } catch (e) { alert("Request failed: " + e.message); this.disabled = false; }
+        });
+      });
+    } catch (_) {}
+  }
+
+  loadUsers();
+
+  document.getElementById("btnAddUser")?.addEventListener("click", async function () {
+    const errEl = document.getElementById("addUserError");
+    errEl.style.display = "none";
+    errEl.textContent   = "";
+    const payload = {
+      username: document.getElementById("newUserUsername").value.trim(),
+      password: document.getElementById("newUserPassword").value,
+      role:     document.getElementById("newUserRole").value,
+    };
+    if (!payload.username || !payload.password) {
+      errEl.textContent = "Username and password are required.";
+      errEl.style.display = "block";
+      return;
+    }
+    this.disabled = true;
+    try {
+      const res  = await fetch("/auth/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-CSRFToken": document.querySelector('meta[name="csrf-token"]').content },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        document.getElementById("newUserUsername").value = "";
+        document.getElementById("newUserPassword").value = "";
+        document.getElementById("newUserRole").value     = "viewer";
+        loadUsers();
+      } else {
+        errEl.textContent   = data.error || "Failed to create user.";
+        errEl.style.display = "block";
+      }
+    } catch (err) {
+      errEl.textContent   = "Request failed: " + err.message;
+      errEl.style.display = "block";
+    } finally {
+      this.disabled = false;
+    }
+  });
+  {% endif %}
   {% endif %}
 
-  // Load settings on startup and apply defaults to the audit form
-  loadSettings();
+  // Load settings on startup — admin only; non-admin roles get 403 and have
+  // sensible JS-side defaults (auto_pdf:false, auto_archive:false, default_compliance:"")
+  if (userRole === 'admin') loadSettings();
 
   {% if demo_mode %}
   // ── Demo mode: audit single-file picker (cards already in DOM) ──────────────
@@ -2907,7 +3195,7 @@
 
     /* Download helpers (non-demo only) */
     {% if not demo_mode %}
-    document.getElementById("remPlanDownloadPdf").addEventListener("click", async () => {
+    document.getElementById("remPlanDownloadPdf")?.addEventListener("click", async () => {
       if (!lastPlanPayload) return;
       try {
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content
@@ -2926,7 +3214,7 @@
       } catch (err) { alert("PDF download failed: " + err.message); }
     });
 
-    document.getElementById("remPlanDownloadMd").addEventListener("click", async () => {
+    document.getElementById("remPlanDownloadMd")?.addEventListener("click", async () => {
       if (!lastPlanPayload) return;
       try {
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content
@@ -2947,7 +3235,7 @@
     {% endif %}
 
     /* Wire up buttons — single audit */
-    document.getElementById("remediationPlanBtn").addEventListener("click", () => {
+    document.getElementById("remediationPlanBtn")?.addEventListener("click", () => {
       if (!lastAuditData) return;
       fetchAndShowPlan({
         findings: lastAuditData.enriched_findings || lastAuditData.findings || [],
@@ -2966,7 +3254,7 @@
     let lastConnectData = null;
     window._setLastConnectData = function(d) { lastConnectData = d; };
 
-    document.getElementById("connRemediationPlanBtn").addEventListener("click", () => {
+    document.getElementById("connRemediationPlanBtn")?.addEventListener("click", () => {
       if (!lastConnectData) return;
       fetchAndShowPlan({
         findings: lastConnectData.enriched_findings || lastConnectData.findings || [],

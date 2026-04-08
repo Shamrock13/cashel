@@ -7,10 +7,24 @@ created after forking and survive correctly.
 """
 
 import os
+import secrets as _secrets
+
+# Ensure all workers share the same Flask SECRET_KEY.
+# Without this, each worker generates its own random key (web.py fallback),
+# causing session cookies signed by one worker to be rejected by another.
+if not os.environ.get("CASHEL_SECRET"):
+    os.environ["CASHEL_SECRET"] = _secrets.token_hex(32)
 
 # ── Server ────────────────────────────────────────────────────────────────────
 bind = f"0.0.0.0:{os.environ.get('PORT', '5000')}"
-workers = int(os.environ.get("GUNICORN_WORKERS", "2"))
+
+# WEB_CONCURRENCY is set by Render (and other PaaS) based on available CPUs/RAM.
+# GUNICORN_WORKERS is our own override for self-hosted deployments.
+# Render's value takes priority so the instance isn't overloaded on zero-downtime deploys.
+workers = int(
+    os.environ.get("WEB_CONCURRENCY") or os.environ.get("GUNICORN_WORKERS", "2")
+)
+
 timeout = 120
 preload_app = False  # each worker imports the app independently
 
