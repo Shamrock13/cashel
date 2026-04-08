@@ -9,7 +9,7 @@ from pathlib import Path
 
 from flask import Blueprint, jsonify, request
 
-from cashel.web import limiter, csrf
+from cashel.extensions import limiter, csrf
 from cashel._vendor_helpers import ALL_VENDORS, detect_vendor, extract_hostname
 from cashel._helpers import _err, _make_temp_path, _MAX_FILE_BYTES
 from cashel.ftd import is_ftd_config
