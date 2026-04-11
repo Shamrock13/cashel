@@ -1,6 +1,6 @@
 """Tests for alert_engine.py — threshold evaluation and dedup logic."""
 
-import json
+import functools
 import os
 import sys
 import tempfile
@@ -13,6 +13,7 @@ import cashel.db as db_mod
 
 def _tmp_db(fn):
     """Decorator: run test against an isolated temp database."""
+    @functools.wraps(fn)
     def wrapper(*args, **kwargs):
         with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
             tmp = f.name
@@ -33,7 +34,6 @@ def _tmp_db(fn):
                 os.unlink(tmp)
             except OSError:
                 pass
-    wrapper.__name__ = fn.__name__
     return wrapper
 
 
@@ -55,7 +55,7 @@ class TestAlertSchema(unittest.TestCase):
         self.assertIsNotNone(row)
 
 
-from cashel import alert_engine
+from cashel import alert_engine  # noqa: E402
 
 
 class TestThresholdCRUD(unittest.TestCase):

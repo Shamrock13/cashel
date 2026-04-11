@@ -40,6 +40,12 @@ class AlertResult:
 
 def save_threshold(threshold: dict) -> dict:
     """Insert or update a threshold rule. Returns the saved threshold with id."""
+    metric = threshold.get("metric")
+    operator = threshold.get("operator")
+    if metric not in VALID_METRICS:
+        raise ValueError(f"Invalid metric: {metric!r}. Must be one of {sorted(VALID_METRICS)}")
+    if operator not in VALID_OPERATORS:
+        raise ValueError(f"Invalid operator: {operator!r}. Must be one of {sorted(VALID_OPERATORS)}")
     tid = threshold.get("id") or uuid.uuid4().hex[:12]
     now = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
     conn = get_conn()
@@ -71,8 +77,17 @@ def save_threshold(threshold: dict) -> dict:
 def delete_threshold(threshold_id: str) -> bool:
     """Delete a threshold by id. Returns True if deleted."""
     conn = get_conn()
+    # Fetch the threshold first so we can clear its schedule's alert state
+    row = conn.execute(
+        "SELECT schedule_id FROM alert_thresholds WHERE id = ?", (threshold_id,)
+    ).fetchone()
     cur = conn.execute("DELETE FROM alert_thresholds WHERE id = ?", (threshold_id,))
     conn.commit()
+    if cur.rowcount > 0 and row:
+        # Clear alert state for the affected schedule so stale breach state
+        # doesn't suppress alerts after threshold reconfiguration
+        state_key = row["schedule_id"] or _MANUAL_SENTINEL
+        _clear_state(state_key)
     return cur.rowcount > 0
 
 
@@ -143,25 +158,17 @@ def get_alert_channels() -> dict:
 
 
 def save_alert_channels(channels: dict) -> None:
-    """Persist alert channel config to settings."""
-    from .settings import get_settings
+    """Persist alert channel config to settings.json.
+
+    Reads and writes settings.json directly (bypassing get_settings/save_settings)
+    to avoid hydrating smtp_password into memory. Only the three alert-specific
+    keys are written. TOCTOU risk is acceptable: this is a single-process app
+    and settings writes are low-frequency admin operations.
+    """
     from .crypto import encrypt
-
-    current = get_settings()
-    if channels.get("alert_slack_webhook"):
-        current["alert_slack_webhook_enc"] = encrypt(channels["alert_slack_webhook"])
-    if channels.get("alert_teams_webhook"):
-        current["alert_teams_webhook_enc"] = encrypt(channels["alert_teams_webhook"])
-    if "alert_email_recipients" in channels:
-        current["alert_email_recipients"] = channels["alert_email_recipients"]
-    _save_raw_settings(current)
-
-
-def _save_raw_settings(data: dict) -> None:
-    """Write arbitrary keys to settings.json without going through save_settings validation."""
+    from .settings import SETTINGS_FILE
     import json as _json
     import os
-    from .settings import SETTINGS_FILE
 
     os.makedirs(os.path.dirname(SETTINGS_FILE), exist_ok=True)
     try:
@@ -169,7 +176,14 @@ def _save_raw_settings(data: dict) -> None:
             existing = _json.load(f)
     except (FileNotFoundError, _json.JSONDecodeError):
         existing = {}
-    existing.update(data)
+
+    if channels.get("alert_slack_webhook"):
+        existing["alert_slack_webhook_enc"] = encrypt(channels["alert_slack_webhook"])
+    if channels.get("alert_teams_webhook"):
+        existing["alert_teams_webhook_enc"] = encrypt(channels["alert_teams_webhook"])
+    if "alert_email_recipients" in channels:
+        existing["alert_email_recipients"] = channels["alert_email_recipients"]
+
     with open(SETTINGS_FILE, "w") as f:
         _json.dump(existing, f, indent=2)
 
@@ -535,8 +549,12 @@ def _send_alert_email(
                 server.login(smtp_user, smtp_password)
             server.sendmail(smtp_from, [recipient], msg.as_string())
         logger.info("Alert email sent to %s", recipient)
+    except smtplib.SMTPException as exc:
+        logger.warning("Alert email SMTP error to %s: %s", recipient, exc)
+    except OSError as exc:
+        logger.warning("Alert email connection error to %s: %s", recipient, exc)
     except Exception as exc:  # noqa: BLE001
-        logger.warning("Alert email failed to %s: %s", recipient, exc)
+        logger.warning("Alert email unexpected error to %s: %s", recipient, exc)
 
 
 # ── Internal helpers ───────────────────────────────────────────────────────────
