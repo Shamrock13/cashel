@@ -111,6 +111,26 @@ def init_db() -> None:
             timestamp   TEXT NOT NULL
         );
         CREATE INDEX IF NOT EXISTS idx_auth_events_ts ON auth_events(timestamp DESC);
+
+        CREATE TABLE IF NOT EXISTS alert_thresholds (
+            id              TEXT PRIMARY KEY,
+            schedule_id     TEXT,
+            metric          TEXT NOT NULL,
+            operator        TEXT NOT NULL,
+            threshold_value REAL NOT NULL,
+            enabled         INTEGER NOT NULL DEFAULT 1,
+            created_at      TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_alert_thresholds_schedule
+            ON alert_thresholds(schedule_id);
+
+        CREATE TABLE IF NOT EXISTS alert_state (
+            schedule_id         TEXT PRIMARY KEY,
+            in_breach           INTEGER NOT NULL DEFAULT 0,
+            breach_started_at   TEXT,
+            breach_audit_id     TEXT,
+            breached_metrics    TEXT NOT NULL DEFAULT '[]'
+        );
     """)
     conn.commit()
     _migrate_json_to_sqlite()
