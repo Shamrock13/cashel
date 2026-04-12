@@ -252,6 +252,8 @@ def test_system_detects_telnet():
     findings = check_system_juniper(SET_STYLE_RISKY)
     msgs = [f["message"] for f in findings]
     assert any("Telnet" in m for m in msgs)
+    telnet_findings = [f for f in findings if "Telnet" in f["message"]]
+    assert all(f["severity"] == "CRITICAL" for f in telnet_findings)
 
 
 def test_system_detects_snmp_community():
