@@ -851,6 +851,11 @@
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="1.5" width="14" height="5" rx="1.5"/><rect x="1" y="9.5" width="14" height="5" rx="1.5"/><circle cx="4" cy="4" r="0.8" fill="currentColor" stroke="none"/><circle cx="4" cy="12" r="0.8" fill="currentColor" stroke="none"/><line x1="7" y1="4" x2="12" y2="4"/><line x1="7" y1="12" x2="12" y2="12"/></svg>
             Syslog
           </button>
+
+          <button class="settings-nav-item" data-pane="alerts">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 1.5a4.5 4.5 0 0 1 4.5 4.5c0 2 .8 3.2 1.5 4H2c.7-.8 1.5-2 1.5-4A4.5 4.5 0 0 1 8 1.5z"/><path d="M6.5 14a1.5 1.5 0 0 0 3 0"/></svg>
+            Alert Thresholds
+          </button>
         </nav>
         {% endif %}
 
@@ -1183,6 +1188,121 @@
                   <option value="daemon">DAEMON</option>
                   <option value="user">USER</option>
                 </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Alert Thresholds pane -->
+          <div class="settings-pane" id="spane-alerts">
+            <div class="settings-pane-header">
+              <h2 class="settings-pane-title">Alert Thresholds</h2>
+              <p class="settings-pane-desc">Fire a consolidated notification when an audit result crosses a configured threshold. Alerts fire once on first breach and re-arm after the condition clears.</p>
+            </div>
+
+            <div class="settings-group">
+              <h3 class="settings-group-title">Alert Channels</h3>
+              <p class="settings-row-desc" style="margin-bottom:0.75rem">Separate from per-schedule notifications — these channels receive threshold breach alerts only.</p>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label for="alert-slack-webhook">Slack Webhook URL</label>
+                  <input type="password" id="alert-slack-webhook" placeholder="https://hooks.slack.com/services/…" autocomplete="off" />
+                  <span class="form-hint" id="alert-slack-set-hint" style="display:none">&#10003; Webhook configured (enter new URL to replace)</span>
+                </div>
+                <div class="form-group">
+                  <label for="alert-teams-webhook">Teams Webhook URL</label>
+                  <input type="password" id="alert-teams-webhook" placeholder="https://webhook.office.com/…" autocomplete="off" />
+                  <span class="form-hint" id="alert-teams-set-hint" style="display:none">&#10003; Webhook configured (enter new URL to replace)</span>
+                </div>
+                <div class="form-group" style="grid-column:1/-1">
+                  <label for="alert-email-recipients">Email Recipients</label>
+                  <input type="text" id="alert-email-recipients" placeholder="ops@example.com, security@example.com" autocomplete="off" />
+                  <span class="form-hint">Comma-separated. Uses the SMTP settings from the Email pane.</span>
+                </div>
+              </div>
+              <button class="btn-secondary" id="saveAlertChannelsBtn" style="margin-top:0.75rem">Save Channels</button>
+              <span class="settings-saved-msg hidden" id="alertChannelsSavedMsg">&#10003; Saved</span>
+            </div>
+
+            <div class="settings-group" style="margin-top:1.5rem">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem">
+                <h3 class="settings-group-title" style="margin:0">Global Thresholds</h3>
+                <button class="btn-secondary" id="addGlobalThresholdBtn">+ Add Threshold</button>
+              </div>
+              <p class="settings-row-desc">Applied to all audits. Per-schedule overrides (below) take precedence on a per-metric basis.</p>
+              <div id="globalThresholdsTable">
+                <p class="muted" id="noGlobalThresholds">No global thresholds configured.</p>
+              </div>
+            </div>
+
+            <div class="settings-group" style="margin-top:1.5rem">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem">
+                <h3 class="settings-group-title" style="margin:0">Per-Schedule Overrides</h3>
+              </div>
+              <p class="settings-row-desc">Select a schedule to view or add overrides. An override replaces the global threshold for that metric on that schedule only.</p>
+              <div class="form-group" style="max-width:300px;margin-bottom:1rem">
+                <label for="alertScheduleSelect">Schedule</label>
+                <select id="alertScheduleSelect">
+                  <option value="">— Select a schedule —</option>
+                </select>
+              </div>
+              <div id="scheduleThresholdsTable" style="display:none">
+                <div style="display:flex;justify-content:flex-end;margin-bottom:0.5rem">
+                  <button class="btn-secondary" id="addScheduleThresholdBtn">+ Add Override</button>
+                </div>
+                <div id="scheduleThresholdsList">
+                  <p class="muted" id="noScheduleThresholds">No overrides for this schedule.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Hidden threshold add form -->
+          <div id="addThresholdModal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+            <div class="modal-box" style="max-width:420px">
+              <div class="modal-header">
+                <h3 class="modal-title" id="addThresholdModalTitle">Add Threshold</h3>
+                <button class="modal-close" id="addThresholdModalClose">&times;</button>
+              </div>
+              <div class="modal-body">
+                <input type="hidden" id="addThresholdScheduleId" value="" />
+                <div class="form-group">
+                  <label for="addThresholdMetric">Metric</label>
+                  <select id="addThresholdMetric">
+                    <optgroup label="Overall">
+                      <option value="score">Score (0–100)</option>
+                    </optgroup>
+                    <optgroup label="Finding Counts">
+                      <option value="high">High findings</option>
+                      <option value="medium">Medium findings</option>
+                      <option value="low">Low findings</option>
+                      <option value="total">Total findings</option>
+                    </optgroup>
+                    <optgroup label="Compliance (%)">
+                      <option value="pci">PCI-DSS</option>
+                      <option value="cis">CIS</option>
+                      <option value="nist">NIST</option>
+                      <option value="hipaa">HIPAA</option>
+                      <option value="soc2">SOC2</option>
+                      <option value="stig">STIG</option>
+                    </optgroup>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="addThresholdOperator">Condition</label>
+                  <select id="addThresholdOperator">
+                    <option value="lt">Below (&lt;)</option>
+                    <option value="gte">At or above (&ge;)</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="addThresholdValue">Value</label>
+                  <input type="number" id="addThresholdValue" min="0" max="10000" step="0.1" placeholder="e.g. 70" />
+                </div>
+                <div style="display:flex;gap:0.5rem;margin-top:1rem">
+                  <button class="btn-primary" id="saveThresholdBtn">Save</button>
+                  <button class="btn-secondary" id="cancelThresholdBtn">Cancel</button>
+                </div>
+                <span class="alert-inline hidden" id="addThresholdError" style="display:block;margin-top:0.5rem"></span>
               </div>
             </div>
           </div>
@@ -2795,6 +2915,218 @@
       msg.classList.remove("hidden");
       setTimeout(() => msg.classList.add("hidden"), 2500);
     } catch (_) {}
+  });
+
+  // ═══════════════════════════════════════════════ ALERT THRESHOLDS ══
+
+  const METRIC_LABELS = {
+    score: "Score", high: "High findings", medium: "Medium findings",
+    low: "Low findings", total: "Total findings",
+    pci: "PCI-DSS (%)", cis: "CIS (%)", nist: "NIST (%)",
+    hipaa: "HIPAA (%)", soc2: "SOC2 (%)", stig: "STIG (%)",
+  };
+  const OP_LABELS = { lt: "<", gte: "≥" };
+  let _allThresholds = [];
+  let _activeThresholdScheduleId = null;
+
+  async function loadAlertChannels() {
+    try {
+      const res = await fetch("/settings/alert-channels");
+      if (!res.ok) return;
+      const data = await res.json();
+      const slackHint = document.getElementById("alert-slack-set-hint");
+      const teamsHint = document.getElementById("alert-teams-set-hint");
+      if (slackHint) slackHint.style.display = data.alert_slack_webhook_set ? "" : "none";
+      if (teamsHint) teamsHint.style.display = data.alert_teams_webhook_set ? "" : "none";
+      const emailEl = document.getElementById("alert-email-recipients");
+      if (emailEl) emailEl.value = data.alert_email_recipients || "";
+    } catch (_) {}
+  }
+
+  async function loadAlertThresholds() {
+    try {
+      const res = await fetch("/settings/alert-thresholds");
+      if (!res.ok) return;
+      _allThresholds = await res.json();
+      renderGlobalThresholds();
+      renderScheduleThresholds(_activeThresholdScheduleId);
+    } catch (_) {}
+  }
+
+  function renderGlobalThresholds() {
+    const container = document.getElementById("globalThresholdsTable");
+    const noMsg = document.getElementById("noGlobalThresholds");
+    if (!container) return;
+    const globals = _allThresholds.filter(t => !t.schedule_id);
+    if (!globals.length) {
+      if (noMsg) noMsg.style.display = "";
+      container.querySelectorAll("table").forEach(el => el.remove());
+      return;
+    }
+    if (noMsg) noMsg.style.display = "none";
+    container.querySelectorAll("table").forEach(el => el.remove());
+    container.appendChild(_buildThresholdTable(globals));
+  }
+
+  function renderScheduleThresholds(scheduleId) {
+    const container = document.getElementById("scheduleThresholdsList");
+    const noMsg = document.getElementById("noScheduleThresholds");
+    if (!container) return;
+    if (!scheduleId) return;
+    const overrides = _allThresholds.filter(t => t.schedule_id === scheduleId);
+    if (!overrides.length) {
+      if (noMsg) noMsg.style.display = "";
+      container.querySelectorAll("table").forEach(el => el.remove());
+      return;
+    }
+    if (noMsg) noMsg.style.display = "none";
+    container.querySelectorAll("table").forEach(el => el.remove());
+    container.appendChild(_buildThresholdTable(overrides));
+  }
+
+  function _buildThresholdTable(thresholds) {
+    const table = document.createElement("table");
+    table.className = "data-table";
+    table.innerHTML = `<thead><tr><th>Metric</th><th>Condition</th><th>Value</th><th></th></tr></thead>`;
+    const tbody = document.createElement("tbody");
+    for (const t of thresholds) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${METRIC_LABELS[t.metric] || t.metric}</td>
+        <td>${OP_LABELS[t.operator] || t.operator}</td>
+        <td>${t.threshold_value}</td>
+        <td><button class="btn-danger-sm" data-tid="${t.id}">Delete</button></td>
+      `;
+      tr.querySelector("[data-tid]").addEventListener("click", async () => {
+        await deleteAlertThreshold(t.id);
+      });
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    return table;
+  }
+
+  async function deleteAlertThreshold(id) {
+    try {
+      const csrf = document.querySelector("meta[name='csrf-token']")?.content || "";
+      const res = await fetch(`/settings/alert-thresholds/${id}`, {
+        method: "DELETE",
+        headers: { "X-CSRFToken": csrf },
+      });
+      if (res.ok) await loadAlertThresholds();
+    } catch (_) {}
+  }
+
+  async function saveAlertThreshold(metric, operator, value, scheduleId) {
+    const csrf = document.querySelector("meta[name='csrf-token']")?.content || "";
+    try {
+      const res = await fetch("/settings/alert-thresholds", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
+        body: JSON.stringify({
+          metric, operator,
+          threshold_value: parseFloat(value),
+          enabled: true,
+          schedule_id: scheduleId || null,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        return err.error || "Failed to save threshold";
+      }
+      await loadAlertThresholds();
+      return null;
+    } catch (_) { return "Request failed"; }
+  }
+
+  let _addThresholdForSchedule = null;
+  function openAddThresholdModal(scheduleId) {
+    _addThresholdForSchedule = scheduleId || null;
+    const modal = document.getElementById("addThresholdModal");
+    const title = document.getElementById("addThresholdModalTitle");
+    if (title) title.textContent = scheduleId ? "Add Schedule Override" : "Add Global Threshold";
+    const errEl = document.getElementById("addThresholdError");
+    if (errEl) { errEl.textContent = ""; errEl.classList.add("hidden"); }
+    if (modal) modal.classList.remove("hidden");
+  }
+
+  document.getElementById("addGlobalThresholdBtn")?.addEventListener("click", () => openAddThresholdModal(null));
+  document.getElementById("addScheduleThresholdBtn")?.addEventListener("click", () => openAddThresholdModal(_activeThresholdScheduleId));
+  document.getElementById("addThresholdModalClose")?.addEventListener("click", () => {
+    document.getElementById("addThresholdModal")?.classList.add("hidden");
+  });
+  document.getElementById("cancelThresholdBtn")?.addEventListener("click", () => {
+    document.getElementById("addThresholdModal")?.classList.add("hidden");
+  });
+
+  document.getElementById("saveThresholdBtn")?.addEventListener("click", async () => {
+    const metric   = document.getElementById("addThresholdMetric").value;
+    const operator = document.getElementById("addThresholdOperator").value;
+    const value    = document.getElementById("addThresholdValue").value;
+    const errEl    = document.getElementById("addThresholdError");
+    if (!value || isNaN(parseFloat(value))) {
+      if (errEl) { errEl.textContent = "Please enter a numeric value."; errEl.classList.remove("hidden"); }
+      return;
+    }
+    const err = await saveAlertThreshold(metric, operator, value, _addThresholdForSchedule);
+    if (err) {
+      if (errEl) { errEl.textContent = err; errEl.classList.remove("hidden"); }
+    } else {
+      document.getElementById("addThresholdModal")?.classList.add("hidden");
+    }
+  });
+
+  document.getElementById("saveAlertChannelsBtn")?.addEventListener("click", async () => {
+    const csrf = document.querySelector("meta[name='csrf-token']")?.content || "";
+    const data = {
+      alert_slack_webhook:    document.getElementById("alert-slack-webhook")?.value.trim() || "",
+      alert_teams_webhook:    document.getElementById("alert-teams-webhook")?.value.trim() || "",
+      alert_email_recipients: document.getElementById("alert-email-recipients")?.value.trim() || "",
+    };
+    try {
+      const res = await fetch("/settings/alert-channels", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
+        body: JSON.stringify(data),
+      });
+      if (res.ok) {
+        await loadAlertChannels();
+        const msg = document.getElementById("alertChannelsSavedMsg");
+        if (msg) { msg.classList.remove("hidden"); setTimeout(() => msg.classList.add("hidden"), 2500); }
+      }
+    } catch (_) {}
+  });
+
+  async function loadAlertScheduleSelect() {
+    try {
+      const res = await fetch("/schedules");
+      if (!res.ok) return;
+      const schedules = await res.json();
+      const sel = document.getElementById("alertScheduleSelect");
+      if (!sel) return;
+      sel.innerHTML = '<option value="">— Select a schedule —</option>';
+      for (const s of schedules) {
+        const opt = document.createElement("option");
+        opt.value = s.id;
+        opt.textContent = s.name || `${s.vendor}@${s.host}`;
+        sel.appendChild(opt);
+      }
+    } catch (_) {}
+  }
+
+  document.getElementById("alertScheduleSelect")?.addEventListener("change", function () {
+    _activeThresholdScheduleId = this.value || null;
+    const table = document.getElementById("scheduleThresholdsTable");
+    if (table) table.style.display = _activeThresholdScheduleId ? "" : "none";
+    if (_activeThresholdScheduleId) renderScheduleThresholds(_activeThresholdScheduleId);
+  });
+
+  document.querySelectorAll(".settings-nav-item[data-pane='alerts']").forEach(btn => {
+    btn.addEventListener("click", () => {
+      loadAlertChannels();
+      loadAlertThresholds();
+      loadAlertScheduleSelect();
+    });
   });
 
   // ══════════════════════════════════════════════════ TEST SMTP ══

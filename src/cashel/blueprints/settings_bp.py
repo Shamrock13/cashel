@@ -151,3 +151,92 @@ def settings_test_smtp():
         return jsonify({"ok": False, "message": f"SMTP error: {exc}"})
     except OSError as exc:
         return jsonify({"ok": False, "message": f"Connection error: {exc}"})
+
+
+# ── Alert Thresholds ──────────────────────────────────────────────────────────
+
+from cashel.alert_engine import (  # noqa: E402
+    list_thresholds,
+    save_threshold as _save_threshold,
+    delete_threshold as _delete_threshold,
+    get_alert_channels,
+    save_alert_channels as _save_alert_channels,
+    VALID_METRICS,
+    VALID_OPERATORS,
+)
+
+
+@settings_bp.route("/settings/alert-thresholds", methods=["GET"])
+@_require_role("admin")
+def alert_thresholds_get():
+    return jsonify(list_thresholds())
+
+
+@settings_bp.route("/settings/alert-thresholds", methods=["POST"])
+@_require_role("admin")
+def alert_thresholds_save():
+    if DEMO_MODE:
+        return jsonify({"error": "Not available in demo mode."}), 403
+    data = request.get_json(silent=True) or {}
+    metric = data.get("metric", "")
+    operator = data.get("operator", "")
+    if metric not in VALID_METRICS:
+        return jsonify({"error": f"Invalid metric: {metric}"}), 400
+    if operator not in VALID_OPERATORS:
+        return jsonify({"error": f"Invalid operator: {operator}"}), 400
+    try:
+        threshold_value = float(data["threshold_value"])
+    except (KeyError, TypeError, ValueError):
+        return jsonify({"error": "threshold_value must be a number"}), 400
+    saved = _save_threshold(
+        {
+            "id": data.get("id"),
+            "schedule_id": data.get("schedule_id") or None,
+            "metric": metric,
+            "operator": operator,
+            "threshold_value": threshold_value,
+            "enabled": bool(data.get("enabled", True)),
+        }
+    )
+    return jsonify(saved), 201
+
+
+@settings_bp.route("/settings/alert-thresholds/<threshold_id>", methods=["DELETE"])
+@_require_role("admin")
+def alert_thresholds_delete(threshold_id):
+    if DEMO_MODE:
+        return jsonify({"error": "Not available in demo mode."}), 403
+    deleted = _delete_threshold(threshold_id)
+    if not deleted:
+        return jsonify({"error": "Threshold not found"}), 404
+    return jsonify({"ok": True})
+
+
+@settings_bp.route("/settings/alert-channels", methods=["GET"])
+@_require_role("admin")
+def alert_channels_get():
+    channels = get_alert_channels()
+    # Mask webhook URLs — return only whether they are set
+    return jsonify(
+        {
+            "alert_slack_webhook_set": bool(channels.get("alert_slack_webhook")),
+            "alert_teams_webhook_set": bool(channels.get("alert_teams_webhook")),
+            "alert_email_recipients": channels.get("alert_email_recipients", ""),
+        }
+    )
+
+
+@settings_bp.route("/settings/alert-channels", methods=["POST"])
+@_require_role("admin")
+def alert_channels_save():
+    if DEMO_MODE:
+        return jsonify({"error": "Not available in demo mode."}), 403
+    data = request.get_json(silent=True) or {}
+    _save_alert_channels(
+        {
+            "alert_slack_webhook": data.get("alert_slack_webhook", ""),
+            "alert_teams_webhook": data.get("alert_teams_webhook", ""),
+            "alert_email_recipients": data.get("alert_email_recipients", ""),
+        }
+    )
+    return jsonify({"ok": True})
