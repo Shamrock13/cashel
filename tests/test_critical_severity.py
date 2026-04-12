@@ -5,10 +5,22 @@ Run with:  python -m pytest tests/test_critical_severity.py -v
 
 import os
 import sys
+import tempfile
+from os import unlink as _os_unlink
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from cashel.audit_engine import _build_summary, _sort_findings
+from ciscoconfparse import CiscoConfParse
+from cashel.audit_engine import (
+    _build_summary,
+    _sort_findings,
+    _check_any_any,
+    _check_telnet_asa,
+)
+from cashel.ftd import (
+    _check_any_any as ftd_check_any_any,
+    _check_telnet as ftd_check_telnet,
+)
 
 
 def _f(severity, msg):
@@ -88,3 +100,47 @@ def test_sort_critical_before_high():
     assert "[CRITICAL]" in sorted_f[0]["message"]
     assert "[HIGH]" in sorted_f[1]["message"]
     assert "[MEDIUM]" in sorted_f[2]["message"]
+
+
+# ── Vendor parser severity promotions ─────────────────────────────────────────
+
+
+def _asa_parse(cfg_text: str):
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".cfg", delete=False) as fh:
+        fh.write(cfg_text)
+        path = fh.name
+    parse = CiscoConfParse(path, ignore_blank_lines=False)
+    _os_unlink(path)
+    return parse
+
+
+def test_asa_any_any_is_critical():
+    parse = _asa_parse("access-list OUTSIDE_IN permit ip any any\n")
+    findings = _check_any_any(parse)
+    assert len(findings) == 1
+    assert findings[0]["severity"] == "CRITICAL"
+    assert "[CRITICAL]" in findings[0]["message"]
+
+
+def test_asa_telnet_is_critical():
+    parse = _asa_parse("telnet 0.0.0.0 0.0.0.0 mgmt\n")
+    findings = _check_telnet_asa(parse)
+    assert len(findings) == 1
+    assert findings[0]["severity"] == "CRITICAL"
+    assert "[CRITICAL]" in findings[0]["message"]
+
+
+def test_ftd_any_any_is_critical():
+    parse = _asa_parse("access-list OUTSIDE_IN permit ip any any\n")
+    findings = ftd_check_any_any(parse)
+    assert len(findings) == 1
+    assert findings[0]["severity"] == "CRITICAL"
+    assert "[CRITICAL]" in findings[0]["message"]
+
+
+def test_ftd_telnet_is_critical():
+    parse = _asa_parse("telnet 0.0.0.0 0.0.0.0 mgmt\n")
+    findings = ftd_check_telnet(parse)
+    assert len(findings) == 1
+    assert findings[0]["severity"] == "CRITICAL"
+    assert "[CRITICAL]" in findings[0]["message"]

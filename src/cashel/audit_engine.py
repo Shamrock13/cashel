@@ -116,9 +116,9 @@ def _build_summary(findings):
 def _check_any_any(parse):
     return [
         _f(
-            "HIGH",
+            "CRITICAL",
             "exposure",
-            f"[HIGH] Overly permissive rule found: {r.text.strip()}",
+            f"[CRITICAL] Overly permissive rule found: {r.text.strip()}",
             "Restrict source and destination to specific IP ranges. "
             "Remove or scope down any/any permit rules to enforce least-privilege access.",
         )
@@ -176,9 +176,9 @@ def _check_redundant_rules(parse):
 def _check_telnet_asa(parse):
     return [
         _f(
-            "MEDIUM",
+            "CRITICAL",
             "protocol",
-            f"[MEDIUM] Telnet management access configured: {r.text.strip()}",
+            f"[CRITICAL] Telnet management access configured: {r.text.strip()}",
             "Disable Telnet management (no telnet ...) and enforce SSH. "
             "Telnet transmits all data including credentials in cleartext.",
         )
