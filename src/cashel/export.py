@@ -9,7 +9,7 @@ import io
 import json
 
 TOOL_NAME = "Cashel"
-TOOL_VERSION = "1.4"
+TOOL_VERSION = "1.5.1"
 TOOL_INFO_URI = "https://github.com/Shamrock13/cashel"
 
 

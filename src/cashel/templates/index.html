@@ -1324,7 +1324,7 @@
   </main>
 
   <footer class="footer">
-    <p>Cashel v1.4 &mdash; Firewall Security Auditor</p>
+    <p>Cashel v1.5.1 &mdash; Firewall Security Auditor</p>
   </footer>
 
   <script nonce="{{ g.csp_nonce }}">
@@ -1879,7 +1879,7 @@
   function exportJSON() {
     if (!lastAuditData) return;
     const payload = {
-      tool: "Cashel", version: "1.4",
+      tool: "Cashel", version: "1.5.1",
       filename:  lastAuditData.filename  || "",
       vendor:    lastAuditData.vendor    || "",
       timestamp: new Date().toISOString(),
@@ -1932,7 +1932,7 @@
       version: "2.1.0",
       "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
       runs: [{
-        tool: {driver: {name:"Cashel", version:"1.4", informationUri:"https://github.com/Shamrock13/cashel", rules: Object.values(seenRules)}},
+        tool: {driver: {name:"Cashel", version:"1.5.1", informationUri:"https://github.com/Shamrock13/cashel", rules: Object.values(seenRules)}},
         results,
       }],
     };
