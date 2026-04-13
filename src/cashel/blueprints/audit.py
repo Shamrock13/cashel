@@ -54,6 +54,7 @@ _DEMO_CONFIGS = {
         "label": "Cisco ASA — Enterprise Edge",
         "filename": "cisco_asa.txt",
         "vendor": "asa",
+        "compliance": "cis",
         "description": "ASA 5525-X with ACL misconfigurations, SNMPv2, Telnet, and duplicate rules.",
     },
     "palo_alto": {
@@ -100,43 +101,43 @@ _DEMO_COMPARISON_PAIRS = {
 # Pre-canned demo SSH audit result (Cisco ASA scenario).
 _DEMO_SSH_FINDINGS = [
     {
-        "severity": "critical",
+        "severity": "CRITICAL",
         "category": "exposure",
         "message": "[CRITICAL] Telnet enabled on inside interface — transmits credentials in plaintext",
         "remediation": "Disable Telnet with 'no telnet' and enforce SSH for all remote management access.",
     },
     {
-        "severity": "high",
+        "severity": "HIGH",
         "category": "protocol",
         "message": "[HIGH] SNMPv2 community string 'public' configured — no per-user auth, plaintext on wire",
         "remediation": "Migrate to SNMPv3 with authPriv. Remove all SNMPv2 community strings.",
     },
     {
-        "severity": "high",
+        "severity": "HIGH",
         "category": "exposure",
         "message": "[HIGH] ACL OUTSIDE_IN contains 'permit ip any any' — unrestricted inbound traffic",
         "remediation": "Replace with explicit permit rules scoped to required sources, destinations, and services. Ensure a deny-all terminator exists.",
     },
     {
-        "severity": "high",
+        "severity": "HIGH",
         "category": "exposure",
         "message": "[HIGH] ASDM HTTP server accessible from 0.0.0.0/0 on outside interface",
         "remediation": "Restrict HTTP server to management subnets only: 'http <mgmt-subnet> <mask> inside'. Remove the 0.0.0.0/0 outside entry.",
     },
     {
-        "severity": "medium",
+        "severity": "MEDIUM",
         "category": "hygiene",
         "message": "[MEDIUM] Duplicate ACL rule — 'permit tcp any host 172.16.0.10 eq 80' appears twice in OUTSIDE_IN",
         "remediation": "Remove the duplicate entry. Use 'show access-list' hit counts to identify and consolidate redundant rules.",
     },
     {
-        "severity": "medium",
+        "severity": "MEDIUM",
         "category": "hygiene",
         "message": "[MEDIUM] NTP not configured — log timestamps will be unreliable",
         "remediation": "Configure at least two NTP servers: 'ntp server <ip> prefer'. Ensure NTP traffic is permitted by the management ACL.",
     },
     {
-        "severity": "low",
+        "severity": "LOW",
         "category": "compliance",
         "message": "[LOW] No login banner configured — required by CIS and STIG for legal notice",
         "remediation": "Add 'banner login' or 'banner motd' with an authorised-use warning.",
@@ -161,6 +162,7 @@ def get_demo_index_data() -> tuple[list, list]:
             "id": k,
             "label": v["label"],
             "vendor": v["vendor"],
+            "compliance": v.get("compliance", ""),
             "description": v["description"],
         }
         for k, v in _DEMO_CONFIGS.items()
@@ -189,6 +191,7 @@ def demo_configs():
                 "id": k,
                 "label": v["label"],
                 "vendor": v["vendor"],
+                "compliance": v.get("compliance", ""),
                 "description": v["description"],
             }
             for k, v in _DEMO_CONFIGS.items()
