@@ -330,7 +330,14 @@ def generate_report(
     pdf.add_page()
 
     _draw_meta(pdf, filename, vendor, compliance)
-    _draw_summary_boxes(pdf, total_high, total_medium, len(findings), score=score, critical=total_critical)
+    _draw_summary_boxes(
+        pdf,
+        total_high,
+        total_medium,
+        len(findings),
+        score=score,
+        critical=total_critical,
+    )
 
     # Divider
     pdf.set_draw_color(*_BORDER)

@@ -87,7 +87,11 @@ def test_top_findings_limit():
 def test_top_findings_critical_before_high():
     mixed = [
         {"severity": "HIGH", "message": "[HIGH] a high finding", "category": "x"},
-        {"severity": "CRITICAL", "message": "[CRITICAL] a critical finding", "category": "x"},
+        {
+            "severity": "CRITICAL",
+            "message": "[CRITICAL] a critical finding",
+            "category": "x",
+        },
     ]
     top = _top_findings(mixed)
     assert top[0] == "[CRITICAL] a critical finding"

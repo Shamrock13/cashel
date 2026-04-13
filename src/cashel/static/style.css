@@ -1594,6 +1594,7 @@ select:focus, input[type="text"]:focus {
 .demo-config-label { font-weight: 600; font-size: 0.88rem; color: var(--text); }
 .demo-config-desc { font-size: 0.78rem; color: var(--text-muted); line-height: 1.4; }
 .demo-config-action { font-size: 0.78rem; color: var(--btn-primary-bg); font-weight: 600; margin-top: 0.25rem; }
+.demo-config-compliance-badge { font-size: 0.7rem; font-weight: 700; color: var(--compliance); background: var(--finding-comp-bg); border: 1px solid var(--compliance); border-radius: 3px; padding: 0.1rem 0.4rem; align-self: flex-start; }
 .demo-loading, .demo-error { color: var(--text-muted); font-size: 0.85rem; }
 
 /* ===== Remediation Plan ===== */
