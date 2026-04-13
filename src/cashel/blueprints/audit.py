@@ -54,6 +54,7 @@ _DEMO_CONFIGS = {
         "label": "Cisco ASA — Enterprise Edge",
         "filename": "cisco_asa.txt",
         "vendor": "asa",
+        "compliance": "cis",
         "description": "ASA 5525-X with ACL misconfigurations, SNMPv2, Telnet, and duplicate rules.",
     },
     "palo_alto": {
@@ -161,6 +162,7 @@ def get_demo_index_data() -> tuple[list, list]:
             "id": k,
             "label": v["label"],
             "vendor": v["vendor"],
+            "compliance": v.get("compliance", ""),
             "description": v["description"],
         }
         for k, v in _DEMO_CONFIGS.items()
@@ -189,6 +191,7 @@ def demo_configs():
                 "id": k,
                 "label": v["label"],
                 "vendor": v["vendor"],
+                "compliance": v.get("compliance", ""),
                 "description": v["description"],
             }
             for k, v in _DEMO_CONFIGS.items()

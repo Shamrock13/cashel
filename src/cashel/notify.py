@@ -113,10 +113,9 @@ _MAX_FINDINGS_IN_ALERT = 5
 # ── Message helpers ───────────────────────────────────────────────────────────
 
 
-def _top_findings(
-    findings: list, limit: int = _MAX_FINDINGS_IN_ALERT
-) -> list[str]:
+def _top_findings(findings: list, limit: int = _MAX_FINDINGS_IN_ALERT) -> list[str]:
     """Return up to *limit* most severe findings — CRITICAL first, then HIGH."""
+
     def _msg(f):
         return f.get("message", "") if isinstance(f, dict) else f
 
@@ -227,14 +226,18 @@ def send_slack(
         med = summary.get("medium", 0)
         low = summary.get("low", 0)
         total = summary.get("total", 0)
-        icon = ":rotating_light:" if crit else ":fire:" if high else ":white_check_mark:"
+        icon = (
+            ":rotating_light:" if crit else ":fire:" if high else ":white_check_mark:"
+        )
         text = (
             f"{icon} *Cashel audit complete* — {label}\n"
             f"*{total} finding(s): {crit} CRITICAL · {high} HIGH · {med} MEDIUM · {low} LOW*"
         )
         top = _top_findings(findings)
         if top:
-            text += "\n\n*Top findings (CRITICAL/HIGH):*\n" + "\n".join(f"• {h}" for h in top)
+            text += "\n\n*Top findings (CRITICAL/HIGH):*\n" + "\n".join(
+                f"• {h}" for h in top
+            )
             extra = crit + high - len(top)
             if extra > 0:
                 text += f"\n_…and {extra} more_"

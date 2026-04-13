@@ -146,9 +146,10 @@
         <div class="demo-config-grid" id="demoConfigGrid">
           {% for cfg in demo_configs %}
           <button type="button" class="demo-config-card"
-                  data-id="{{ cfg.id }}" data-vendor="{{ cfg.vendor }}">
+                  data-id="{{ cfg.id }}" data-vendor="{{ cfg.vendor }}" data-compliance="{{ cfg.compliance or '' }}">
             <span class="demo-config-label">{{ cfg.label }}</span>
             <span class="demo-config-desc">{{ cfg.description }}</span>
+            {% if cfg.compliance %}<span class="demo-config-compliance-badge">+ {{ cfg.compliance | upper }} compliance</span>{% endif %}
             <span class="demo-config-action">Load &amp; Audit &rarr;</span>
           </button>
           {% endfor %}
@@ -3402,9 +3403,10 @@
               .forEach(c => c.classList.remove("demo-config-selected"));
       this.classList.add("demo-config-selected");
 
-      const id     = this.dataset.id;
-      const vendor = this.dataset.vendor;
-      const label  = this.querySelector(".demo-config-label").textContent;
+      const id         = this.dataset.id;
+      const vendor     = this.dataset.vendor;
+      const compliance = this.dataset.compliance || "";
+      const label      = this.querySelector(".demo-config-label").textContent;
       try {
         const resp = await fetch(`/demo/load/${id}`);
         if (!resp.ok) throw new Error("Server returned " + resp.status);
@@ -3416,6 +3418,7 @@
         formData.append("config", new File([blob], id + ext, { type: "text/plain" }));
         formData.append("vendor", vendor);
         formData.append("tag",    label.split(" \u2014")[0].trim());
+        if (compliance) formData.append("compliance", compliance);
         const res  = await fetch("/audit", { method: "POST", body: formData });
         const data = await res.json();
         if (data.error) { showAuditError(data.error); return; }
