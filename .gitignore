@@ -51,6 +51,7 @@ build/
 keygen.py
 CNAME
 .claude/
+.claire/
 .wrangler/
 
 # Internal planning and ops docs — never publish
