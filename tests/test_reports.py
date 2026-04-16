@@ -4,10 +4,6 @@ import sys
 import tempfile
 import unittest
 
-# Point the DB at a writable temp location before importing the app
-_TEST_DB_DIR = tempfile.mkdtemp()
-os.environ.setdefault("CASHEL_DB", os.path.join(_TEST_DB_DIR, "test_cashel.db"))
-
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 def _make_client():
@@ -46,7 +42,17 @@ SAMPLE_PAYLOAD = {
 
 class TestRemediationPdfInline(unittest.TestCase):
     def setUp(self):
+        import cashel.db as db_mod
         import cashel.settings as settings_mod
+
+        # Isolated temp DB so tests pass regardless of execution order.
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
+            self._tmp_db_path = f.name
+        self._orig_db_path = db_mod.DB_PATH
+        self._orig_db_conn = getattr(db_mod._local, "conn", None)
+        db_mod.DB_PATH = self._tmp_db_path
+        db_mod._local.conn = None
+        db_mod.init_db()
 
         # Use an isolated temp settings file with auth disabled so routes are
         # reachable without a login session.
@@ -64,7 +70,19 @@ class TestRemediationPdfInline(unittest.TestCase):
         _ensure_user_exists()
 
     def tearDown(self):
+        import cashel.db as db_mod
         import cashel.settings as settings_mod
+
+        conn = getattr(db_mod._local, "conn", None)
+        if conn:
+            conn.close()
+        db_mod.DB_PATH = self._orig_db_path
+        db_mod._local.conn = self._orig_db_conn
+        try:
+            os.unlink(self._tmp_db_path)
+        except OSError:
+            pass
+
         settings_mod.SETTINGS_FILE = self._orig_settings_file
 
         if self._orig_folder is None:
