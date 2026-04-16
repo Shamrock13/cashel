@@ -3651,8 +3651,20 @@
         if (!res.ok) throw new Error("PDF generation failed");
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
-        window.open(url, "_blank", "noopener");
-        setTimeout(() => URL.revokeObjectURL(url), 60000);
+        // window.open returns null when blocked by popup blocker (doesn't throw)
+        const win = window.open(url, "_blank", "noopener");
+        if (!win) {
+          URL.revokeObjectURL(url);
+          alert("Popup blocked — please allow popups for this site to open the PDF.");
+          return;
+        }
+        // Revoke after the PDF has had time to load; also revoke if open throws
+        try {
+          setTimeout(() => URL.revokeObjectURL(url), 60000);
+        } catch (_) {
+          URL.revokeObjectURL(url);
+          throw _;
+        }
       } catch (err) { alert("Could not open PDF: " + err.message); }
     });
 
