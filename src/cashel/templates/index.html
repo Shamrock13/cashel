@@ -21,8 +21,17 @@
   <div class="demo-banner" id="demoBanner" role="banner">
     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" style="width:16px;height:16px;flex-shrink:0"><circle cx="10" cy="10" r="8"/><path d="M10 7v3M10 13h.01"/></svg>
     <span><strong>Live Demo</strong> &mdash; Sample configs are processed in memory and never stored. No account required.</span>
+    <a href="/demo/sample-report.pdf" target="_blank" rel="noopener" class="demo-banner-link">&#128196; Sample Report</a>
     <a href="https://github.com/shamrock13/cashel" target="_blank" rel="noopener" class="demo-banner-link">Get Cashel &rarr;</a>
     <button class="demo-banner-close" id="demoBannerClose" aria-label="Dismiss">&times;</button>
+  </div>
+  {% endif %}
+
+  {% if not demo_mode and not current_user %}
+  <div class="demo-banner" style="background:var(--surface-alt,#f0f4ff);color:var(--text,#1a1a2e);border-bottom:1px solid var(--border,#d0d5ea);">
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" style="width:16px;height:16px;flex-shrink:0"><path d="M4 4h12v12H4z"/><path d="M8 8h4M8 11h4M8 14h2"/></svg>
+    <span>See what a Cashel audit report looks like &mdash; no account needed.</span>
+    <a href="/demo/sample-report.pdf" target="_blank" rel="noopener" class="demo-banner-link">&#128196; View Sample Report &rarr;</a>
   </div>
   {% endif %}
 
