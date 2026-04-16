@@ -3511,7 +3511,8 @@
         <h3 class="modal-title">Remediation Plan</h3>
         <div style="display:flex;gap:0.5rem;align-items:center;">
           {% if not demo_mode %}
-          <button class="btn-secondary btn-sm" id="remPlanDownloadPdf" title="Download PDF">PDF</button>
+          <button class="btn-secondary btn-sm" id="remPlanOpenPdf" title="Open as PDF in new tab">&#x2197; Open PDF</button>
+          <button class="btn-secondary btn-sm" id="remPlanDownloadPdf" title="Download PDF">&#8681; PDF</button>
           <button class="btn-secondary btn-sm" id="remPlanDownloadMd" title="Download Markdown">MD</button>
           {% endif %}
           <button class="modal-close" id="remediationModalClose" aria-label="Close">&times;</button>
@@ -3637,6 +3638,24 @@
 
     /* Download helpers (non-demo only) */
     {% if not demo_mode %}
+    document.getElementById("remPlanOpenPdf")?.addEventListener("click", async () => {
+      if (!lastPlanPayload) return;
+      try {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content
+                       || document.querySelector('input[name="csrf_token"]')?.value || '';
+        const res = await fetch("/remediation-plan?fmt=pdf&inline=1", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
+          body: JSON.stringify(lastPlanPayload),
+        });
+        if (!res.ok) throw new Error("PDF generation failed");
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        window.open(url, "_blank", "noopener");
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+      } catch (err) { alert("Could not open PDF: " + err.message); }
+    });
+
     document.getElementById("remPlanDownloadPdf")?.addEventListener("click", async () => {
       if (!lastPlanPayload) return;
       try {
