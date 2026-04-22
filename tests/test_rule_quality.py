@@ -76,9 +76,6 @@ def test_asa_shadow():
     assert any("permit tcp any host 10.0.0.1 eq 80" in m for m in msgs)
     assert any("deny ip any any" in m for m in msgs)
 
-    print(f"  PASS  test_asa_shadow — {len(result)} shadow findings detected")
-    for f in result:
-        print(f"        [{f['severity']}] {f['message'][:100]}")
 
 
 # ── Test 2: Fortinet shadow detection ────────────────────────────────────────
@@ -122,9 +119,6 @@ def test_fortinet_shadow():
         "Allow-All should be the shadowing rule"
     )
 
-    print(f"  PASS  test_fortinet_shadow — {len(result)} shadow findings detected")
-    for f in result:
-        print(f"        [{f['severity']}] {f['message'][:100]}")
 
 
 # ── Test 3: Palo Alto shadow detection ───────────────────────────────────────
@@ -162,28 +156,10 @@ def test_paloalto_shadow():
         "Allow-Any-Any should be the shadowing rule"
     )
 
-    print(f"  PASS  test_paloalto_shadow — {len(result)} shadow findings detected")
-    for f in result:
-        print(f"        [{f['severity']}] {f['message'][:100]}")
 
 
 # ── Entrypoint ────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    print("\n── Rule Quality Analysis: Shadow Detection Tests ──\n")
-    failures = 0
-
-    for test_fn in (test_asa_shadow, test_fortinet_shadow, test_paloalto_shadow):
-        try:
-            test_fn()
-        except AssertionError as e:
-            print(f"  FAIL  {test_fn.__name__}: {e}")
-            failures += 1
-        except Exception as e:
-            print(f"  ERROR {test_fn.__name__}: {type(e).__name__}: {e}")
-            failures += 1
-
-    print(
-        f"\n{'All tests passed.' if failures == 0 else f'{failures} test(s) failed.'}\n"
-    )
-    sys.exit(failures)
+    import pytest
+    sys.exit(pytest.main([__file__, "-v"]))
