@@ -2156,6 +2156,10 @@
           <a class="btn-secondary btn-sm" href="/archive/${escHtml(e.id)}/export?fmt=json"  download title="Download JSON">JSON</a>
           <a class="btn-secondary btn-sm" href="/archive/${escHtml(e.id)}/export?fmt=csv"   download title="Download CSV">CSV</a>
           <a class="btn-secondary btn-sm" href="/archive/${escHtml(e.id)}/export?fmt=sarif" download title="Download SARIF">SARIF</a>
+          ${(userRole === 'admin' || userRole === 'auditor')
+            ? `<button class="btn-secondary btn-sm" data-evidence-bundle="${escHtml(e.id)}" title="Download Evidence Bundle (ZIP)">&#128196; Bundle</button>`
+            : ''
+          }
           ${userRole === 'admin'
             ? `<button class="btn-danger btn-sm" data-delete="${escHtml(e.id)}" title="Delete">&#128465;</button>`
             : `<button class="btn-danger btn-sm" disabled title="Deletion requires Admin role" style="opacity:0.4;cursor:not-allowed">&#128465;</button>`
@@ -2212,6 +2216,41 @@
           }
         } catch (err) {
           body.innerHTML = `<div class="alert alert-error">Failed: ${escHtml(err.message)}</div>`;
+        }
+      });
+    });
+
+    /* Evidence bundle download buttons */
+    el.querySelectorAll("[data-evidence-bundle]").forEach(btn => {
+      btn.addEventListener("click", async function () {
+        const entryId = this.dataset.evidenceBundle;
+        const origText = this.textContent;
+        this.disabled = true;
+        this.textContent = "Generating…";
+        try {
+          const res = await fetch(`/reports/${entryId}/evidence-bundle`, { method: "POST" });
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+            alert("Evidence bundle failed: " + (err.error || res.status));
+            return;
+          }
+          const blob = await res.blob();
+          const disposition = res.headers.get("Content-Disposition") || "";
+          const fnMatch = disposition.match(/filename="?([^"]+)"?/);
+          const filename = fnMatch ? fnMatch[1] : `cashel_evidence_${entryId}.zip`;
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        } catch (err) {
+          alert("Evidence bundle failed: " + err.message);
+        } finally {
+          this.disabled = false;
+          this.textContent = origText;
         }
       });
     });
