@@ -12,6 +12,13 @@ html { overflow-y: scroll; }
   --acc:     oklch(0.86 0.19 128);
   --acc-ink: oklch(0.22 0.08 140);
 
+  /* Severity / status bands — shared across themes */
+  --crit: oklch(0.58 0.2 25);
+  --high: oklch(0.65 0.19 35);
+  --med:  oklch(0.72 0.15 75);
+  --low:  oklch(0.75 0.1 200);
+  --ok:   oklch(0.7 0.16 140);
+
   /* v2 surface tokens */
   --bg:      oklch(0.985 0.003 90);
   --surface: oklch(1 0 0);
@@ -1865,17 +1872,8 @@ select:focus, input[type="text"]:focus {
 .brand .logo-mark {
   width: 22px;
   height: 22px;
-  border-radius: 4px;
-  background: var(--ink);
-  position: relative;
   flex-shrink: 0;
-}
-.brand .logo-mark::after {
-  content: "";
-  position: absolute;
-  inset: 6px;
-  background: var(--acc);
-  border-radius: 1px;
+  display: block;
 }
 .brand .brand-sep { color: var(--ink-4); margin: 0 2px; font-weight: 300; }
 .brand .brand-sub { color: var(--ink-3); font-weight: 400; }
@@ -1905,6 +1903,53 @@ select:focus, input[type="text"]:focus {
 }
 .theme-btn-v2:hover { background: var(--tint); }
 .theme-btn-v2 svg { width: 14px; height: 14px; }
+
+/* License chip — two states */
+.license-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  background: color-mix(in oklab, var(--ok) 15%, transparent);
+  color: var(--ok);
+  white-space: nowrap;
+}
+.license-chip .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ok);
+  flex-shrink: 0;
+}
+.license-chip.unlicensed {
+  background: color-mix(in oklab, var(--med) 14%, transparent);
+  color: color-mix(in oklab, var(--med) 55%, var(--ink));
+  border: 1px dashed color-mix(in oklab, var(--med) 45%, var(--line));
+  padding: 4px 11px;
+  cursor: pointer;
+  transition: background .15s;
+}
+.license-chip.unlicensed:hover {
+  background: color-mix(in oklab, var(--med) 20%, transparent);
+}
+.license-chip.unlicensed .dot {
+  background: var(--med);
+  animation: lic-pulse 2.2s ease-in-out infinite;
+}
+.license-chip .arrow {
+  width: 10px;
+  height: 10px;
+  margin-left: 2px;
+  opacity: .7;
+  flex-shrink: 0;
+}
+@keyframes lic-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: .5; transform: scale(.75); }
+}
 
 .user-chip {
   display: inline-flex;
