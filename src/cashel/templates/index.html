@@ -92,14 +92,17 @@
         <svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
       </button>
       {% if licensed %}
-      <span class="license-chip" id="licenseBadgeBtn">
+      <span class="license-chip" id="licenseBadgeBtn" role="button" tabindex="0"
+            title="Open Licensing settings"
+            style="cursor:pointer"
+            onclick="_openLicensing()">
         <span class="dot"></span>
         <span id="licenseBadge">Licensed</span>
       </span>
       {% else %}
       <span class="license-chip unlicensed" id="licenseBadgeBtn" role="button" tabindex="0"
             title="Compliance checks disabled — click to activate a license"
-            onclick="document.querySelector('[data-tab=settings]')?.click()">
+            onclick="_openLicensing()">
         <span class="dot"></span>
         <span id="licenseBadge">Unlicensed</span>
         <svg class="arrow" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M2 5h6M6 3l2 2-2 2"/></svg>
@@ -115,37 +118,12 @@
         <button type="submit" class="btn-logout">Logout</button>
       </form>
       {% endif %}
-      <button class="btn-ghost-v2" id="tweaksBtn" style="padding:6px 10px;font-size:12px" title="Tweaks">Tweaks</button>
+      <button class="accent-btn" id="accentCycleBtn" aria-label="Change accent color" title="Cycle accent">
+        <span class="accent-dot" id="accentDot"></span>
+      </button>
     </div>
   </header>
 
-  <!-- License Modal -->
-  <div class="modal-overlay hidden" id="licenseModal" role="dialog" aria-modal="true" aria-label="License Management">
-    <div class="modal-box">
-      <div class="modal-header">
-        <h3 class="modal-title">License Management</h3>
-        <button class="modal-close" id="modalClose" aria-label="Close">&times;</button>
-      </div>
-      <div class="modal-body">
-        <div id="licenseStatus" class="license-status">
-          {% if licensed %}
-            <p class="status-ok">&#10003; Active license: <code>{{ license_info }}</code></p>
-          {% else %}
-            <p class="status-warn">No active license. Compliance checks require a valid key.</p>
-          {% endif %}
-        </div>
-        <p class="modal-label">Activate a license key</p>
-        <form id="activateForm" class="modal-form">
-          <input type="text" id="licenseKey" name="key" placeholder="CSL-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX" maxlength="48" autocomplete="off" />
-          <button type="submit" class="btn-secondary">Activate</button>
-        </form>
-        <form id="deactivateForm" class="modal-form mt-sm{% if not licensed %} hidden{% endif %}">
-          <button type="submit" class="btn-danger">Deactivate License</button>
-        </form>
-        <div id="licenseMsg" class="license-msg hidden"></div>
-      </div>
-    </div>
-  </div>
 
   <!-- v2 Primary Nav -->
   <nav class="primary-nav" role="tablist" aria-label="Main navigation">
@@ -194,11 +172,11 @@
         </div>
       </section>
 
-      <!-- v2 Workspace: main form + side panel -->
-      <section class="work-v2">
+      <!-- Workspace: main form + sidebar (Single mode only) -->
+      <div class="audit-work" id="auditWorkSingle">
 
         <!-- ── MAIN FORM COLUMN ── -->
-        <div class="work-main-v2">
+        <div class="work-main">
 
           {% if not current_user or current_user.role in ('admin', 'auditor') %}
 
@@ -488,26 +466,23 @@
           </div>
           {% endif %}
 
-        </div><!-- /work-main-v2 -->
+        </div><!-- /work-main -->
 
-        <!-- ── SIDE PANEL ── -->
-        <aside class="work-side-v2">
+        <aside class="work-side" id="auditSidebar">
 
-          <!-- Recent runs -->
           <div class="side-block">
             <h3>Recent <span class="count">last 24h</span></h3>
             <div id="sideRecentRuns">
-              <!-- populated by JS from recent_audits context or placeholder -->
               {% if recent_audits %}
                 {% for a in recent_audits[:4] %}
                 <div class="run-row">
                   <div>
                     <div class="rn">{{ a.filename | truncate(22, True) }}</div>
-                    <div class="rn-sub">{{ a.vendor | default('—') }}{% if a.compliance %} &middot; {{ a.compliance | upper }}{% endif %}</div>
+                    <div class="rn-sub">{{ a.vendor | default('&mdash;') }}{% if a.compliance %} &middot; {{ a.compliance | upper }}{% endif %}</div>
                   </div>
                   <div>
                     <div class="rn-score {% if a.score >= 85 %}ok{% elif a.score >= 65 %}warn{% else %}bad{% endif %}">{{ a.score | int }}</div>
-                    <div class="rn-score-sub">{{ a.created_at | default('—') }}</div>
+                    <div class="rn-score-sub">{{ a.created_at | default('&mdash;') }}</div>
                   </div>
                 </div>
                 {% endfor %}
@@ -522,32 +497,31 @@
             </div>
           </div>
 
-          <!-- Vendor coverage -->
           <div class="side-block">
-            <h3>Vendor coverage <span class="count">10 engines</span></h3>
+            <h3>Vendor coverage <span class="count">7 engines</span></h3>
             <div class="vendor-list">
-              <div class="vendor-row"><span>Cisco ASA</span><span class="vendor-bar"><i style="width:98%"></i></span><span class="vendor-pct">98</span></div>
-              <div class="vendor-row"><span>Palo Alto</span><span class="vendor-bar"><i style="width:94%"></i></span><span class="vendor-pct">94</span></div>
-              <div class="vendor-row"><span>Fortinet</span><span class="vendor-bar"><i style="width:91%"></i></span><span class="vendor-pct">91</span></div>
-              <div class="vendor-row"><span>Juniper SRX</span><span class="vendor-bar"><i style="width:88%"></i></span><span class="vendor-pct">88</span></div>
-              <div class="vendor-row"><span>pfSense</span><span class="vendor-bar"><i style="width:82%"></i></span><span class="vendor-pct">82</span></div>
-              <div class="vendor-row"><span>iptables</span><span class="vendor-bar"><i style="width:79%"></i></span><span class="vendor-pct">79</span></div>
+              <div class="vendor-row"><span>Cisco ASA</span><span class="bar"><i style="width:98%"></i></span><span class="pct">98</span></div>
+              <div class="vendor-row"><span>PAN-OS</span><span class="bar"><i style="width:94%"></i></span><span class="pct">94</span></div>
+              <div class="vendor-row"><span>FortiGate</span><span class="bar"><i style="width:91%"></i></span><span class="pct">91</span></div>
+              <div class="vendor-row"><span>Juniper SRX</span><span class="bar"><i style="width:88%"></i></span><span class="pct">88</span></div>
+              <div class="vendor-row"><span>Check Point</span><span class="bar"><i style="width:82%"></i></span><span class="pct">82</span></div>
+              <div class="vendor-row"><span>pfSense</span><span class="bar"><i style="width:76%"></i></span><span class="pct">76</span></div>
             </div>
           </div>
 
-          <!-- Shortcuts -->
           <div class="side-block">
             <h3>Shortcuts</h3>
             <div class="kbds">
               <div class="kbd-row"><span class="lab">Run audit</span><span class="keys"><kbd>&#8984;</kbd><kbd>&#8629;</kbd></span></div>
+              <div class="kbd-row"><span class="lab">Open last report</span><span class="keys"><kbd>&#8984;</kbd><kbd>L</kbd></span></div>
               <div class="kbd-row"><span class="lab">Toggle theme</span><span class="keys"><kbd>&#8984;</kbd><kbd>J</kbd></span></div>
-              <div class="kbd-row"><span class="lab">Cancel</span><span class="keys"><kbd>Esc</kbd></span></div>
+              <div class="kbd-row"><span class="lab">Clear form</span><span class="keys"><kbd>&#8984;</kbd><kbd>K</kbd></span></div>
             </div>
           </div>
 
         </aside>
 
-      </section><!-- /work-v2 -->
+      </div><!-- /audit-work -->
 
     </section><!-- /tab-audit -->
 
@@ -1094,6 +1068,11 @@
             Alert Thresholds
           </button>
 
+          <button class="settings-nav-item" data-pane="licensing">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>
+            Licensing
+          </button>
+
           <button class="settings-nav-item" data-pane="webhooks">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 8a6 6 0 1 1 12 0"/><path d="M5 8a3 3 0 1 1 6 0"/><circle cx="8" cy="8" r="1" fill="currentColor" stroke="none"/><line x1="8" y1="9" x2="8" y2="14.5"/><line x1="5.5" y1="14.5" x2="10.5" y2="14.5"/></svg>
             Webhooks
@@ -1153,6 +1132,25 @@
                   <option value="soc2">SOC2</option>
                 </select>
               </label>
+            </div>
+
+            <div class="settings-group">
+              <h3 class="settings-group-title">Accent Color</h3>
+              <div class="settings-row">
+                <div class="settings-row-info">
+                  <span class="settings-row-label">Interface accent</span>
+                  <span class="settings-row-desc">Applied to buttons, active states, and the brand mark merlon.</span>
+                </div>
+                <div class="accent-swatches" id="accentSwatches">
+                  <button class="accent-swatch" data-accent="acid"   title="Acid"   style="background:oklch(0.86 0.19 128)"></button>
+                  <button class="accent-swatch" data-accent="blue"   title="Blue"   style="background:oklch(0.72 0.17 245)"></button>
+                  <button class="accent-swatch" data-accent="violet" title="Violet" style="background:oklch(0.72 0.17 295)"></button>
+                  <button class="accent-swatch" data-accent="amber"  title="Amber"  style="background:oklch(0.82 0.17 75)"></button>
+                  <button class="accent-swatch" data-accent="rose"   title="Rose"   style="background:oklch(0.74 0.17 15)"></button>
+                  <button class="accent-swatch" data-accent="teal"   title="Teal"   style="background:oklch(0.78 0.14 185)"></button>
+                  <button class="accent-swatch" data-accent="mono"   title="Mono"   style="background:oklch(0.78 0.01 260)"></button>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -1498,6 +1496,77 @@
             </div>
           </div>
 
+          <!-- Licensing pane -->
+          <div class="settings-pane" id="spane-licensing">
+            <div class="settings-pane-header">
+              <h2 class="settings-pane-title">Licensing</h2>
+              <p class="settings-pane-desc">Cashel runs a free hygiene engine out of the box. A license unlocks compliance frameworks (HIPAA, CIS Benchmark v8, NIST 800-53, PCI-DSS 4.0) and removes the per-run watermark on PDF reports.</p>
+            </div>
+
+            <div class="sub-head-v2">Current license</div>
+            <div class="lic-card">
+              <div class="lic-card-row">
+                <div>
+                  <div class="lic-status{% if licensed %} ok{% endif %}" id="licStatusBlock">
+                    <span class="lic-status-dot"></span>
+                    <span class="lic-status-text">{% if licensed %}Cashel Pro &middot; active{% else %}No active license{% endif %}</span>
+                  </div>
+                  <div class="lic-status-help" id="licStatusHelp">{% if licensed %}All compliance frameworks unlocked. Renewal and seat usage shown to the right.{% else %}Compliance checks require a valid key. Hygiene scanning continues to work without one.{% endif %}</div>
+                </div>
+                <div class="lic-meta" id="licMetaBlock"{% if not licensed %} style="display:none"{% endif %}>
+                  <div class="lic-meta-row"><span class="lab">Plan</span><span class="val">Cashel Pro</span></div>
+                  <div class="lic-meta-row"><span class="lab">Seats</span><span class="val">5 engines</span></div>
+                  <div class="lic-meta-row"><span class="lab">Key</span><span class="val mono">{{ license_info[:12] }}&hellip;</span></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="sub-head-v2">Activate a license key</div>
+            <div class="form-v2">
+              <div class="field-v2 split-v2">
+                <div>
+                  <div class="label-v2">License key</div>
+                  <div class="help-v2">Paste the key from your purchase email. Activation is local — no telemetry.</div>
+                </div>
+                <div class="ctrl-v2">
+                  <input class="input-v2 mono" id="licenseKeyInput" placeholder="CSL-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX" autocomplete="off" style="font-family:'Geist Mono',monospace;font-size:12px;letter-spacing:0.02em" />
+                  <button type="button" class="btn-run" id="activateLicenseBtn" style="white-space:nowrap;align-self:flex-end">
+                    Activate
+                    <span class="btn-arr" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+                  </button>
+                </div>
+              </div>
+              <div class="field-v2">
+                <div>
+                  <div class="label-v2">Offline activation</div>
+                  <div class="help-v2">Air-gapped install? Generate a request file, upload it at cashel.dev/activate, then import the response.</div>
+                </div>
+                <div class="ctrl-v2">
+                  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                    <button type="button" class="btn-ghost-v2" style="border:1px solid var(--line-2);border-radius:999px;padding:8px 14px;font-size:13px;color:var(--ink-2)">Download request</button>
+                    <button type="button" class="btn-ghost-v2" style="border:1px solid var(--line-2);border-radius:999px;padding:8px 14px;font-size:13px;color:var(--ink-2)">Import response</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="sub-head-v2" style="margin-top:2rem">What a license unlocks</div>
+            <div class="lic-features">
+              <div class="lic-feat"><span class="dot"></span><div><div class="t">Compliance frameworks</div><div class="d">HIPAA Security Rule, CIS Benchmark v8, NIST 800-53, PCI-DSS 4.0.</div></div></div>
+              <div class="lic-feat"><span class="dot"></span><div><div class="t">Bulk + scheduled audits</div><div class="d">Run more than 3 configs at once and schedule recurring audits.</div></div></div>
+              <div class="lic-feat"><span class="dot"></span><div><div class="t">Branded PDF reports</div><div class="d">Remove the evaluation watermark and add your organisation lockup.</div></div></div>
+              <div class="lic-feat"><span class="dot"></span><div><div class="t">Priority support</div><div class="d">Email response within one business day, plus signed-build access.</div></div></div>
+            </div>
+
+            <div style="padding-top:28px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+              <button type="button" class="btn-ghost-v2" id="deactivateLicenseBtn" style="{% if not licensed %}display:none;{% endif %}border:1px solid color-mix(in oklab,var(--crit) 40%,transparent);border-radius:999px;padding:8px 14px;font-size:13px;color:var(--crit)">Deactivate license</button>
+              <a href="https://cashel.dev" target="_blank" rel="noopener" class="btn-ghost-v2" style="border:1px solid var(--line-2);border-radius:999px;padding:8px 14px;font-size:13px;color:var(--ink-2)">Buy a license &rarr;</a>
+              <span style="margin-left:auto;color:var(--ink-3);font-size:13px;">Need help? <a href="mailto:support@cashel.dev" style="color:var(--ink-2);text-decoration:underline">support@cashel.dev</a></span>
+            </div>
+
+            <div id="licenseMsg" class="hidden" style="margin-top:1rem;font-size:13px;padding:10px 14px;border-radius:6px;"></div>
+          </div>
+
           <!-- Webhooks pane -->
           <div class="settings-pane" id="spane-webhooks">
             <div class="settings-pane-header">
@@ -1646,7 +1715,7 @@
     </div>
     <div class="tweaks-row">
       <label>Accent</label>
-      <div class="accent-swatches" id="accentSwatches">
+      <div class="accent-swatches" id="tweaksAccentSwatches">
         <div class="accent-swatch on" data-accent="acid"   style="background:oklch(0.86 0.19 128)" title="Acid"></div>
         <div class="accent-swatch"   data-accent="blue"   style="background:oklch(0.72 0.17 245)" title="Blue"></div>
         <div class="accent-swatch"   data-accent="violet" style="background:oklch(0.72 0.17 295)" title="Violet"></div>
@@ -1731,6 +1800,32 @@
     if (saved) applyAccent(saved);
   })();
 
+  // ═══════════════════════════════════════════════ ACCENT CYCLE BUTTON ══
+  const ACCENT_ORDER = ['acid','blue','violet','amber','rose','teal','mono'];
+  function _updateAccentDot() {
+    const dot = document.getElementById('accentDot');
+    const key = localStorage.getItem('bastion.accent') || 'acid';
+    const v = window._ACCENTS?.[key];
+    if (dot && v) dot.style.background = v.a;
+    /* mark active swatch in settings pane */
+    document.querySelectorAll('.accent-swatch').forEach(b => {
+      b.classList.toggle('active', b.dataset.accent === key);
+    });
+  }
+  document.getElementById('accentCycleBtn')?.addEventListener('click', function() {
+    const cur = localStorage.getItem('bastion.accent') || 'acid';
+    const next = ACCENT_ORDER[(ACCENT_ORDER.indexOf(cur) + 1) % ACCENT_ORDER.length];
+    window._setAccent(next);
+    _updateAccentDot();
+  });
+  document.querySelectorAll('.accent-swatch').forEach(btn => {
+    btn.addEventListener('click', function() {
+      window._setAccent(this.dataset.accent);
+      _updateAccentDot();
+    });
+  });
+  _updateAccentDot();
+
   function maskLicenseKey(key) {
     const parts = key.split("-");
     if (parts.length >= 2) {
@@ -1739,67 +1834,86 @@
     return key.slice(0, 4) + "\u2022".repeat(key.length - 4);
   }
 
-  // ═══════════════════════════════════════════════════════ LICENSE MODAL ══
-  const modal = document.getElementById("licenseModal");
-  function _modalKeyHandler(e) {
-    if (e.key === "Escape") { closeModal(); return; }
-    if (e.key === "Tab") {
-      const focusable = modal.querySelectorAll('button, input, select, textarea, a[href], [tabindex]:not([tabindex="-1"])');
-      if (!focusable.length) return;
-      const first = focusable[0], last = focusable[focusable.length - 1];
-      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
-      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
-    }
+  // ═══════════════════════════════════════════════════════ LICENSING ══
+  function _openLicensing() {
+    /* Navigate to Settings tab */
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+    document.querySelectorAll('[data-tab]').forEach(b => b.classList.remove('nav-active'));
+    const settingsPanel = document.getElementById('tab-settings');
+    const settingsBtn = document.querySelector('[data-tab="settings"]');
+    if (settingsPanel) settingsPanel.classList.remove('hidden');
+    if (settingsBtn) settingsBtn.classList.add('nav-active');
+    /* Activate Licensing pane */
+    document.querySelectorAll('.settings-pane').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.settings-nav-item').forEach(b => b.classList.remove('settings-nav-active'));
+    const licPane = document.getElementById('spane-licensing');
+    const licBtn = document.querySelector('[data-pane="licensing"]');
+    if (licPane) licPane.classList.add('active');
+    if (licBtn) licBtn.classList.add('settings-nav-active');
+    window.scrollTo(0, 0);
   }
-  const openModal = () => {
-    modal.classList.remove("hidden");
-    document.body.style.overflow = "hidden";
-    document.addEventListener("keydown", _modalKeyHandler);
-    document.getElementById("licenseKey").focus();
-  };
-  const closeModal = () => {
-    modal.classList.add("hidden");
-    document.body.style.overflow = "";
-    document.removeEventListener("keydown", _modalKeyHandler);
-  };
-  document.getElementById("licenseBadgeBtn")?.addEventListener("click", openModal);
-  document.getElementById("modalClose")?.addEventListener("click", closeModal);
-  modal.addEventListener("click", e => { if (e.target === modal) closeModal(); });
 
-  document.getElementById("activateForm")?.addEventListener("submit", async function (e) {
-    e.preventDefault();
-    const key  = document.getElementById("licenseKey").value.trim();
-    const res  = await fetch("/license/activate", { method: "POST", body: new URLSearchParams({ key }) });
-    const data = await res.json();
-    showLicenseMsg(data.message, data.success ? "ok" : "error");
-    if (data.success) { document.getElementById("licenseKey").value = ""; refreshLicenseBadge(true, key.toUpperCase()); }
-  });
-  document.getElementById("deactivateForm")?.addEventListener("submit", async function (e) {
-    e.preventDefault();
-    const res  = await fetch("/license/deactivate", { method: "POST" });
-    const data = await res.json();
-    showLicenseMsg(data.message, data.success ? "ok" : "error");
-    if (data.success) refreshLicenseBadge(false, null);
-  });
-  function showLicenseMsg(msg, type) {
-    const el = document.getElementById("licenseMsg");
-    el.textContent = msg;
-    el.className = "license-msg " + (type === "ok" ? "msg-ok" : "msg-error");
-    el.classList.remove("hidden");
-  }
-  function refreshLicenseBadge(licensed, key) {
-    const badge = document.getElementById("licenseBadge");
-    const status = document.getElementById("licenseStatus");
-    if (licensed) {
-      badge.className = "badge badge-active";
-      badge.innerHTML = "&#10003; Licensed";
-      status.innerHTML = `<p class="status-ok">&#10003; Active license: <code>${escHtml(maskLicenseKey(key))}</code></p>`;
-    } else {
-      badge.className = "badge badge-unlicensed";
-      badge.innerHTML = "&#9888; Unlicensed";
-      status.innerHTML = `<p class="status-warn">No active license. Compliance checks require a valid key.</p>`;
+  /* Licensing pane activate/deactivate */
+  document.getElementById('activateLicenseBtn')?.addEventListener('click', async function() {
+    const key = document.getElementById('licenseKeyInput')?.value?.trim();
+    const msg = document.getElementById('licenseMsg');
+    if (!key) return;
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
+    try {
+      const r = await fetch('/api/v1/license', {method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':csrf||''}, body: JSON.stringify({key})});
+      const d = await r.json();
+      if (r.ok && d.status === 'ok') {
+        _syncLicenseState(true, key);
+        if (msg) { msg.textContent = '✓ License activated'; msg.style.background='color-mix(in oklab,var(--ok) 12%,var(--surface))'; msg.style.color='var(--ok)'; msg.classList.remove('hidden'); }
+      } else {
+        if (msg) { msg.textContent = d.error || 'Activation failed'; msg.style.background='color-mix(in oklab,var(--crit) 10%,var(--surface))'; msg.style.color='var(--crit)'; msg.classList.remove('hidden'); }
+      }
+    } catch(e) {
+      if (msg) { msg.textContent = 'Network error'; msg.style.background='color-mix(in oklab,var(--crit) 10%,var(--surface))'; msg.style.color='var(--crit)'; msg.classList.remove('hidden'); }
     }
-    document.getElementById("deactivateForm").classList.toggle("hidden", !licensed);
+  });
+  document.getElementById('deactivateLicenseBtn')?.addEventListener('click', async function() {
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
+    const r = await fetch('/api/v1/license', {method:'DELETE', headers:{'X-CSRFToken':csrf||''}});
+    if (r.ok) _syncLicenseState(false, '');
+  });
+  function _syncLicenseState(isLicensed, key) {
+    /* Chip */
+    const chip = document.getElementById('licenseBadgeBtn');
+    const badge = document.getElementById('licenseBadge');
+    if (chip && badge) {
+      if (isLicensed) {
+        chip.classList.remove('unlicensed');
+        chip.title = 'Open Licensing settings';
+        badge.textContent = 'Licensed';
+        const arr = chip.querySelector('.arrow'); if (arr) arr.remove();
+      } else {
+        chip.classList.add('unlicensed');
+        chip.title = 'Compliance checks disabled — click to activate a license';
+        badge.textContent = 'Unlicensed';
+      }
+    }
+    /* Pane status block */
+    const sb = document.getElementById('licStatusBlock');
+    const sh = document.getElementById('licStatusHelp');
+    const sm = document.getElementById('licMetaBlock');
+    const db = document.getElementById('deactivateLicenseBtn');
+    if (sb) {
+      const t = sb.querySelector('.lic-status-text');
+      if (isLicensed) {
+        sb.classList.add('ok');
+        if (t) t.textContent = 'Cashel Pro · active';
+        if (sh) sh.textContent = 'All compliance frameworks unlocked. Renewal and seat usage shown to the right.';
+        if (sm) sm.style.display = '';
+        if (db) db.style.display = '';
+      } else {
+        sb.classList.remove('ok');
+        if (t) t.textContent = 'No active license';
+        if (sh) sh.textContent = 'Compliance checks require a valid key. Hygiene scanning continues to work without one.';
+        if (sm) sm.style.display = 'none';
+        if (db) db.style.display = 'none';
+      }
+    }
   }
 
   const DEMO_MODE = {{ 'true' if demo_mode else 'false' }};
@@ -1826,6 +1940,17 @@
     if (seg) seg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode === mode)));
     document.getElementById("audit-mode-single").classList.toggle("hidden", mode !== "single");
     document.getElementById("audit-mode-bulk").classList.toggle("hidden", mode !== "bulk");
+    /* Show sidebar only in single mode */
+    const auditWorkEl = document.getElementById('auditWorkSingle');
+    if (auditWorkEl) {
+      if (mode === 'single') {
+        auditWorkEl.style.gridTemplateColumns = '';  /* restore default from CSS */
+      } else {
+        auditWorkEl.style.gridTemplateColumns = '1fr';  /* bulk: full width */
+      }
+    }
+    const sidebar = document.getElementById('auditSidebar');
+    if (sidebar) sidebar.style.display = mode === 'single' ? '' : 'none';
   }
   (function() {
     const seg = document.getElementById('auditModeSegmented');
