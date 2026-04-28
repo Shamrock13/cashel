@@ -6,6 +6,9 @@
   <meta name="csrf-token" content="{{ csrf_token() }}" />
   <title>Cashel &mdash; Firewall Audit</title>
   <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}" />
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" nonce="{{ g.csp_nonce }}"></script>
   <script nonce="{{ g.csp_nonce }}">
@@ -35,36 +38,39 @@
   </div>
   {% endif %}
 
-  <!-- Header -->
-  <header class="header">
-    <div class="header-inner">
-      <div class="logo">
-        <svg class="logo-icon" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M14 2L3 6.5v8C3 20.5 7.8 25.6 14 27c6.2-1.4 11-6.5 11-12.5v-8L14 2z" stroke="#7EAEFF" stroke-width="1.6" fill="rgba(126,174,255,0.12)"/>
-          <polyline points="9,14 12.5,17.5 19,11" stroke="#7EAEFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <div class="shell">
+
+  <!-- Topbar -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">
+        <svg viewBox="0 0 120 120" width="22" height="22" xmlns="http://www.w3.org/2000/svg" aria-label="Cashel">
+          <rect x="0" y="0" width="120" height="120" rx="22" fill="var(--ink)"/>
+          <path d="M24 86 V42 H38 V58 H52 V42 H68 V58 H82 V42 H96 V86 Z" fill="var(--acc)"/>
         </svg>
-        <span class="logo-text">Cashel</span>
-        <span class="logo-sub">Firewall Security Auditor</span>
-      </div>
-      <div class="header-actions">
-        <button class="theme-toggle" id="themeToggle" title="Theme: Light / Dark / Auto" aria-label="Toggle theme">
-          <span id="themeIcon">&#9788;</span>
-        </button>
-        <button class="badge-btn" id="licenseBadgeBtn" title="Manage license">
-          {% if licensed %}
-            <span class="badge badge-active" id="licenseBadge">&#10003; Licensed</span>
-          {% else %}
-            <span class="badge badge-unlicensed" id="licenseBadge">&#9888; Unlicensed</span>
-          {% endif %}
-        </button>
-        {% if current_user and not demo_mode %}
-        <span class="header-username">{{ current_user.username }}</span>
-        <form method="post" action="/logout" style="display:inline;margin:0">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <button type="submit" class="btn-logout">Logout</button>
-        </form>
+      </span>
+      <span>Cashel</span>
+      <span class="sep">/</span>
+      <span class="sub">Firewall Audit</span>
+    </div>
+    <div class="top-right">
+      <button class="theme-btn" id="themeToggle" aria-label="Toggle theme">
+        <svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      </button>
+      <button id="licenseBadgeBtn" aria-label="Manage license" style="background:none;border:none;padding:0;cursor:pointer">
+        {% if licensed %}
+          <span class="license-chip" id="licenseBadge"><span class="dot"></span>Licensed</span>
+        {% else %}
+          <span class="license-chip unlicensed" id="licenseBadge"><span class="dot"></span>Unlicensed</span>
         {% endif %}
-      </div>
+      </button>
+      {% if current_user and not demo_mode %}
+      <span class="user"><span>{{ current_user.username }}</span><span class="avatar">{{ current_user.username[0] | upper }}</span></span>
+      <form method="post" action="/logout" style="display:inline;margin:0">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn-logout">Logout</button>
+      </form>
+      {% endif %}
     </div>
   </header>
 
@@ -96,54 +102,41 @@
     </div>
   </div>
 
-  <main class="main">
-
-    <!-- Tab nav -->
-    <nav class="tab-nav" role="tablist">
-      <button class="tab-btn tab-active" data-tab="audit" role="tab">
-        <svg class="tab-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 2h8.5L16 4.5V17H5V2z"/><path d="M13 2v3h3"/><circle cx="10" cy="11.5" r="2.5"/><path d="M14 15.5l-1.8-1.8"/></svg>
-        Audit
-      </button>
-      <button class="tab-btn" data-tab="diff" role="tab">
-        <svg class="tab-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="7" height="14" rx="1"/><rect x="11" y="3" width="7" height="14" rx="1"/><path d="M5.5 7h2M5.5 10h2M5.5 13h2M12.5 7h2M12.5 10h2M12.5 13h2"/></svg>
-        Compare
-      </button>
-      {% if not current_user or current_user.role in ('admin', 'auditor') %}
-      <button class="tab-btn" data-tab="connect" role="tab">
-        <svg class="tab-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="16" height="14" rx="2"/><path d="M2 7h16"/><path d="M6 11l3 2.5L6 16"/><path d="M12 15h3"/></svg>
-        Live Connect
-      </button>
-      {% endif %}
-      <button class="tab-btn" data-tab="schedules" role="tab">
-        <svg class="tab-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3.5" width="16" height="14" rx="2"/><path d="M2 8h16M7 2v3M13 2v3"/><circle cx="13.5" cy="13.5" r="3"/><path d="M13.5 12v1.5l1 1"/></svg>
-        Schedules
-      </button>
-      <button class="tab-btn" data-tab="history" role="tab">
-        <svg class="tab-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10a6 6 0 1 0 1.5-4"/><path d="M2 8.5l1.5 2 2-1.5"/><path d="M10 7v4l2 1.5"/></svg>
-        History
-      </button>
-      {% if not current_user or current_user.role == 'admin' %}
-      <button class="tab-btn" data-tab="settings" role="tab">
-        <svg class="tab-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><line x1="3" y1="5" x2="17" y2="5"/><line x1="3" y1="10" x2="17" y2="10"/><line x1="3" y1="15" x2="17" y2="15"/><circle cx="7" cy="5" r="2"/><circle cx="13" cy="10" r="2"/><circle cx="8" cy="15" r="2"/></svg>
-        Settings
-      </button>
-      {% elif current_user and not demo_mode %}
-      <button class="tab-btn" data-tab="settings" role="tab">
-        <svg class="tab-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="7.5" r="3.5"/><path d="M3 18c0-3.3 3.1-6 7-6s7 2.7 7 6"/></svg>
-        My Account
-      </button>
-      {% endif %}
-    </nav>
+  <!-- Primary nav -->
+  <nav class="nav">
+    <a data-tab="audit" class="active">Audit</a>
+    <a data-tab="diff">Compare</a>
+    {% if not current_user or current_user.role in ('admin', 'auditor') %}
+    <a data-tab="connect">Live Connect</a>
+    {% endif %}
+    <a data-tab="schedules">Schedules</a>
+    <a data-tab="history">History</a>
+    {% if not current_user or current_user.role == 'admin' %}
+    <a data-tab="settings">Settings</a>
+    {% elif current_user and not demo_mode %}
+    <a data-tab="settings">My Account</a>
+    {% endif %}
+    {% if current_user and not demo_mode %}
+    <span class="tail"><span class="dot"></span>{{ current_user.username }}</span>
+    {% endif %}
+  </nav>
 
     <!-- ══════════════════════════════════════════════ AUDIT ══ -->
-    <section class="tab-panel" id="tab-audit">
+    <section class="page" id="tab-audit">
 
       {% if not current_user or current_user.role in ('admin', 'auditor') %}
-      <!-- Audit mode toggle: Single File / Bulk -->
-      <div class="audit-mode-bar">
-        <button class="mode-btn mode-active" data-mode="single">Single File</button>
-        <button class="mode-btn" data-mode="bulk">Bulk</button>
-      </div>
+      <section class="page-head">
+        <div>
+          <div class="eyebrow">Firewall audit</div>
+          <h1>Review a config<br/><em>in one pass.</em></h1>
+        </div>
+        <div class="actions">
+          <div class="seg" id="modeSeg">
+            <button aria-pressed="true" data-mode="single">Single file</button>
+            <button aria-pressed="false" data-mode="bulk">Bulk</button>
+          </div>
+        </div>
+      </section>
 
       <!-- ── Single File mode ── -->
       <div id="audit-mode-single">
@@ -166,103 +159,115 @@
       </div>
       {% endif %}
 
-      <div class="card">
-        <h2 class="card-title">Run Audit</h2>
-        <form id="auditForm" enctype="multipart/form-data">
-          <div class="form-grid">
-            <div class="form-group" style="grid-column:1/-1">
-              <label for="deviceTag">Device Tag</label>
-              <input type="text" id="deviceTag" name="tag" placeholder="e.g. ASA01, FortiGate-HQ&hellip;" autocomplete="off" maxlength="64" required />
-            </div>
-            <div class="form-group">
-              <label for="config">Config File</label>
-              <div class="file-input-wrapper">
-                <input type="file" id="config" name="config" required />
-                <span class="file-label" id="fileLabel">Choose a file&hellip;</span>
+      <div class="audit-work">
+        <div class="work-main">
+          <div class="section-head"><div><div class="idx">01 — Configure</div><h2>New audit</h2></div></div>
+          <form id="auditForm" enctype="multipart/form-data">
+            <div class="form">
+              <div class="field">
+                <div><div class="label">Device tag</div><div class="help">Used to label this run in history.</div></div>
+                <div class="ctrl">
+                  <input class="input" id="deviceTag" name="tag" placeholder="ASA01, FortiGate-HQ&hellip;" autocomplete="off" maxlength="64" required />
+                </div>
+              </div>
+              <div class="field split">
+                <div><div class="label">Config file</div><div class="help">.conf, .cfg, .xml, .txt</div></div>
+                <div class="ctrl">
+                  <label for="config" class="file-field empty" id="configField">
+                    <div><div class="fname" id="fileLabel">Choose a file&hellip;</div><div class="fmeta" id="fileMeta"></div></div>
+                    <span class="browse">Browse</span>
+                    <input type="file" id="config" name="config" required hidden />
+                  </label>
+                  <select class="select" id="vendor" name="vendor">
+                    <option value="auto" selected>Auto-detect (recommended)</option>
+                    <option value="aws">AWS Security Group</option>
+                    <option value="azure">Azure NSG</option>
+                    <option value="cisco">Cisco</option>
+                    <option value="fortinet">Fortinet</option>
+                    <option value="gcp">GCP VPC Firewall</option>
+                    <option value="iptables">iptables (Linux)</option>
+                    <option value="juniper">Juniper SRX</option>
+                    <option value="nftables">nftables (Linux)</option>
+                    <option value="paloalto">Palo Alto Networks</option>
+                    <option value="pfsense">pfSense</option>
+                  </select>
+                </div>
+              </div>
+              <div class="field">
+                <div><div class="label">Compliance <span class="opt-tag">Licensed</span></div><div class="help">Adds framework-specific findings.</div></div>
+                <div class="ctrl">
+                  <select class="select" id="compliance" name="compliance">
+                    <option value="">None</option>
+                    <option value="cis">CIS Benchmark</option>
+                    <option value="stig">DISA STIG</option>
+                    <option value="hipaa">HIPAA Security Rule</option>
+                    <option value="nist">NIST SP 800-41</option>
+                    <option value="pci">PCI-DSS</option>
+                    <option value="soc2">SOC2</option>
+                  </select>
+                </div>
+              </div>
+              <div class="field">
+                <div><div class="label">Options</div><div class="help">What to do when the audit completes.</div></div>
+                <div class="ctrl">
+                  <div class="toggles">
+                    <label class="tgl" id="tglReport"><input type="checkbox" id="report" name="report" value="1" /><span class="mark"></span>PDF report</label>
+                    <label class="tgl" id="tglArchive"><input type="checkbox" id="archive" name="archive" value="1" /><span class="mark"></span>Save to history</label>
+                  </div>
+                </div>
               </div>
             </div>
-            <div class="form-group">
-              <label for="vendor">Vendor</label>
-              <select id="vendor" name="vendor">
-                <option value="auto" selected>Auto-detect (recommended)</option>
-                <option value="aws">AWS Security Group</option>
-                <option value="azure">Azure NSG</option>
-                <option value="cisco">Cisco</option>
-                <option value="fortinet">Fortinet</option>
-                <option value="gcp">GCP VPC Firewall</option>
-                <option value="iptables">iptables (Linux)</option>
-                <option value="juniper">Juniper SRX</option>
-                <option value="nftables">nftables (Linux)</option>
-                <option value="paloalto">Palo Alto Networks</option>
-                <option value="pfsense">pfSense</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label for="compliance">Compliance Framework <span class="optional">(licensed)</span></label>
-              <select id="compliance" name="compliance">
-                <option value="">None</option>
-                <option value="cis">CIS Benchmark</option>
-                <option value="stig">DISA STIG</option>
-                <option value="hipaa">HIPAA Security Rule</option>
-                <option value="nist">NIST SP 800-41</option>
-                <option value="pci">PCI-DSS</option>
-                <option value="soc2">SOC2</option>
-              </select>
-            </div>
-            <div class="form-group form-group-check">
-              <label class="checkbox-label">
-                <input type="checkbox" id="report" name="report" value="1" />
-                <span>Generate PDF Report</span>
-              </label>
-              <label class="checkbox-label mt-xs">
-                <input type="checkbox" id="archive" name="archive" value="1" />
-                <span>Save to Audit History</span>
-              </label>
-            </div>
-          </div>
-          <button type="submit" class="btn-primary" id="submitBtn">
-            <span id="submitText">Run Audit</span>
-            <span id="submitSpinner" class="spinner hidden"></span>
-          </button>
-        </form>
-      </div>
+            <button type="submit" class="btn-primary" id="submitBtn" style="margin-top:24px">
+              <span id="submitText">Run Audit</span>
+              <span id="submitSpinner" class="spinner hidden"></span>
+            </button>
+          </form>
 
-      <!-- Audit Results -->
-      <div class="card hidden" id="resultsSection">
-        <div class="results-header">
-          <h2 class="card-title" style="margin-bottom:0">Results</h2>
-          <div style="display:flex;align-items:center;gap:0.75rem;">
-            <span class="detected-vendor hidden" id="detectedVendorTag"></span>
-            <div class="view-toggle" id="findingsViewToggle" title="Toggle compact view">
-              <button class="view-btn view-btn-active" id="viewDetailed">Detailed</button>
-              <button class="view-btn" id="viewCompact">Compact</button>
+          <!-- Audit Results -->
+          <div class="hidden" id="resultsSection">
+            <div class="section-head" style="margin-top:40px">
+              <div><h2>Results</h2></div>
+              <div style="display:flex;align-items:center;gap:12px">
+                <span class="detected-vendor hidden" id="detectedVendorTag"></span>
+                <div class="view-toggle" id="findingsViewToggle">
+                  <button class="view-btn view-btn-active" id="viewDetailed">Detailed</button>
+                  <button class="view-btn" id="viewCompact">Compact</button>
+                </div>
+              </div>
+            </div>
+            <div class="alert alert-warning hidden" id="licenseWarning"></div>
+            <div class="stats" id="summaryGrid"></div>
+            <div class="findings" id="findingsList"></div>
+            <div class="actions-row">
+              <div class="pdf-row hidden" id="pdfRow">
+                <a id="pdfLink" class="btn-secondary" href="#" download>&#8681; Download PDF</a>
+                <a id="pdfViewLink" class="btn-secondary" href="#" target="_blank" rel="noopener">&#128196; View PDF</a>
+              </div>
+              <div class="remediation-row hidden" id="remediationRow">
+                <button id="remediationPlanBtn" class="btn-primary btn-remediation">&#9881; View Remediation Plan</button>
+              </div>
+              <div class="export-row hidden" id="exportRow">
+                <button id="exportJsonBtn" class="btn-secondary">&#8681; JSON</button>
+                <button id="exportCsvBtn"  class="btn-secondary">&#8681; CSV</button>
+                <button id="exportSarifBtn" class="btn-secondary">&#8681; SARIF</button>
+              </div>
+              <div class="archive-row hidden" id="archiveRow">
+                <span class="archive-saved-msg">&#10003; Saved to Audit History &mdash;
+                  <button class="link-btn" id="viewHistoryBtn">View History</button>
+                </span>
+              </div>
             </div>
           </div>
-        </div>
-        <div class="alert alert-warning hidden" id="licenseWarning"></div>
-        <div class="summary-grid" id="summaryGrid"></div>
-        <div id="findingsList"></div>
-        <div id="findingsPagination" class="findings-pagination hidden"></div>
-        <div class="actions-row">
-          <div class="pdf-row hidden" id="pdfRow">
-            <a id="pdfLink" class="btn-secondary" href="#" download>&#8681; Download PDF</a>
-            <a id="pdfViewLink" class="btn-secondary" href="#" target="_blank" rel="noopener">&#128196; View PDF</a>
-          </div>
-          <div class="remediation-row hidden" id="remediationRow">
-            <button id="remediationPlanBtn" class="btn-primary btn-remediation">&#9881; View Remediation Plan</button>
-          </div>
-          <div class="export-row hidden" id="exportRow">
-            <button id="exportJsonBtn" class="btn-secondary">&#8681; JSON</button>
-            <button id="exportCsvBtn"  class="btn-secondary">&#8681; CSV</button>
-            <button id="exportSarifBtn" class="btn-secondary">&#8681; SARIF</button>
-          </div>
-          <div class="archive-row hidden" id="archiveRow">
-            <span class="archive-saved-msg">&#10003; Saved to Audit History &mdash;
-              <button class="link-btn" id="viewHistoryBtn">View History</button>
-            </span>
+        </div><!-- /work-main -->
+
+        <!-- Sidebar — populated by JS after audit completes, also shown statically -->
+        <div class="work-side" id="auditSidebar">
+          <div class="side-block">
+            <h3>Recent runs <span class="count" id="recentCount"></span></h3>
+            <div id="recentRunsList"><p class="text-muted">No recent runs yet.</p></div>
           </div>
         </div>
-      </div>
+      </div><!-- /audit-work -->
       </div><!-- /audit-mode-single -->
 
       <!-- ── Bulk mode ── -->
@@ -287,21 +292,23 @@
       </div>
       {% endif %}
 
-      <div class="card">
-        <h2 class="card-title">Bulk Audit</h2>
-        <p class="card-desc">Upload multiple firewall configs at once. Each file is audited independently and results are shown side-by-side.</p>
-        <form id="bulkForm" enctype="multipart/form-data">
-          <div class="form-grid">
-            <div class="form-group" style="grid-column:1/-1">
-              <label for="bulkConfigs">Config Files</label>
-              <div class="file-input-wrapper">
-                <input type="file" id="bulkConfigs" name="configs[]" multiple required />
-                <span class="file-label" id="bulkFileLabel">Choose one or more files&hellip;</span>
-              </div>
+      <div class="section-head"><div><div class="idx">01 — Configure</div><h2>Bulk audit</h2></div></div>
+      <form id="bulkForm" enctype="multipart/form-data">
+        <div class="form">
+          <div class="field">
+            <div><div class="label">Config files</div><div class="help">Multiple files, same or mixed vendors.</div></div>
+            <div class="ctrl">
+              <label for="bulkConfigs" class="file-field empty" id="bulkConfigField">
+                <div><div class="fname" id="bulkFileLabel">Choose one or more files&hellip;</div><div class="fmeta" id="bulkFileMeta"></div></div>
+                <span class="browse">Browse</span>
+                <input type="file" id="bulkConfigs" name="configs[]" multiple required hidden />
+              </label>
             </div>
-            <div class="form-group">
-              <label for="bulkVendor">Vendor</label>
-              <select id="bulkVendor" name="vendor">
+          </div>
+          <div class="field split">
+            <div><div class="label">Vendor</div><div class="help">Applied to all files unless auto-detected.</div></div>
+            <div class="ctrl">
+              <select class="select" id="bulkVendor" name="vendor">
                 <option value="auto" selected>Auto-detect (recommended)</option>
                 <option value="aws">AWS Security Group</option>
                 <option value="azure">Azure NSG</option>
@@ -314,11 +321,8 @@
                 <option value="paloalto">Palo Alto Networks</option>
                 <option value="pfsense">pfSense</option>
               </select>
-            </div>
-            <div class="form-group">
-              <label for="bulkCompliance">Compliance Framework <span class="optional">(licensed)</span></label>
-              <select id="bulkCompliance" name="compliance">
-                <option value="">None</option>
+              <select class="select" id="bulkCompliance" name="compliance">
+                <option value="">No compliance</option>
                 <option value="cis">CIS Benchmark</option>
                 <option value="stig">DISA STIG</option>
                 <option value="hipaa">HIPAA Security Rule</option>
@@ -327,35 +331,35 @@
                 <option value="soc2">SOC2</option>
               </select>
             </div>
-            <div class="form-group form-group-check">
-              <label class="checkbox-label">
-                <input type="checkbox" id="bulkArchive" name="archive" value="1" />
-                <span>Save all to Audit History</span>
-              </label>
+          </div>
+          <div class="field">
+            <div><div class="label">Options</div></div>
+            <div class="ctrl">
+              <div class="toggles">
+                <label class="tgl" id="tglBulkArchive"><input type="checkbox" id="bulkArchive" name="archive" value="1" /><span class="mark"></span>Save all to history</label>
+              </div>
             </div>
           </div>
-          <button type="submit" class="btn-primary" id="bulkBtn">
-            <span id="bulkText">Run Bulk Audit</span>
-            <span id="bulkSpinner" class="spinner hidden"></span>
-          </button>
-        </form>
-      </div>
+        </div>
+        <button type="submit" class="btn-primary" id="bulkBtn" style="margin-top:24px">
+          <span id="bulkText">Run Bulk Audit</span>
+          <span id="bulkSpinner" class="spinner hidden"></span>
+        </button>
+      </form>
 
-      <div class="card hidden" id="bulkResults">
-        <h2 class="card-title">Bulk Results</h2>
+      <div class="hidden" id="bulkResults" style="margin-top:32px">
+        <div class="section-head"><div><h2>Bulk Results</h2></div></div>
         <div id="bulkResultsList"></div>
       </div>
       </div><!-- /audit-mode-bulk -->
       {% else %}
-      <div class="card">
-        <p class="role-notice">Audit execution requires Auditor or Admin role. You can view results in the History tab.</p>
-      </div>
+      <p class="role-notice">Audit execution requires Auditor or Admin role. You can view results in the History tab.</p>
       {% endif %}
 
     </section>
 
     <!-- ═════════════════════════════════════════ COMPARE CONFIGS ══ -->
-    <section class="tab-panel hidden" id="tab-diff">
+    <section class="page hidden" id="tab-diff">
       {% if demo_mode %}
       <div class="card demo-picker-card">
         <h2 class="card-title">Sample Comparisons</h2>
@@ -374,52 +378,61 @@
       </div>
       {% endif %}
 
-      <div class="card" id="diffUploadCard">
-        <h2 class="card-title">Compare Configs</h2>
-        <p class="card-desc">Upload two firewall configs of the same vendor to see added, removed, and unchanged rules.</p>
+      <section class="page-head">
+        <div>
+          <div class="eyebrow">Config diff</div>
+          <h1>Compare two<br/><em>revisions.</em></h1>
+        </div>
+      </section>
+
+      <div id="diffUploadCard">
+        <div class="section-head"><div><div class="idx">01 — Upload</div><h2>Select configs</h2></div></div>
         <form id="diffForm" enctype="multipart/form-data">
-          <div class="form-grid">
-            <div class="form-group">
-              <label for="config_a">Baseline Config <span class="optional">(older)</span></label>
-              <div class="file-input-wrapper">
-                <input type="file" id="config_a" name="config_a" required />
-                <span class="file-label" id="fileLabelA">Choose a file&hellip;</span>
+          <div class="form">
+            <div class="field split">
+              <div><div class="label">Baseline <span class="opt-tag">older</span></div><div class="help">The reference config to compare against.</div></div>
+              <div class="ctrl">
+                <label for="config_a" class="file-field empty" id="diffFieldA">
+                  <div><div class="fname" id="fileLabelA">Choose a file&hellip;</div><div class="fmeta" id="fileMetaA"></div></div>
+                  <span class="browse">Browse</span>
+                  <input type="file" id="config_a" name="config_a" required hidden />
+                </label>
+                <label for="config_b" class="file-field empty" id="diffFieldB">
+                  <div><div class="fname" id="fileLabelB">Choose a file&hellip;</div><div class="fmeta" id="fileMetaB"></div></div>
+                  <span class="browse">Browse</span>
+                  <input type="file" id="config_b" name="config_b" required hidden />
+                </label>
               </div>
             </div>
-            <div class="form-group">
-              <label for="config_b">New Config <span class="optional">(current)</span></label>
-              <div class="file-input-wrapper">
-                <input type="file" id="config_b" name="config_b" required />
-                <span class="file-label" id="fileLabelB">Choose a file&hellip;</span>
+            <div class="field">
+              <div><div class="label">Vendor</div><div class="help">Auto-detect works for most formats.</div></div>
+              <div class="ctrl">
+                <select class="select" id="diffVendor" name="vendor">
+                  <option value="auto" selected>Auto-detect (recommended)</option>
+                  <option value="aws">AWS Security Group</option>
+                  <option value="azure">Azure NSG</option>
+                  <option value="cisco">Cisco</option>
+                  <option value="fortinet">Fortinet</option>
+                  <option value="gcp">GCP VPC Firewall</option>
+                  <option value="iptables">iptables (Linux)</option>
+                  <option value="juniper">Juniper SRX</option>
+                  <option value="nftables">nftables (Linux)</option>
+                  <option value="paloalto">Palo Alto Networks</option>
+                  <option value="pfsense">pfSense</option>
+                </select>
               </div>
-            </div>
-            <div class="form-group">
-              <label for="diffVendor">Vendor</label>
-              <select id="diffVendor" name="vendor">
-                <option value="auto" selected>Auto-detect (recommended)</option>
-                <option value="aws">AWS Security Group</option>
-                <option value="azure">Azure NSG</option>
-                <option value="cisco">Cisco</option>
-                <option value="fortinet">Fortinet</option>
-                <option value="gcp">GCP VPC Firewall</option>
-                <option value="iptables">iptables (Linux)</option>
-                <option value="juniper">Juniper SRX</option>
-                <option value="nftables">nftables (Linux)</option>
-                <option value="paloalto">Palo Alto Networks</option>
-                <option value="pfsense">pfSense</option>
-              </select>
             </div>
           </div>
-          <button type="submit" class="btn-primary" id="diffBtn">
+          <button type="submit" class="btn-primary" id="diffBtn" style="margin-top:24px">
             <span id="diffText">Compare</span>
             <span id="diffSpinner" class="spinner hidden"></span>
           </button>
         </form>
-      </div><!-- /#diffUploadCard -->
+      </div>
 
-      <div class="card hidden" id="diffResults">
-        <div class="results-header">
-          <h2 class="card-title" style="margin-bottom:0">Diff Results</h2>
+      <div class="hidden" id="diffResults" style="margin-top:32px">
+        <div class="section-head">
+          <div><h2>Diff Results</h2></div>
           <span class="detected-vendor hidden" id="diffVendorTag"></span>
         </div>
         <div id="diffSummary"></div>
@@ -430,31 +443,34 @@
     </section>
 
     <!-- ══════════════════════════════════════════ LIVE CONNECT ══════ -->
-    <section class="tab-panel hidden" id="tab-connect">
-      <div class="card">
-        <h2 class="card-title">Live SSH Connection</h2>
-        <p class="card-desc">Connect directly to a device to pull its running configuration and audit it in real time.</p>
-        {% if demo_mode %}
-        <div class="alert alert-info" style="display:flex;align-items:center;gap:0.6rem">
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="width:15px;height:15px;flex-shrink:0" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><line x1="8" y1="5" x2="8" y2="8.5"/><circle cx="8" cy="11" r="0.6" fill="currentColor" stroke="none"/></svg>
-          <span><strong>Demo session active</strong> &mdash; a sample Cisco ASA (ASA01-EDGE) is pre-connected. Click <em>Connect &amp; Audit</em> to run the audit and see live findings.</span>
-        </div>
-        {% else %}
-        <div class="alert alert-info">
-          Supported: <strong>Cisco</strong>, <strong>Fortinet</strong>, <strong>Palo Alto Networks</strong> (SSH).
-          Credentials are used only for the single connection and are never stored.
-        </div>
-        {% endif %}
-        <form id="connectForm">
-          <div class="form-grid connect-grid">
-            <div class="form-group" style="grid-column:1/-1">
-              <label for="connDeviceTag">Device Tag</label>
-              <input type="text" id="connDeviceTag" name="tag" placeholder="e.g. ASA01, FortiGate-HQ&hellip;" autocomplete="off" maxlength="64" required
-                {% if demo_mode %}value="ASA01-EDGE" readonly{% endif %} />
-            </div>
-            <div class="form-group">
+    <section class="page hidden" id="tab-connect">
+      <section class="page-head">
+        <div><div class="eyebrow">Live Connect</div><h1>SSH audit<br/><em>in real time.</em></h1></div>
+      </section>
+
+      {% if demo_mode %}
+      <div class="banner">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="width:15px;height:15px;flex-shrink:0" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><line x1="8" y1="5" x2="8" y2="8.5"/><circle cx="8" cy="11" r="0.6" fill="currentColor" stroke="none"/></svg>
+        <span><strong>Demo session active</strong> &mdash; a sample Cisco ASA (ASA01-EDGE) is pre-connected. Click <em>Connect &amp; Audit</em> to run the audit and see live findings.</span>
+      </div>
+      {% else %}
+      <div class="banner">
+        Supported: <strong>Cisco</strong>, <strong>Fortinet</strong>, <strong>Palo Alto Networks</strong> (SSH).
+        Credentials are used only for the single connection and are never stored.
+      </div>
+      {% endif %}
+
+      <form id="connectForm" style="margin-top:24px">
+        <div class="form">
+          <div class="field">
+            <label for="connDeviceTag">Device Tag</label>
+            <input class="input" type="text" id="connDeviceTag" name="tag" placeholder="e.g. ASA01, FortiGate-HQ&hellip;" autocomplete="off" maxlength="64" required
+              {% if demo_mode %}value="ASA01-EDGE" readonly{% endif %} />
+          </div>
+          <div class="field triple">
+            <div>
               <label for="connVendor">Vendor</label>
-              <select id="connVendor" name="vendor" {% if demo_mode %}disabled{% endif %}>
+              <select class="select" id="connVendor" name="vendor" {% if demo_mode %}disabled{% endif %}>
                 <option value="cisco" {% if demo_mode %}selected{% endif %}>Cisco</option>
                 <option value="fortinet">Fortinet</option>
                 <option value="iptables">iptables (Linux)</option>
@@ -464,80 +480,80 @@
                 <option value="pfsense">pfSense</option>
               </select>
             </div>
-            <div class="form-group">
+            <div>
               <label for="connHost">Host / IP</label>
-              <input type="text" id="connHost" name="host" placeholder="192.168.1.1" autocomplete="off"
+              <input class="input" type="text" id="connHost" name="host" placeholder="192.168.1.1" autocomplete="off"
                 {% if demo_mode %}value="203.0.113.50" readonly{% endif %} />
             </div>
-            <div class="form-group">
+            <div>
               <label for="connPort">SSH Port</label>
-              <input type="text" id="connPort" name="port" value="22" placeholder="22" autocomplete="off"
+              <input class="input" type="text" id="connPort" name="port" value="22" placeholder="22" autocomplete="off"
                 {% if demo_mode %}readonly{% endif %} />
             </div>
-            <div class="form-group">
-              <label for="connUser">Username</label>
-              <input type="text" id="connUser" name="username" placeholder="admin" autocomplete="off"
-                {% if demo_mode %}value="auditor" readonly{% endif %} />
-            </div>
-            {% if not demo_mode %}
-            <div class="form-group" style="grid-column:1/-1">
-              <label>Authentication Method</label>
-              <div style="display:flex;gap:1.5rem;margin-top:0.35rem">
-                <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer">
-                  <input type="radio" name="auth_method" value="password" id="authMethodPassword" checked />
-                  <span>Password</span>
-                </label>
-                <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer">
-                  <input type="radio" name="auth_method" value="pem_key" id="authMethodPem" />
-                  <span>PEM Key File</span>
-                </label>
-              </div>
-            </div>
-            <div class="form-group" id="connPassGroup">
-              <label for="connPass">Password</label>
-              <input type="password" id="connPass" name="password" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" autocomplete="current-password" />
-            </div>
-            <div class="form-group hidden" id="connPemGroup">
-              <label for="connPemKey">PEM Key File</label>
-              <input type="file" id="connPemKey" name="pem_key" accept=".pem,.key" />
-            </div>
-            <div class="form-group hidden" id="connPemPassGroup">
-              <label for="connPemPassphrase">Key Passphrase <span class="optional">(if encrypted)</span></label>
-              <input type="password" id="connPemPassphrase" name="pem_passphrase" autocomplete="new-password" />
-            </div>
-            {% endif %}
-            <div class="form-group">
-              <label for="connCompliance">Compliance <span class="optional">(licensed)</span></label>
-              <select id="connCompliance" name="compliance" {% if demo_mode %}disabled{% endif %}>
-                <option value="">None</option>
-                <option value="cis">CIS Benchmark</option>
-                <option value="stig">DISA STIG</option>
-                <option value="hipaa">HIPAA Security Rule</option>
-                <option value="nist">NIST SP 800-41</option>
-                <option value="pci">PCI-DSS</option>
-                <option value="soc2">SOC2</option>
-              </select>
+          </div>
+          <div class="field">
+            <label for="connUser">Username</label>
+            <input class="input" type="text" id="connUser" name="username" placeholder="admin" autocomplete="off"
+              {% if demo_mode %}value="auditor" readonly{% endif %} />
+          </div>
+          {% if not demo_mode %}
+          <div class="field">
+            <label>Authentication Method</label>
+            <div class="toggles">
+              <label class="tgl" id="tglAuthPassword">
+                <input type="radio" name="auth_method" value="password" id="authMethodPassword" checked />
+                <span class="mark"></span>Password
+              </label>
+              <label class="tgl" id="tglAuthPem">
+                <input type="radio" name="auth_method" value="pem_key" id="authMethodPem" />
+                <span class="mark"></span>PEM Key File
+              </label>
             </div>
           </div>
-          <button type="submit" class="btn-primary" id="connectBtn">
-            <span id="connectText">Connect &amp; Audit</span>
-            <span id="connectSpinner" class="spinner hidden"></span>
-          </button>
-        </form>
-      </div>
+          <div class="field" id="connPassGroup">
+            <label for="connPass">Password</label>
+            <input class="input" type="password" id="connPass" name="password" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" autocomplete="current-password" />
+          </div>
+          <div class="field hidden" id="connPemGroup">
+            <label for="connPemKey">PEM Key File</label>
+            <input class="input" type="file" id="connPemKey" name="pem_key" accept=".pem,.key" />
+          </div>
+          <div class="field hidden" id="connPemPassGroup">
+            <label for="connPemPassphrase">Key Passphrase <span class="optional">(if encrypted)</span></label>
+            <input class="input" type="password" id="connPemPassphrase" name="pem_passphrase" autocomplete="new-password" />
+          </div>
+          {% endif %}
+          <div class="field">
+            <label for="connCompliance">Compliance <span class="optional">(licensed)</span></label>
+            <select class="select" id="connCompliance" name="compliance" {% if demo_mode %}disabled{% endif %}>
+              <option value="">None</option>
+              <option value="cis">CIS Benchmark</option>
+              <option value="stig">DISA STIG</option>
+              <option value="hipaa">HIPAA Security Rule</option>
+              <option value="nist">NIST SP 800-41</option>
+              <option value="pci">PCI-DSS</option>
+              <option value="soc2">SOC2</option>
+            </select>
+          </div>
+        </div>
+        <button type="submit" class="btn-primary" id="connectBtn" style="margin-top:24px">
+          <span id="connectText">Connect &amp; Audit</span>
+          <span id="connectSpinner" class="spinner hidden"></span>
+        </button>
+      </form>
 
-      <div class="card hidden" id="connectResults">
-        <div class="results-header">
-          <h2 class="card-title" style="margin-bottom:0">Live Audit Results</h2>
+      <div class="hidden" id="connectResults" style="margin-top:40px">
+        <div class="section-head">
+          <h2>Live Audit Results</h2>
           <span class="detected-vendor hidden" id="connVendorTag"></span>
         </div>
-        <div class="summary-grid" id="connSummaryGrid"></div>
+        <div class="stats" id="connSummaryGrid"></div>
         <div id="connFindingsList"></div>
         <div class="remediation-row hidden" id="connRemediationRow">
-          <button id="connRemediationPlanBtn" class="btn-primary btn-remediation">&#9881; View Remediation Plan</button>
+          <button id="connRemediationPlanBtn" class="btn-primary btn-remediation">View Remediation Plan</button>
         </div>
         <div class="archive-row hidden" id="connArchiveRow">
-          <span class="archive-saved-msg">&#10003; Result saved to Audit History &mdash;
+          <span class="archive-saved-msg">Result saved to Audit History &mdash;
             <button class="link-btn" id="connViewHistoryBtn">View History</button>
           </span>
         </div>
@@ -545,32 +561,29 @@
     </section>
 
     <!-- ═══════════════════════════════════════════════ HISTORY ══════ -->
-    <section class="tab-panel hidden" id="tab-history">
+    <section class="page hidden" id="tab-history">
 
-      <!-- History sub-tabs: Audit History / Activity Log -->
-      <div class="sub-tab-nav">
-        <button class="sub-tab-btn sub-tab-active" data-subtab="audits">&#128337; Audit History</button>
+      <nav class="subnav">
+        <a class="active" data-subtab="audits">Audit History</a>
         {% if not current_user or current_user.role == 'admin' %}
-        <button class="sub-tab-btn" data-subtab="activity">&#128203; Activity Log</button>
+        <a data-subtab="activity">Activity Log</a>
         {% endif %}
         {% if not current_user or current_user.role in ('admin', 'auditor') %}
-        <button class="sub-tab-btn" data-subtab="seclog">&#128274; Security Log</button>
+        <a data-subtab="seclog">Security Log</a>
         {% endif %}
-      </div>
+      </nav>
 
       <!-- ── Audit History sub-tab ── -->
       <div id="sub-audits">
-      <div class="card">
-        <div class="results-header">
-          <h2 class="card-title" style="margin-bottom:0">Audit History</h2>
-          <button class="btn-secondary" id="refreshHistoryBtn" style="font-size:0.8rem;padding:0.3rem 0.75rem">&#8635; Refresh</button>
+        <div class="section-head">
+          <h2>Audit History</h2>
+          <button class="btn-outline" id="refreshHistoryBtn">&#8635; Refresh</button>
         </div>
-        <p class="card-desc">Saved audits. Select two entries and click Compare.</p>
-        <!-- Filters -->
-        <div class="history-filters">
-          <div class="history-filter-group">
-            <label class="filter-label">Vendor</label>
-            <select id="historyVendorFilter">
+        <p class="section-desc">Saved audits. Select two entries and click Compare.</p>
+        <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1rem;align-items:flex-end">
+          <div>
+            <label style="font-size:0.78rem;color:var(--text-muted);display:block;margin-bottom:4px">Vendor</label>
+            <select class="select" id="historyVendorFilter">
               <option value="">All vendors</option>
               <option value="aws">AWS Security Group</option>
               <option value="azure">Azure NSG</option>
@@ -584,76 +597,73 @@
               <option value="pfsense">pfSense</option>
             </select>
           </div>
-          <div class="history-filter-group">
-            <label class="filter-label">Sort by</label>
-            <select id="historySort">
+          <div>
+            <label style="font-size:0.78rem;color:var(--text-muted);display:block;margin-bottom:4px">Sort by</label>
+            <select class="select" id="historySort">
               <option value="newest">Newest first</option>
               <option value="oldest">Oldest first</option>
               <option value="most">Most issues</option>
               <option value="least">Least issues</option>
             </select>
           </div>
-          <div class="history-filter-group">
-            <label class="filter-label">Search</label>
-            <input type="text" id="historySearch" placeholder="Filter by filename&hellip;" style="padding:0.3rem 0.6rem;font-size:0.85rem;" />
+          <div>
+            <label style="font-size:0.78rem;color:var(--text-muted);display:block;margin-bottom:4px">Search</label>
+            <input class="input" type="text" id="historySearch" placeholder="Filter by filename&hellip;" />
           </div>
         </div>
-        <div id="historyList" class="history-list">
+        <div id="historyList" class="list">
           <p class="text-muted">Loading&hellip;</p>
         </div>
-      </div>
 
-      <!-- Trends chart -->
-      <div class="card" id="trendsCard">
-        <div class="results-header">
-          <h2 class="card-title" style="margin-bottom:0">Score Trends</h2>
-          <button class="btn-secondary" id="refreshTrendsBtn" style="font-size:0.8rem;padding:0.3rem 0.75rem">&#8635; Refresh</button>
-        </div>
-        <p class="card-desc">Security score over time per device. Score = 100 &minus; (HIGH &times; 10) &minus; (MEDIUM &times; 3), min 0.</p>
-        <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1rem;" id="trendsFilters">
-          <div class="history-filter-group">
-            <label class="filter-label">Vendor</label>
-            <select id="trendsVendorFilter">
-              <option value="">All vendors</option>
-            </select>
+        <!-- Trends chart -->
+        <div id="trendsCard" style="margin-top:40px">
+          <div class="section-head">
+            <h2>Score Trends</h2>
+            <button class="btn-outline" id="refreshTrendsBtn">&#8635; Refresh</button>
           </div>
-          <div class="history-filter-group">
-            <label class="filter-label">Device Tag</label>
-            <select id="trendsDeviceFilter">
-              <option value="">All devices</option>
-            </select>
+          <p class="section-desc">Security score over time per device. Score = 100 &minus; (HIGH &times; 10) &minus; (MEDIUM &times; 3), min 0.</p>
+          <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1rem;align-items:flex-end" id="trendsFilters">
+            <div>
+              <label style="font-size:0.78rem;color:var(--text-muted);display:block;margin-bottom:4px">Vendor</label>
+              <select class="select" id="trendsVendorFilter">
+                <option value="">All vendors</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:0.78rem;color:var(--text-muted);display:block;margin-bottom:4px">Device Tag</label>
+              <select class="select" id="trendsDeviceFilter">
+                <option value="">All devices</option>
+              </select>
+            </div>
+          </div>
+          <div id="trendsEmpty" class="hidden"><p class="text-muted">No trend data yet. Save two or more audits for the same device to see trends.</p></div>
+          <div id="trendsChartWrap" style="position:relative;max-height:320px;">
+            <canvas id="trendsChart"></canvas>
           </div>
         </div>
-        <div id="trendsEmpty" class="hidden"><p class="text-muted">No trend data yet. Save two or more audits for the same device to see trends.</p></div>
-        <div id="trendsChartWrap" style="position:relative;max-height:320px;">
-          <canvas id="trendsChart"></canvas>
-        </div>
-      </div>
 
-      <!-- Comparison result -->
-      <div class="card hidden" id="compareResults">
-        <h2 class="card-title">Comparison</h2>
-        <div id="compareContent"></div>
-      </div>
+        <!-- Comparison result -->
+        <div class="hidden" id="compareResults" style="margin-top:40px">
+          <div class="section-head"><h2>Comparison</h2></div>
+          <div id="compareContent"></div>
+        </div>
       </div><!-- /sub-audits -->
 
       <!-- ── Activity Log sub-tab ── -->
       {% if not current_user or current_user.role == 'admin' %}
       <div id="sub-activity" class="hidden">
-      <div class="card">
-        <div class="results-header">
-          <h2 class="card-title" style="margin-bottom:0">Activity Log</h2>
-          <div style="display:flex;gap:0.5rem;align-items:center;">
-            <button class="btn-secondary" id="refreshActivityBtn" style="font-size:0.8rem;padding:0.3rem 0.75rem">&#8635; Refresh</button>
-            <button class="btn-danger"    id="clearActivityBtn"   style="font-size:0.8rem;padding:0.3rem 0.75rem">&#128465; Clear All</button>
+        <div class="section-head">
+          <h2>Activity Log</h2>
+          <div style="display:flex;gap:0.5rem">
+            <button class="btn-outline" id="refreshActivityBtn">&#8635; Refresh</button>
+            <button class="btn-danger" id="clearActivityBtn">Clear All</button>
           </div>
         </div>
-        <p class="card-desc">All application activity — audits, SSH connections, and config diffs — including failures.</p>
-        <div id="activityList" class="history-list">
+        <p class="section-desc">All application activity &mdash; audits, SSH connections, and config diffs &mdash; including failures.</p>
+        <div id="activityList">
           <p class="text-muted">Loading&hellip;</p>
         </div>
       </div>
-      </div><!-- /sub-activity -->
       {% else %}
       <div id="sub-activity" class="hidden"></div>
       {% endif %}
@@ -661,22 +671,20 @@
       <!-- ── Security Log sub-tab ── -->
       {% if not current_user or current_user.role in ('admin', 'auditor') %}
       <div id="sub-seclog" class="hidden">
-      <div class="card">
-        <div class="results-header">
-          <h2 class="card-title" style="margin-bottom:0">Security Log</h2>
-          <div style="display:flex;gap:0.5rem;align-items:center;">
-            <button class="btn-secondary" id="refreshSecLogBtn" style="font-size:0.8rem;padding:0.3rem 0.75rem">&#8635; Refresh</button>
+        <div class="section-head">
+          <h2>Security Log</h2>
+          <div style="display:flex;gap:0.5rem">
+            <button class="btn-outline" id="refreshSecLogBtn">&#8635; Refresh</button>
             {% if not current_user or current_user.role == 'admin' %}
-            <button class="btn-danger" id="clearSecLogBtn" style="font-size:0.8rem;padding:0.3rem 0.75rem">&#128465; Clear All</button>
+            <button class="btn-danger" id="clearSecLogBtn">Clear All</button>
             {% endif %}
           </div>
         </div>
-        <p class="card-desc">Authentication events — logins, failures, invalid API keys, and user/settings changes.</p>
-        <div id="secLogList" class="history-list">
+        <p class="section-desc">Authentication events &mdash; logins, failures, invalid API keys, and user/settings changes.</p>
+        <div id="secLogList">
           <p class="text-muted">Loading&hellip;</p>
         </div>
       </div>
-      </div><!-- /sub-seclog -->
       {% else %}
       <div id="sub-seclog" class="hidden"></div>
       {% endif %}
@@ -684,68 +692,244 @@
     </section>
 
     <!-- ═══════════════════════════════════════════════ SCHEDULES ══════ -->
-    <section class="tab-panel hidden" id="tab-schedules">
-      <div class="card">
-        <div class="results-header">
-          <h2 class="card-title" style="margin-bottom:0">Scheduled Audits</h2>
-          <button class="btn-secondary" id="refreshSchedulesBtn" style="font-size:0.8rem;padding:0.3rem 0.75rem">&#8635; Refresh</button>
+    <section class="page hidden" id="tab-schedules">
+      <section class="page-head">
+        <div><div class="eyebrow">Schedules</div><h1>Automated audits<br/><em>on your terms.</em></h1></div>
+        <div class="actions">
+          <button class="btn-outline" id="refreshSchedulesBtn">&#8635; Refresh</button>
         </div>
-        <p class="card-desc">Automatically run SSH audits on a recurring schedule. Results are saved to Audit History.</p>
-        {% if demo_mode %}
-        <div class="alert alert-info" style="margin-top:0.75rem">
-          <strong>Read-only demo view</strong> &mdash; Sample schedules are shown below. Creating, editing, and deleting schedules is disabled in demo mode.
-        </div>
-        {% endif %}
-        <div id="schedulesList" class="schedules-list">
-          <p class="text-muted">Loading&hellip;</p>
-        </div>
+      </section>
+
+      <p class="section-desc">Automatically run SSH audits on a recurring schedule. Results are saved to Audit History.</p>
+      {% if demo_mode %}
+      <div class="banner" style="margin-bottom:1rem">
+        <strong>Read-only demo view</strong> &mdash; Sample schedules are shown below. Creating, editing, and deleting schedules is disabled in demo mode.
+      </div>
+      {% endif %}
+      <div id="schedulesList">
+        <p class="text-muted">Loading&hellip;</p>
       </div>
 
       <!-- New / Edit Schedule Form — hidden in demo mode and for viewer role -->
-      <div class="card{% if demo_mode or (current_user and current_user.role == 'viewer') %} hidden{% endif %}" id="scheduleFormCard">
-        <h2 class="card-title" id="scheduleFormTitle">New Schedule</h2>
-        <form id="scheduleForm">
+      <div class="{% if demo_mode or (current_user and current_user.role == 'viewer') %}hidden{% endif %}" id="scheduleFormCard" style="margin-top:40px">
+        <div class="section-head">
+          <h2 id="scheduleFormTitle">New Schedule</h2>
+        </div>
+        <form id="scheduleForm" style="margin-top:16px">
           <input type="hidden" id="scheduleId" value="" />
-          <div class="form-grid">
-            <div class="form-group">
-              <label for="schedName">Name</label>
-              <input type="text" id="schedName" name="name" placeholder="My ASA01 daily audit" maxlength="80" autocomplete="off" required />
+          <div class="form">
+            <div class="field split">
+              <div>
+                <label for="schedName">Name</label>
+                <input class="input" type="text" id="schedName" name="name" placeholder="My ASA01 daily audit" maxlength="80" autocomplete="off" required />
+              </div>
+              <div>
+                <label for="schedVendor">Vendor</label>
+                <select class="select" id="schedVendor" name="vendor">
+                  <option value="cisco">Cisco</option>
+                  <option value="fortinet">Fortinet</option>
+                  <option value="iptables">iptables (Linux)</option>
+                  <option value="juniper">Juniper SRX</option>
+                  <option value="nftables">nftables (Linux)</option>
+                  <option value="paloalto">Palo Alto Networks</option>
+                  <option value="pfsense">pfSense</option>
+                </select>
+              </div>
             </div>
-            <div class="form-group">
-              <label for="schedVendor">Vendor</label>
-              <select id="schedVendor" name="vendor">
-                <option value="cisco">Cisco</option>
-                <option value="fortinet">Fortinet</option>
-                <option value="iptables">iptables (Linux)</option>
-                <option value="juniper">Juniper SRX</option>
-                <option value="nftables">nftables (Linux)</option>
-                <option value="paloalto">Palo Alto Networks</option>
-                <option value="pfsense">pfSense</option>
-              </select>
+            <div class="field triple">
+              <div>
+                <label for="schedHost">Host / IP</label>
+                <input class="input" type="text" id="schedHost" name="host" placeholder="192.168.1.1" autocomplete="off" required />
+              </div>
+              <div>
+                <label for="schedPort">SSH Port</label>
+                <input class="input" type="text" id="schedPort" name="port" value="22" placeholder="22" autocomplete="off" />
+              </div>
+              <div>
+                <label for="schedUser">Username</label>
+                <input class="input" type="text" id="schedUser" name="username" placeholder="admin" autocomplete="off" required />
+              </div>
             </div>
-            <div class="form-group">
-              <label for="schedHost">Host / IP</label>
-              <input type="text" id="schedHost" name="host" placeholder="192.168.1.1" autocomplete="off" required />
+            <div class="field split">
+              <div>
+                <label for="schedPass">Password</label>
+                <input class="input" type="password" id="schedPass" name="password" placeholder="leave blank to keep existing" autocomplete="new-password" />
+              </div>
+              <div>
+                <label for="schedTag">Device Tag</label>
+                <input class="input" type="text" id="schedTag" name="tag" placeholder="ASA01" maxlength="64" autocomplete="off" />
+              </div>
             </div>
-            <div class="form-group">
-              <label for="schedPort">SSH Port</label>
-              <input type="text" id="schedPort" name="port" value="22" placeholder="22" autocomplete="off" />
+            <div class="field split">
+              <div>
+                <label for="schedCompliance">Compliance <span class="optional">(licensed)</span></label>
+                <select class="select" id="schedCompliance" name="compliance">
+                  <option value="">None</option>
+                  <option value="cis">CIS Benchmark</option>
+                  <option value="stig">DISA STIG</option>
+                  <option value="hipaa">HIPAA Security Rule</option>
+                  <option value="nist">NIST SP 800-41</option>
+                  <option value="pci">PCI-DSS</option>
+                  <option value="soc2">SOC2</option>
+                </select>
+              </div>
+              <div>
+                <label for="schedFrequency">Frequency</label>
+                <select class="select" id="schedFrequency" name="frequency">
+                  <option value="hourly">Hourly</option>
+                  <option value="daily" selected>Daily</option>
+                  <option value="weekly">Weekly</option>
+                </select>
+              </div>
             </div>
-            <div class="form-group">
-              <label for="schedUser">Username</label>
-              <input type="text" id="schedUser" name="username" placeholder="admin" autocomplete="off" required />
+            <div class="field triple">
+              <div id="schedHourGroup">
+                <label for="schedHour">Hour (UTC, 0&ndash;23)</label>
+                <input class="input" type="number" id="schedHour" name="hour" value="2" min="0" max="23" />
+              </div>
+              <div>
+                <label for="schedMinute">Minute (0&ndash;59)</label>
+                <input class="input" type="number" id="schedMinute" name="minute" value="0" min="0" max="59" />
+              </div>
+              <div id="schedDowGroup" style="display:none">
+                <label for="schedDow">Day of Week</label>
+                <select class="select" id="schedDow" name="day_of_week">
+                  <option value="mon" selected>Monday</option>
+                  <option value="tue">Tuesday</option>
+                  <option value="wed">Wednesday</option>
+                  <option value="thu">Thursday</option>
+                  <option value="fri">Friday</option>
+                  <option value="sat">Saturday</option>
+                  <option value="sun">Sunday</option>
+                </select>
+              </div>
             </div>
-            <div class="form-group">
-              <label for="schedPass">Password</label>
-              <input type="password" id="schedPass" name="password" placeholder="leave blank to keep existing" autocomplete="new-password" />
+            <div class="field">
+              <label>Status &amp; Notifications</label>
+              <div class="toggles">
+                <label class="tgl" id="tglSchedEnabled">
+                  <input type="checkbox" id="schedEnabled" name="enabled" checked />
+                  <span class="mark"></span>Enabled
+                </label>
+                <label class="tgl" id="tglSchedNotifyFinding">
+                  <input type="checkbox" id="schedNotifyFinding" />
+                  <span class="mark"></span>Alert on HIGH findings
+                </label>
+                <label class="tgl" id="tglSchedNotifyError">
+                  <input type="checkbox" id="schedNotifyError" />
+                  <span class="mark"></span>Alert on audit errors
+                </label>
+              </div>
             </div>
-            <div class="form-group">
-              <label for="schedTag">Device Tag</label>
-              <input type="text" id="schedTag" name="tag" placeholder="ASA01" maxlength="64" autocomplete="off" />
+            <div class="field">
+              <label for="schedSlackWebhook">Slack Webhook URL <span class="optional">(optional)</span></label>
+              <input class="input" type="url" id="schedSlackWebhook" placeholder="https://hooks.slack.com/services/&hellip;" autocomplete="off" maxlength="512" />
             </div>
-            <div class="form-group">
-              <label for="schedCompliance">Compliance <span class="optional">(licensed)</span></label>
-              <select id="schedCompliance" name="compliance">
+            <div class="field">
+              <label for="schedTeamsWebhook">Microsoft Teams Webhook URL <span class="optional">(optional)</span></label>
+              <input class="input" type="url" id="schedTeamsWebhook" placeholder="https://[tenant].webhook.office.com/webhookb2/&hellip;" autocomplete="off" maxlength="512" />
+            </div>
+            <div class="field">
+              <label for="schedNotifyEmail">Alert Email <span class="optional">(optional)</span></label>
+              <input class="input" type="email" id="schedNotifyEmail" placeholder="ops@example.com" autocomplete="off" maxlength="254" />
+            </div>
+          </div>
+          <div style="display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap;margin-top:24px">
+            <button type="submit" class="btn-primary" id="schedSaveBtn">Save Schedule</button>
+            <button type="button" class="btn-outline" id="schedCancelBtn">Cancel</button>
+            <span class="settings-saved-msg hidden" id="schedSavedMsg">&#10003; Saved</span>
+            <span class="alert-inline hidden" id="schedErrorMsg"></span>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- ════════════════════════════════════════════════ SETTINGS ══════ -->
+    <section class="page hidden" id="tab-settings">
+      <div class="settings">
+
+        <!-- ── Left sidebar — admin only ─────────────────────────────────── -->
+        {% if not current_user or current_user.role == 'admin' %}
+        <nav class="settings-nav" role="navigation" aria-label="Settings sections">
+          <div class="settings-nav-group-label">Configuration</div>
+
+          <a class="active" data-pane="general">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><line x1="2" y1="5" x2="14" y2="5"/><line x1="2" y1="9" x2="14" y2="9"/><line x1="2" y1="13" x2="14" y2="13"/><circle cx="6" cy="5" r="1.75"/><circle cx="10" cy="9" r="1.75"/><circle cx="6" cy="13" r="1.75"/></svg>
+            General
+          </a>
+
+          <a data-pane="email">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="3.5" width="14" height="9" rx="1.5"/><path d="M1 5l7 4.5L15 5"/></svg>
+            Email (SMTP)
+          </a>
+
+          {% if not demo_mode %}
+          <a data-pane="auth">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="10" height="8" rx="1.5"/><path d="M5 7V5a3 3 0 0 1 6 0v2"/><circle cx="8" cy="11" r="1" fill="currentColor" stroke="none"/></svg>
+            Authentication
+          </a>
+          {% endif %}
+
+          <a data-pane="security">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 1.5L2 4v4.5c0 3.5 2.5 6.7 6 7.5 3.5-.8 6-4 6-7.5V4L8 1.5z"/><path d="M5.5 8l2 2 3-3"/></svg>
+            Security
+          </a>
+
+          <a data-pane="syslog">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="1.5" width="14" height="5" rx="1.5"/><rect x="1" y="9.5" width="14" height="5" rx="1.5"/><circle cx="4" cy="4" r="0.8" fill="currentColor" stroke="none"/><circle cx="4" cy="12" r="0.8" fill="currentColor" stroke="none"/><line x1="7" y1="4" x2="12" y2="4"/><line x1="7" y1="12" x2="12" y2="12"/></svg>
+            Syslog
+          </a>
+
+          <a data-pane="alerts">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 1.5a4.5 4.5 0 0 1 4.5 4.5c0 2 .8 3.2 1.5 4H2c.7-.8 1.5-2 1.5-4A4.5 4.5 0 0 1 8 1.5z"/><path d="M6.5 14a1.5 1.5 0 0 0 3 0"/></svg>
+            Alert Thresholds
+          </a>
+
+          <a data-pane="webhooks">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 8a6 6 0 1 1 12 0"/><path d="M5 8a3 3 0 1 1 6 0"/><circle cx="8" cy="8" r="1" fill="currentColor" stroke="none"/><line x1="8" y1="9" x2="8" y2="14.5"/><line x1="5.5" y1="14.5" x2="10.5" y2="14.5"/></svg>
+            Webhooks
+          </a>
+        </nav>
+        {% endif %}
+
+        <!-- ── Right content ─────────────────────────────────────────────── -->
+        <div class="settings-main">
+
+          {% if not current_user or current_user.role == 'admin' %}
+          <!-- General pane -->
+          <div class="settings-pane active" id="spane-general">
+            <h2>General</h2>
+            <p class="section-desc">Global defaults applied to every audit. Individual audit options always override these defaults.</p>
+
+            <div class="sub-head">File Audit Defaults</div>
+            <div class="field">
+              <div>
+                <label>Always generate PDF report</label>
+                <p class="help">Pre-check &ldquo;Generate PDF Report&rdquo; on every file audit.</p>
+              </div>
+              <label class="sw-toggle">
+                <input type="checkbox" id="setting-auto-pdf" />
+                <span class="track"></span>
+              </label>
+            </div>
+            <div class="field">
+              <div>
+                <label>Always save to Audit History</label>
+                <p class="help">Pre-check &ldquo;Save to Audit History&rdquo; on every file audit.</p>
+              </div>
+              <label class="sw-toggle">
+                <input type="checkbox" id="setting-auto-archive" />
+                <span class="track"></span>
+              </label>
+            </div>
+
+            <div class="sub-head">Compliance Default</div>
+            <div class="field">
+              <div>
+                <label for="setting-default-compliance">Default compliance framework</label>
+                <p class="help">Pre-select a framework on the File Audit and Live Connect forms.</p>
+              </div>
+              <select class="select" id="setting-default-compliance">
                 <option value="">None</option>
                 <option value="cis">CIS Benchmark</option>
                 <option value="stig">DISA STIG</option>
@@ -755,217 +939,49 @@
                 <option value="soc2">SOC2</option>
               </select>
             </div>
-            <div class="form-group">
-              <label for="schedFrequency">Frequency</label>
-              <select id="schedFrequency" name="frequency">
-                <option value="hourly">Hourly</option>
-                <option value="daily" selected>Daily</option>
-                <option value="weekly">Weekly</option>
-              </select>
-            </div>
-            <div class="form-group" id="schedHourGroup">
-              <label for="schedHour">Hour (UTC, 0&ndash;23)</label>
-              <input type="number" id="schedHour" name="hour" value="2" min="0" max="23" />
-            </div>
-            <div class="form-group">
-              <label for="schedMinute">Minute (0&ndash;59)</label>
-              <input type="number" id="schedMinute" name="minute" value="0" min="0" max="59" />
-            </div>
-            <div class="form-group" id="schedDowGroup" style="display:none">
-              <label for="schedDow">Day of Week</label>
-              <select id="schedDow" name="day_of_week">
-                <option value="mon" selected>Monday</option>
-                <option value="tue">Tuesday</option>
-                <option value="wed">Wednesday</option>
-                <option value="thu">Thursday</option>
-                <option value="fri">Friday</option>
-                <option value="sat">Saturday</option>
-                <option value="sun">Sunday</option>
-              </select>
-            </div>
-            <div class="form-group form-group-check">
-              <label class="checkbox-label">
-                <input type="checkbox" id="schedEnabled" name="enabled" checked />
-                <span>Enabled</span>
-              </label>
-            </div>
-            <!-- Notifications -->
-            <div class="form-group" style="grid-column:1/-1">
-              <label>Notifications</label>
-              <div style="display:flex;gap:1.5rem;flex-wrap:wrap;margin-top:0.35rem">
-                <label class="checkbox-label">
-                  <input type="checkbox" id="schedNotifyFinding" />
-                  <span>Alert on HIGH findings</span>
-                </label>
-                <label class="checkbox-label">
-                  <input type="checkbox" id="schedNotifyError" />
-                  <span>Alert on audit errors</span>
-                </label>
-              </div>
-            </div>
-            <div class="form-group" style="grid-column:1/-1">
-              <label for="schedSlackWebhook">Slack Webhook URL <span class="optional">(optional)</span></label>
-              <input type="url" id="schedSlackWebhook" placeholder="https://hooks.slack.com/services/…" autocomplete="off" maxlength="512" />
-            </div>
-            <div class="form-group" style="grid-column:1/-1">
-              <label for="schedTeamsWebhook">Microsoft Teams Webhook URL <span class="optional">(optional)</span></label>
-              <input type="url" id="schedTeamsWebhook" placeholder="https://[tenant].webhook.office.com/webhookb2/…" autocomplete="off" maxlength="512" />
-            </div>
-            <div class="form-group" style="grid-column:1/-1">
-              <label for="schedNotifyEmail">Alert Email <span class="optional">(optional)</span></label>
-              <input type="email" id="schedNotifyEmail" placeholder="ops@example.com" autocomplete="off" maxlength="254" />
-            </div>
-          </div>
-          <div style="display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap">
-            <button type="submit" class="btn-primary" id="schedSaveBtn">Save Schedule</button>
-            <button type="button" class="btn-secondary" id="schedCancelBtn">Cancel</button>
-            <span class="settings-saved-msg hidden" id="schedSavedMsg">&#10003; Saved</span>
-            <span class="alert-inline hidden" id="schedErrorMsg"></span>
-          </div>
-        </form>
-      </div>
-    </section>
-
-    <!-- ════════════════════════════════════════════════ SETTINGS ══════ -->
-    <section class="tab-panel hidden" id="tab-settings">
-      <div class="settings-shell">
-
-        <!-- ── Left sidebar — admin only ─────────────────────────────────── -->
-        {% if not current_user or current_user.role == 'admin' %}
-        <nav class="settings-sidebar" role="navigation" aria-label="Settings sections">
-          <div class="settings-nav-group-label">Configuration</div>
-
-          <button class="settings-nav-item settings-nav-active" data-pane="general">
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><line x1="2" y1="5" x2="14" y2="5"/><line x1="2" y1="9" x2="14" y2="9"/><line x1="2" y1="13" x2="14" y2="13"/><circle cx="6" cy="5" r="1.75"/><circle cx="10" cy="9" r="1.75"/><circle cx="6" cy="13" r="1.75"/></svg>
-            General
-          </button>
-
-          <button class="settings-nav-item" data-pane="email">
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="3.5" width="14" height="9" rx="1.5"/><path d="M1 5l7 4.5L15 5"/></svg>
-            Email (SMTP)
-          </button>
-
-          {% if not demo_mode %}
-          <button class="settings-nav-item" data-pane="auth">
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="10" height="8" rx="1.5"/><path d="M5 7V5a3 3 0 0 1 6 0v2"/><circle cx="8" cy="11" r="1" fill="currentColor" stroke="none"/></svg>
-            Authentication
-          </button>
-          {% endif %}
-
-          <button class="settings-nav-item" data-pane="security">
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 1.5L2 4v4.5c0 3.5 2.5 6.7 6 7.5 3.5-.8 6-4 6-7.5V4L8 1.5z"/><path d="M5.5 8l2 2 3-3"/></svg>
-            Security
-          </button>
-
-          <button class="settings-nav-item" data-pane="syslog">
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="1.5" width="14" height="5" rx="1.5"/><rect x="1" y="9.5" width="14" height="5" rx="1.5"/><circle cx="4" cy="4" r="0.8" fill="currentColor" stroke="none"/><circle cx="4" cy="12" r="0.8" fill="currentColor" stroke="none"/><line x1="7" y1="4" x2="12" y2="4"/><line x1="7" y1="12" x2="12" y2="12"/></svg>
-            Syslog
-          </button>
-
-          <button class="settings-nav-item" data-pane="alerts">
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 1.5a4.5 4.5 0 0 1 4.5 4.5c0 2 .8 3.2 1.5 4H2c.7-.8 1.5-2 1.5-4A4.5 4.5 0 0 1 8 1.5z"/><path d="M6.5 14a1.5 1.5 0 0 0 3 0"/></svg>
-            Alert Thresholds
-          </button>
-
-          <button class="settings-nav-item" data-pane="webhooks">
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 8a6 6 0 1 1 12 0"/><path d="M5 8a3 3 0 1 1 6 0"/><circle cx="8" cy="8" r="1" fill="currentColor" stroke="none"/><line x1="8" y1="9" x2="8" y2="14.5"/><line x1="5.5" y1="14.5" x2="10.5" y2="14.5"/></svg>
-            Webhooks
-          </button>
-        </nav>
-        {% endif %}
-
-        <!-- ── Right content ─────────────────────────────────────────────── -->
-        <div class="settings-content">
-
-          {% if not current_user or current_user.role == 'admin' %}
-          <!-- General pane -->
-          <div class="settings-pane active" id="spane-general">
-            <div class="settings-pane-header">
-              <h2 class="settings-pane-title">General</h2>
-              <p class="settings-pane-desc">Global defaults applied to every audit. Individual audit options always override these defaults.</p>
-            </div>
-
-            <div class="settings-group">
-              <h3 class="settings-group-title">File Audit Defaults</h3>
-              <label class="settings-row">
-                <div class="settings-row-info">
-                  <span class="settings-row-label">Always generate PDF report</span>
-                  <span class="settings-row-desc">Pre-check &ldquo;Generate PDF Report&rdquo; on every file audit.</span>
-                </div>
-                <label class="toggle-switch">
-                  <input type="checkbox" id="setting-auto-pdf" />
-                  <span class="toggle-track"><span class="toggle-thumb"></span></span>
-                </label>
-              </label>
-              <label class="settings-row">
-                <div class="settings-row-info">
-                  <span class="settings-row-label">Always save to Audit History</span>
-                  <span class="settings-row-desc">Pre-check &ldquo;Save to Audit History&rdquo; on every file audit.</span>
-                </div>
-                <label class="toggle-switch">
-                  <input type="checkbox" id="setting-auto-archive" />
-                  <span class="toggle-track"><span class="toggle-thumb"></span></span>
-                </label>
-              </label>
-            </div>
-
-            <div class="settings-group">
-              <h3 class="settings-group-title">Compliance Default</h3>
-              <label class="settings-row">
-                <div class="settings-row-info">
-                  <span class="settings-row-label">Default compliance framework</span>
-                  <span class="settings-row-desc">Pre-select a framework on the File Audit and Live Connect forms.</span>
-                </div>
-                <select id="setting-default-compliance" class="settings-select">
-                  <option value="">None</option>
-                  <option value="cis">CIS Benchmark</option>
-                  <option value="stig">DISA STIG</option>
-                  <option value="hipaa">HIPAA Security Rule</option>
-                  <option value="nist">NIST SP 800-41</option>
-                  <option value="pci">PCI-DSS</option>
-                  <option value="soc2">SOC2</option>
-                </select>
-              </label>
-            </div>
           </div>
 
           <!-- Email pane -->
           <div class="settings-pane" id="spane-email">
-            <div class="settings-pane-header">
-              <h2 class="settings-pane-title">Email (SMTP)</h2>
-              <p class="settings-pane-desc">Configure outbound email for scheduled audit alerts. Leave SMTP Host blank to disable email notifications.</p>
-            </div>
+            <h2>Email (SMTP)</h2>
+            <p class="section-desc">Configure outbound email for scheduled audit alerts. Leave SMTP Host blank to disable email notifications.</p>
 
-            <div class="form-grid" style="margin-top:0">
-              <div class="form-group">
-                <label for="setting-smtp-host">SMTP Host</label>
-                <input type="text" id="setting-smtp-host" placeholder="smtp.gmail.com" autocomplete="off" />
+            <div class="form" style="margin-top:1rem">
+              <div class="field split">
+                <div>
+                  <label for="setting-smtp-host">SMTP Host</label>
+                  <input class="input" type="text" id="setting-smtp-host" placeholder="smtp.gmail.com" autocomplete="off" />
+                </div>
+                <div>
+                  <label for="setting-smtp-port">SMTP Port</label>
+                  <input class="input" type="number" id="setting-smtp-port" value="587" min="1" max="65535" />
+                </div>
               </div>
-              <div class="form-group">
-                <label for="setting-smtp-port">SMTP Port</label>
-                <input type="number" id="setting-smtp-port" value="587" min="1" max="65535" />
+              <div class="field split">
+                <div>
+                  <label for="setting-smtp-user">SMTP Username</label>
+                  <input class="input" type="text" id="setting-smtp-user" placeholder="alerts@example.com" autocomplete="off" />
+                </div>
+                <div>
+                  <label for="setting-smtp-password">SMTP Password</label>
+                  <input class="input" type="password" id="setting-smtp-password" placeholder="leave blank to keep existing" autocomplete="new-password" />
+                </div>
               </div>
-              <div class="form-group">
-                <label for="setting-smtp-user">SMTP Username</label>
-                <input type="text" id="setting-smtp-user" placeholder="alerts@example.com" autocomplete="off" />
-              </div>
-              <div class="form-group">
-                <label for="setting-smtp-password">SMTP Password</label>
-                <input type="password" id="setting-smtp-password" placeholder="leave blank to keep existing" autocomplete="new-password" />
-              </div>
-              <div class="form-group">
-                <label for="setting-smtp-from">From Address</label>
-                <input type="email" id="setting-smtp-from" placeholder="cashel@example.com" autocomplete="off" />
-              </div>
-              <div class="form-group form-group-check" style="align-self:flex-end">
-                <label class="checkbox-label">
-                  <input type="checkbox" id="setting-smtp-tls" checked />
-                  <span>Use STARTTLS</span>
-                </label>
+              <div class="field split">
+                <div>
+                  <label for="setting-smtp-from">From Address</label>
+                  <input class="input" type="email" id="setting-smtp-from" placeholder="cashel@example.com" autocomplete="off" />
+                </div>
+                <div style="display:flex;align-items:flex-end;padding-bottom:2px">
+                  <label class="tgl">
+                    <input type="checkbox" id="setting-smtp-tls" checked />
+                    <span class="mark"></span>Use STARTTLS
+                  </label>
+                </div>
               </div>
             </div>
             <div style="margin-top:1.25rem;display:flex;align-items:center;gap:0.75rem">
-              <button class="btn-secondary" id="testSmtpBtn">
+              <button class="btn-outline" id="testSmtpBtn">
                 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;vertical-align:-1px;margin-right:4px" aria-hidden="true"><rect x="1" y="3.5" width="14" height="9" rx="1.5"/><path d="M1 5l7 4.5L15 5"/></svg>
                 Test SMTP
               </button>
@@ -977,30 +993,26 @@
           <!-- Authentication pane — hidden in demo mode -->
           {% if not demo_mode %}
           <div class="settings-pane{% if current_user and current_user.role != 'admin' %} active{% endif %}" id="spane-auth">
-            <div class="settings-pane-header">
-              <h2 class="settings-pane-title">{% if current_user and current_user.role != 'admin' %}My Account{% else %}Authentication{% endif %}</h2>
-              <p class="settings-pane-desc">Protect the Cashel web UI and API with an API key. When enabled, all routes require the key — via browser login or <code>X-API-Key</code> header for CI/CD clients.</p>
-            </div>
+            <h2>{% if current_user and current_user.role != 'admin' %}My Account{% else %}Authentication{% endif %}</h2>
+            <p class="section-desc">Protect the Cashel web UI and API with an API key. When enabled, all routes require the key — via browser login or <code>X-API-Key</code> header for CI/CD clients.</p>
 
             {% if not current_user or current_user.role == 'admin' %}
-            <div class="settings-group">
-              <h3 class="settings-group-title">Access Control</h3>
-              <label class="settings-row">
-                <div class="settings-row-info">
-                  <span class="settings-row-label">Enable Authentication</span>
-                  <span class="settings-row-desc">Require an API key to access the web UI and all API endpoints.</span>
-                </div>
-                <label class="toggle-switch">
-                  <input type="checkbox" id="setting-auth-enabled" />
-                  <span class="toggle-track"><span class="toggle-thumb"></span></span>
-                </label>
+            <div class="sub-head">Access Control</div>
+            <div class="field">
+              <div>
+                <label>Enable Authentication</label>
+                <p class="help">Require an API key to access the web UI and all API endpoints.</p>
+              </div>
+              <label class="sw-toggle">
+                <input type="checkbox" id="setting-auth-enabled" />
+                <span class="track"></span>
               </label>
-              <div class="settings-row">
-                <span class="settings-row-label">Session Lifetime</span>
-                <div style="display:flex;align-items:center;gap:0.5rem">
-                  <input type="number" id="setting-session-lifetime" class="settings-input" style="width:80px" min="5" max="10080" />
-                  <span class="text-muted" style="font-size:0.82rem">minutes</span>
-                </div>
+            </div>
+            <div class="field">
+              <label>Session Lifetime</label>
+              <div style="display:flex;align-items:center;gap:0.5rem">
+                <input class="input" type="number" id="setting-session-lifetime" style="width:80px" min="5" max="10080" />
+                <span class="text-muted" style="font-size:0.82rem">minutes</span>
               </div>
             </div>
             {% endif %}
@@ -1008,7 +1020,7 @@
             <!-- Users table — admin only -->
             {% if current_user and current_user.role == 'admin' %}
             <div class="settings-group" id="authUsersGroup">
-              <h3 class="settings-group-title">Users</h3>
+              <div class="sub-head">Users</div>
               <table style="width:100%;border-collapse:collapse;font-size:0.88rem" id="authUsersTable">
                 <thead>
                   <tr style="border-bottom:1px solid var(--border);text-align:left">
@@ -1051,52 +1063,46 @@
             {% endif %}
 
             <!-- Per-user API key — all roles -->
-            <div class="settings-group">
-              <h3 class="settings-group-title">Your API Key</h3>
-              <div class="settings-row">
-                <span class="settings-row-label">Status</span>
-                <span class="text-muted" id="authKeyHint" style="font-family:monospace;font-size:0.88rem">
-                  {% if current_user and current_user.has_api_key %}key active{% else %}not set{% endif %}
-                </span>
-              </div>
-              <div style="margin-top:0.75rem;display:flex;gap:0.75rem;flex-wrap:wrap">
-                <button class="btn-secondary" id="btnGenerateKey">Generate New Key</button>
-                <button class="btn-secondary" id="btnRevokeKey" style="{% if not current_user or not current_user.has_api_key %}display:none{% endif %}">Revoke Key</button>
-              </div>
-              <div id="authNewKeyBox" class="hidden" style="margin-top:1rem;background:var(--card-bg);border:1px solid var(--accent);border-radius:8px;padding:1rem">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
-                  <p style="font-size:0.82rem;color:var(--high);font-weight:600;margin:0">&#9888; Copy this key now — it will not be shown again. Auto-hides in <span id="authKeyCountdown">60</span>s.</p>
-                  <button class="btn-secondary" id="btnDismissKey" style="padding:0.2rem 0.6rem;font-size:0.78rem">Dismiss</button>
-                </div>
-                <div style="display:flex;align-items:center;gap:0.5rem">
-                  <input type="password" id="authNewKeyVal" readonly
-                         style="flex:1;padding:0.5rem;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;word-break:break-all;font-size:0.88rem;color:var(--text);font-family:monospace" />
-                  <button class="btn-secondary" id="btnRevealKey">Show</button>
-                  <button class="btn-secondary" id="btnCopyKey">Copy</button>
-                </div>
-              </div>
-              <p class="settings-pane-desc" style="margin-top:0.75rem">Use this key in the <code>X-API-Key</code> header for CLI or CI/CD access:<br><code>curl -H "X-API-Key: csh_..." https://your-cashel/api/v1/audit</code></p>
+            <div class="sub-head">Your API Key</div>
+            <div class="field">
+              <label>Status</label>
+              <span class="text-muted" id="authKeyHint" style="font-family:monospace;font-size:0.88rem">
+                {% if current_user and current_user.has_api_key %}key active{% else %}not set{% endif %}
+              </span>
             </div>
+            <div style="margin-top:0.75rem;display:flex;gap:0.75rem;flex-wrap:wrap">
+              <button class="btn-outline" id="btnGenerateKey">Generate New Key</button>
+              <button class="btn-outline" id="btnRevokeKey" style="{% if not current_user or not current_user.has_api_key %}display:none{% endif %}">Revoke Key</button>
+            </div>
+            <div id="authNewKeyBox" class="hidden" style="margin-top:1rem;background:var(--surface);border:1px solid var(--accent);border-radius:8px;padding:1rem">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
+                <p style="font-size:0.82rem;color:var(--high);font-weight:600;margin:0">Copy this key now — it will not be shown again. Auto-hides in <span id="authKeyCountdown">60</span>s.</p>
+                <button class="btn-outline" id="btnDismissKey" style="padding:0.2rem 0.6rem;font-size:0.78rem">Dismiss</button>
+              </div>
+              <div style="display:flex;align-items:center;gap:0.5rem">
+                <input type="password" id="authNewKeyVal" readonly
+                       style="flex:1;padding:0.5rem;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;word-break:break-all;font-size:0.88rem;color:var(--text);font-family:monospace" />
+                <button class="btn-outline" id="btnRevealKey">Show</button>
+                <button class="btn-outline" id="btnCopyKey">Copy</button>
+              </div>
+            </div>
+            <p class="section-desc" style="margin-top:0.75rem">Use this key in the <code>X-API-Key</code> header for CLI or CI/CD access:<br><code>curl -H "X-API-Key: csh_..." https://your-cashel/api/v1/audit</code></p>
 
             <!-- Change password — all roles -->
-            <div class="settings-group">
-              <h3 class="settings-group-title">Change Password</h3>
-              <div style="display:flex;flex-direction:column;gap:0.75rem;max-width:360px">
-                <div style="display:flex;flex-direction:column;gap:0.3rem">
-                  <label style="font-size:0.78rem;color:var(--text-muted)">New Password</label>
-                  <input type="password" id="chpwNew" placeholder="12+ characters" autocomplete="new-password"
-                         style="padding:0.55rem 0.75rem;font-size:0.88rem" />
-                </div>
-                <div style="display:flex;flex-direction:column;gap:0.3rem">
-                  <label style="font-size:0.78rem;color:var(--text-muted)">Confirm New Password</label>
-                  <input type="password" id="chpwConfirm" placeholder="Repeat password" autocomplete="new-password"
-                         style="padding:0.55rem 0.75rem;font-size:0.88rem" />
-                </div>
-                <div>
-                  <button class="btn-secondary" id="btnChangePassword">Update Password</button>
-                  <span id="chpwMsg" style="margin-left:0.75rem;font-size:0.82rem"></span>
-                </div>
+            <div class="sub-head" style="margin-top:1.5rem">Change Password</div>
+            <div class="form" style="margin-top:0.75rem;max-width:360px">
+              <div class="field">
+                <label for="chpwNew">New Password</label>
+                <input class="input" type="password" id="chpwNew" placeholder="12+ characters" autocomplete="new-password" />
               </div>
+              <div class="field">
+                <label for="chpwConfirm">Confirm New Password</label>
+                <input class="input" type="password" id="chpwConfirm" placeholder="Repeat password" autocomplete="new-password" />
+              </div>
+            </div>
+            <div style="margin-top:0.75rem">
+              <button class="btn-outline" id="btnChangePassword">Update Password</button>
+              <span id="chpwMsg" style="margin-left:0.75rem;font-size:0.82rem"></span>
             </div>
           </div>
           {% endif %}
@@ -1104,188 +1110,167 @@
           {% if not current_user or current_user.role == 'admin' %}
           <!-- Security pane -->
           <div class="settings-pane" id="spane-security">
-            <div class="settings-pane-header">
-              <h2 class="settings-pane-title">Security</h2>
-              <p class="settings-pane-desc">Controls for SSH host verification, outbound webhook restrictions, and error reporting exposure.</p>
+            <h2>Security</h2>
+            <p class="section-desc">Controls for SSH host verification, outbound webhook restrictions, and error reporting exposure.</p>
+
+            <div class="sub-head">SSH Host Key Verification</div>
+            <div class="field">
+              <div>
+                <label>SSH Host Key Policy</label>
+                <p class="help">Controls how Cashel handles unrecognised SSH host keys during Live Connect. <strong>Strict</strong> is most secure but requires hosts to be pre-approved in known_hosts.</p>
+              </div>
+              <select class="select" id="setting-ssh-host-key-policy">
+                <option value="warn">Warn — log and continue</option>
+                <option value="strict">Strict — reject unknown</option>
+                <option value="auto_add">Auto-add (lab only)</option>
+              </select>
             </div>
 
-            <div class="settings-group">
-              <h3 class="settings-group-title">SSH Host Key Verification</h3>
-              <label class="settings-row">
-                <div class="settings-row-info">
-                  <span class="settings-row-label">SSH Host Key Policy</span>
-                  <span class="settings-row-desc">Controls how Cashel handles unrecognised SSH host keys during Live Connect. <strong>Strict</strong> is most secure but requires hosts to be pre-approved in known_hosts.</span>
-                </div>
-                <select id="setting-ssh-host-key-policy" class="settings-select">
-                  <option value="warn">Warn — log and continue</option>
-                  <option value="strict">Strict — reject unknown</option>
-                  <option value="auto_add">Auto-add (lab only)</option>
-                </select>
-              </label>
+            <div class="sub-head">Outbound Webhooks</div>
+            <div class="field" style="flex-direction:column;align-items:flex-start;gap:0.5rem">
+              <div>
+                <label>Allowed Webhook Domains</label>
+                <p class="help">Extra hostname suffixes (comma-separated) permitted as webhook targets beyond the built-in allowlist (Slack, Teams, Discord). RFC-1918 addresses are always blocked.</p>
+              </div>
+              <input class="input" type="text" id="setting-webhook-allowlist"
+                     placeholder="webhooks.mycorp.com, hooks.internal.net"
+                     autocomplete="off" style="width:100%;max-width:500px" />
             </div>
 
-            <div class="settings-group">
-              <h3 class="settings-group-title">Outbound Webhooks</h3>
-              <label class="settings-row" style="flex-direction:column;align-items:flex-start;gap:0.5rem">
-                <div class="settings-row-info">
-                  <span class="settings-row-label">Allowed Webhook Domains</span>
-                  <span class="settings-row-desc">Extra hostname suffixes (comma-separated) permitted as webhook targets beyond the built-in allowlist (Slack, Teams, Discord). RFC-1918 addresses are always blocked.</span>
-                </div>
-                <input type="text" id="setting-webhook-allowlist"
-                       placeholder="webhooks.mycorp.com, hooks.internal.net"
-                       autocomplete="off" style="width:100%;max-width:500px" />
-              </label>
-            </div>
-
-            <div class="settings-group">
-              <h3 class="settings-group-title">Error Reporting</h3>
-              <label class="settings-row">
-                <div class="settings-row-info">
-                  <span class="settings-row-label">Error Detail Level</span>
-                  <span class="settings-row-desc">In <strong>Sanitized</strong> mode only generic messages reach the browser; full exception details are always written to the server log.</span>
-                </div>
-                <select id="setting-error-detail" class="settings-select">
-                  <option value="sanitized">Sanitized (production)</option>
-                  <option value="full">Full (development only)</option>
-                </select>
-              </label>
+            <div class="sub-head">Error Reporting</div>
+            <div class="field">
+              <div>
+                <label>Error Detail Level</label>
+                <p class="help">In <strong>Sanitized</strong> mode only generic messages reach the browser; full exception details are always written to the server log.</p>
+              </div>
+              <select class="select" id="setting-error-detail">
+                <option value="sanitized">Sanitized (production)</option>
+                <option value="full">Full (development only)</option>
+              </select>
             </div>
           </div>
 
           <!-- Syslog pane -->
           <div class="settings-pane" id="spane-syslog">
-            <div class="settings-pane-header">
-              <h2 class="settings-pane-title">Syslog</h2>
-              <p class="settings-pane-desc">Forward all Cashel application events to a remote syslog server for SIEM integration and centralised log management.</p>
-            </div>
+            <h2>Syslog</h2>
+            <p class="section-desc">Forward all Cashel application events to a remote syslog server for SIEM integration and centralised log management.</p>
 
-            <div class="settings-group">
-              <h3 class="settings-group-title">Syslog Server</h3>
-              <label class="settings-row">
-                <div class="settings-row-info">
-                  <span class="settings-row-label">Enable Syslog Forwarding</span>
-                  <span class="settings-row-desc">Send application log events to the configured syslog target.</span>
-                </div>
-                <label class="toggle-switch">
-                  <input type="checkbox" id="setting-syslog-enabled" />
-                  <span class="toggle-track"><span class="toggle-thumb"></span></span>
-                </label>
+            <div class="sub-head">Syslog Server</div>
+            <div class="field">
+              <div>
+                <label>Enable Syslog Forwarding</label>
+                <p class="help">Send application log events to the configured syslog target.</p>
+              </div>
+              <label class="sw-toggle">
+                <input type="checkbox" id="setting-syslog-enabled" />
+                <span class="track"></span>
               </label>
             </div>
-
-            <div class="form-grid" style="margin-top:0">
-              <div class="form-group">
-                <label for="setting-syslog-host">Syslog Host</label>
-                <input type="text" id="setting-syslog-host" placeholder="192.168.1.100 or siem.corp.net" autocomplete="off" />
+            <div class="form" style="margin-top:1rem">
+              <div class="field split">
+                <div>
+                  <label for="setting-syslog-host">Syslog Host</label>
+                  <input class="input" type="text" id="setting-syslog-host" placeholder="192.168.1.100 or siem.corp.net" autocomplete="off" />
+                </div>
+                <div>
+                  <label for="setting-syslog-port">Port</label>
+                  <input class="input" type="number" id="setting-syslog-port" value="514" min="1" max="65535" />
+                </div>
               </div>
-              <div class="form-group">
-                <label for="setting-syslog-port">Port</label>
-                <input type="number" id="setting-syslog-port" value="514" min="1" max="65535" />
-              </div>
-              <div class="form-group">
-                <label for="setting-syslog-protocol">Protocol</label>
-                <select id="setting-syslog-protocol">
-                  <option value="udp">UDP — RFC 3164</option>
-                  <option value="tcp">TCP — reliable delivery</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label for="setting-syslog-facility">Facility</label>
-                <select id="setting-syslog-facility">
-                  <option value="local0">LOCAL0</option>
-                  <option value="local1">LOCAL1</option>
-                  <option value="local2">LOCAL2</option>
-                  <option value="local3">LOCAL3</option>
-                  <option value="local4">LOCAL4</option>
-                  <option value="local5">LOCAL5</option>
-                  <option value="local6">LOCAL6</option>
-                  <option value="local7">LOCAL7</option>
-                  <option value="daemon">DAEMON</option>
-                  <option value="user">USER</option>
-                </select>
+              <div class="field split">
+                <div>
+                  <label for="setting-syslog-protocol">Protocol</label>
+                  <select class="select" id="setting-syslog-protocol">
+                    <option value="udp">UDP — RFC 3164</option>
+                    <option value="tcp">TCP — reliable delivery</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="setting-syslog-facility">Facility</label>
+                  <select class="select" id="setting-syslog-facility">
+                    <option value="local0">LOCAL0</option>
+                    <option value="local1">LOCAL1</option>
+                    <option value="local2">LOCAL2</option>
+                    <option value="local3">LOCAL3</option>
+                    <option value="local4">LOCAL4</option>
+                    <option value="local5">LOCAL5</option>
+                    <option value="local6">LOCAL6</option>
+                    <option value="local7">LOCAL7</option>
+                    <option value="daemon">DAEMON</option>
+                    <option value="user">USER</option>
+                  </select>
+                </div>
               </div>
             </div>
           </div>
 
           <!-- Alert Thresholds pane -->
           <div class="settings-pane" id="spane-alerts">
-            <div class="settings-pane-header">
-              <h2 class="settings-pane-title">Alert Thresholds</h2>
-              <p class="settings-pane-desc">Fire a consolidated notification when an audit result crosses a configured threshold. Alerts fire once on first breach and re-arm after the condition clears.</p>
-            </div>
+            <h2>Alert Thresholds</h2>
+            <p class="section-desc">Fire a consolidated notification when an audit result crosses a configured threshold. Alerts fire once on first breach and re-arm after the condition clears.</p>
 
-            <div class="settings-group">
-              <h3 class="settings-group-title">Alert Channels</h3>
-              <p class="settings-row-desc" style="margin-bottom:0.75rem">Separate from per-schedule notifications — these channels receive threshold breach alerts only.</p>
-              <div class="form-grid">
-                <div class="form-group">
+            <div class="sub-head">Alert Channels</div>
+            <p class="help" style="margin-bottom:0.75rem">Separate from per-schedule notifications — these channels receive threshold breach alerts only.</p>
+            <div class="form">
+              <div class="field split">
+                <div>
                   <label for="alert-slack-webhook">Slack Webhook URL</label>
-                  <input type="password" id="alert-slack-webhook" placeholder="https://hooks.slack.com/services/…" autocomplete="off" />
-                  <span class="form-hint" id="alert-slack-set-hint" style="display:none">&#10003; Webhook configured (enter new URL to replace)</span>
+                  <input class="input" type="password" id="alert-slack-webhook" placeholder="https://hooks.slack.com/services/&hellip;" autocomplete="off" />
+                  <span class="help" id="alert-slack-set-hint" style="display:none">Webhook configured (enter new URL to replace)</span>
                 </div>
-                <div class="form-group">
+                <div>
                   <label for="alert-teams-webhook">Teams Webhook URL</label>
-                  <input type="password" id="alert-teams-webhook" placeholder="https://webhook.office.com/…" autocomplete="off" />
-                  <span class="form-hint" id="alert-teams-set-hint" style="display:none">&#10003; Webhook configured (enter new URL to replace)</span>
-                </div>
-                <div class="form-group" style="grid-column:1/-1">
-                  <label for="alert-email-recipients">Email Recipients</label>
-                  <input type="text" id="alert-email-recipients" placeholder="ops@example.com, security@example.com" autocomplete="off" />
-                  <span class="form-hint">Comma-separated. Uses the SMTP settings from the Email pane.</span>
+                  <input class="input" type="password" id="alert-teams-webhook" placeholder="https://webhook.office.com/&hellip;" autocomplete="off" />
+                  <span class="help" id="alert-teams-set-hint" style="display:none">Webhook configured (enter new URL to replace)</span>
                 </div>
               </div>
-              <button class="btn-secondary" id="saveAlertChannelsBtn" style="margin-top:0.75rem">Save Channels</button>
-              <span class="settings-saved-msg hidden" id="alertChannelsSavedMsg">&#10003; Saved</span>
-            </div>
-
-            <div class="settings-group" style="margin-top:1.5rem">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem">
-                <h3 class="settings-group-title" style="margin:0">Global Thresholds</h3>
-                <button class="btn-secondary" id="addGlobalThresholdBtn">+ Add Threshold</button>
-              </div>
-              <p class="settings-row-desc">Applied to all audits. Per-schedule overrides (below) take precedence on a per-metric basis.</p>
-              <div id="globalThresholdsTable">
-                <p class="muted" id="noGlobalThresholds">No global thresholds configured.</p>
+              <div class="field">
+                <label for="alert-email-recipients">Email Recipients</label>
+                <input class="input" type="text" id="alert-email-recipients" placeholder="ops@example.com, security@example.com" autocomplete="off" />
+                <span class="help">Comma-separated. Uses the SMTP settings from the Email pane.</span>
               </div>
             </div>
+            <button class="btn-outline" id="saveAlertChannelsBtn" style="margin-top:0.75rem">Save Channels</button>
+            <span class="settings-saved-msg hidden" id="alertChannelsSavedMsg">&#10003; Saved</span>
 
-            <div class="settings-group" style="margin-top:1.5rem">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem">
-                <h3 class="settings-group-title" style="margin:0">Per-Schedule Overrides</h3>
+            <div class="sub-head" style="margin-top:1.5rem">
+              Global Thresholds
+              <button class="btn-outline" id="addGlobalThresholdBtn" style="margin-left:auto">+ Add Threshold</button>
+            </div>
+            <p class="help">Applied to all audits. Per-schedule overrides (below) take precedence on a per-metric basis.</p>
+            <div id="globalThresholdsTable">
+              <p class="text-muted" id="noGlobalThresholds">No global thresholds configured.</p>
+            </div>
+
+            <div class="sub-head" style="margin-top:1.5rem">Per-Schedule Overrides</div>
+            <p class="help">Select a schedule to view or add overrides. An override replaces the global threshold for that metric on that schedule only.</p>
+            <div style="max-width:300px;margin-bottom:1rem">
+              <label for="alertScheduleSelect" style="font-size:0.78rem;color:var(--text-muted);display:block;margin-bottom:4px">Schedule</label>
+              <select class="select" id="alertScheduleSelect">
+                <option value="">— Select a schedule —</option>
+              </select>
+            </div>
+            <div id="scheduleThresholdsTable" style="display:none">
+              <div style="display:flex;justify-content:flex-end;margin-bottom:0.5rem">
+                <button class="btn-outline" id="addScheduleThresholdBtn">+ Add Override</button>
               </div>
-              <p class="settings-row-desc">Select a schedule to view or add overrides. An override replaces the global threshold for that metric on that schedule only.</p>
-              <div class="form-group" style="max-width:300px;margin-bottom:1rem">
-                <label for="alertScheduleSelect">Schedule</label>
-                <select id="alertScheduleSelect">
-                  <option value="">— Select a schedule —</option>
-                </select>
-              </div>
-              <div id="scheduleThresholdsTable" style="display:none">
-                <div style="display:flex;justify-content:flex-end;margin-bottom:0.5rem">
-                  <button class="btn-secondary" id="addScheduleThresholdBtn">+ Add Override</button>
-                </div>
-                <div id="scheduleThresholdsList">
-                  <p class="muted" id="noScheduleThresholds">No overrides for this schedule.</p>
-                </div>
+              <div id="scheduleThresholdsList">
+                <p class="text-muted" id="noScheduleThresholds">No overrides for this schedule.</p>
               </div>
             </div>
           </div>
 
           <!-- Webhooks pane -->
           <div class="settings-pane" id="spane-webhooks">
-            <div class="settings-pane-header">
-              <h2 class="settings-pane-title">Webhooks</h2>
-              <p class="settings-pane-desc">Send structured JSON events to external URLs when audits complete or alert thresholds are crossed. Each delivery includes an <code>X-Cashel-Signature</code> HMAC header when a secret is configured.</p>
-            </div>
+            <h2>Webhooks</h2>
+            <p class="section-desc">Send structured JSON events to external URLs when audits complete or alert thresholds are crossed. Each delivery includes an <code>X-Cashel-Signature</code> HMAC header when a secret is configured.</p>
 
-            <div class="settings-group">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem">
-                <h3 class="settings-group-title" style="margin:0">Configured Webhooks</h3>
-                <button class="btn-secondary" id="addWebhookBtn">+ Add Webhook</button>
-              </div>
-              <div id="webhooksTable">
-                <p class="muted" id="noWebhooksMsg">No webhooks configured.</p>
-              </div>
+            <div class="sub-head">
+              Configured Webhooks
+              <button class="btn-outline" id="addWebhookBtn" style="margin-left:auto">+ Add Webhook</button>
+            </div>
+            <div id="webhooksTable">
+              <p class="text-muted" id="noWebhooksMsg">No webhooks configured.</p>
             </div>
           </div>
 
@@ -1297,15 +1282,15 @@
                 <button class="modal-close" id="addWebhookModalClose">&times;</button>
               </div>
               <div class="modal-body">
-                <div class="form-group">
+                <div class="field">
                   <label for="whName">Name</label>
-                  <input type="text" id="whName" placeholder="My Webhook" autocomplete="off" />
+                  <input class="input" type="text" id="whName" placeholder="My Webhook" autocomplete="off" />
                 </div>
-                <div class="form-group">
-                  <label for="whUrl">URL <span style="color:var(--color-muted);font-weight:400">(HTTPS required)</span></label>
-                  <input type="url" id="whUrl" placeholder="https://hooks.example.com/cashel" autocomplete="off" />
+                <div class="field">
+                  <label for="whUrl">URL <span style="color:var(--text-muted);font-weight:400">(HTTPS required)</span></label>
+                  <input class="input" type="url" id="whUrl" placeholder="https://hooks.example.com/cashel" autocomplete="off" />
                 </div>
-                <div class="form-group">
+                <div class="field">
                   <label>Events</label>
                   <div style="display:flex;flex-direction:column;gap:0.4rem;margin-top:0.25rem">
                     <label style="font-weight:400;display:flex;align-items:center;gap:0.5rem"><input type="checkbox" class="wh-event-cb" value="audit.complete" checked /> audit.complete</label>
@@ -1313,14 +1298,14 @@
                     <label style="font-weight:400;display:flex;align-items:center;gap:0.5rem"><input type="checkbox" class="wh-event-cb" value="alert.threshold_clear" /> alert.threshold_clear</label>
                   </div>
                 </div>
-                <div class="form-group">
-                  <label for="whSecret">Secret <span style="color:var(--color-muted);font-weight:400">(optional — used for HMAC signature)</span></label>
-                  <input type="password" id="whSecret" placeholder="Leave blank for no signature" autocomplete="off" />
+                <div class="field">
+                  <label for="whSecret">Secret <span style="color:var(--text-muted);font-weight:400">(optional — used for HMAC signature)</span></label>
+                  <input class="input" type="password" id="whSecret" placeholder="Leave blank for no signature" autocomplete="off" />
                 </div>
-                <p class="muted" id="whError" style="color:var(--color-danger);display:none"></p>
+                <p class="text-muted" id="whError" style="color:var(--high);display:none"></p>
               </div>
               <div class="modal-footer" style="display:flex;gap:0.5rem;justify-content:flex-end;padding:1rem 1.25rem 1.25rem">
-                <button class="btn-secondary" id="addWebhookModalCancel">Cancel</button>
+                <button class="btn-outline" id="addWebhookModalCancel">Cancel</button>
                 <button class="btn-primary" id="saveWebhookBtn">Save</button>
               </div>
             </div>
@@ -1335,9 +1320,9 @@
               </div>
               <div class="modal-body">
                 <input type="hidden" id="addThresholdScheduleId" value="" />
-                <div class="form-group">
+                <div class="field">
                   <label for="addThresholdMetric">Metric</label>
-                  <select id="addThresholdMetric">
+                  <select class="select" id="addThresholdMetric">
                     <optgroup label="Overall">
                       <option value="score">Score (0–100)</option>
                     </optgroup>
@@ -1357,20 +1342,20 @@
                     </optgroup>
                   </select>
                 </div>
-                <div class="form-group">
+                <div class="field">
                   <label for="addThresholdOperator">Condition</label>
-                  <select id="addThresholdOperator">
+                  <select class="select" id="addThresholdOperator">
                     <option value="lt">Below (&lt;)</option>
                     <option value="gte">At or above (&ge;)</option>
                   </select>
                 </div>
-                <div class="form-group">
+                <div class="field">
                   <label for="addThresholdValue">Value</label>
-                  <input type="number" id="addThresholdValue" min="0" max="10000" step="0.1" placeholder="e.g. 70" />
+                  <input class="input" type="number" id="addThresholdValue" min="0" max="10000" step="0.1" placeholder="e.g. 70" />
                 </div>
                 <div style="display:flex;gap:0.5rem;margin-top:1rem">
                   <button class="btn-primary" id="saveThresholdBtn">Save</button>
-                  <button class="btn-secondary" id="cancelThresholdBtn">Cancel</button>
+                  <button class="btn-outline" id="cancelThresholdBtn">Cancel</button>
                 </div>
                 <span class="alert-inline hidden" id="addThresholdError" style="display:block;margin-top:0.5rem"></span>
               </div>
@@ -1386,13 +1371,13 @@
           </div>
           {% endif %}
 
-        </div><!-- /.settings-content -->
-      </div><!-- /.settings-shell -->
+        </div><!-- /.settings-main -->
+      </div><!-- /.settings -->
     </section>
 
-  </main>
+  </div><!-- /.shell -->
 
-  <footer class="footer">
+  <footer class="foot">
     <p>Cashel v1.5.1 &mdash; Firewall Security Auditor</p>
   </footer>
 
@@ -1487,30 +1472,30 @@
   const canManageSchedules = (userRole === 'admin' || userRole === 'auditor');
 
   // ═══════════════════════════════════════════════════════════════ TABS ══
-  const tabBtns   = document.querySelectorAll(".tab-btn");
-  const tabPanels = document.querySelectorAll(".tab-panel");
+  const tabBtns   = document.querySelectorAll(".nav a[data-tab]");
+  const tabPanels = document.querySelectorAll(".page");
   function switchTab(tabId) {
-    tabBtns.forEach(b => b.classList.toggle("tab-active", b.dataset.tab === tabId));
+    tabBtns.forEach(b => b.classList.toggle("active", b.dataset.tab === tabId));
     tabPanels.forEach(p => p.classList.toggle("hidden", p.id !== "tab-" + tabId));
     if (tabId === "history")   { loadHistory(); loadTrends(); }
     if (tabId === "settings")  applySettingsToUI();
     if (tabId === "schedules") loadSchedules();
   }
-  tabBtns.forEach(btn => btn.addEventListener("click", () => switchTab(btn.dataset.tab)));
+  tabBtns.forEach(btn => btn.addEventListener("click", e => { e.preventDefault(); switchTab(btn.dataset.tab); }));
 
   // ════════════════════════════════════════ AUDIT MODE TOGGLE (single/bulk) ══
   function switchAuditMode(mode) {
-    document.querySelectorAll(".mode-btn").forEach(b => b.classList.toggle("mode-active", b.dataset.mode === mode));
+    document.querySelectorAll(".seg button[data-mode]").forEach(b => b.setAttribute("aria-pressed", b.dataset.mode === mode ? "true" : "false"));
     document.getElementById("audit-mode-single").classList.toggle("hidden", mode !== "single");
     document.getElementById("audit-mode-bulk").classList.toggle("hidden", mode !== "bulk");
   }
-  document.querySelectorAll(".mode-btn").forEach(btn =>
+  document.querySelectorAll(".seg button[data-mode]").forEach(btn =>
     btn.addEventListener("click", () => switchAuditMode(btn.dataset.mode))
   );
 
   // ═══════════════════════════════════════ HISTORY SUB-TABS (audits/activity) ══
   function switchHistorySubTab(subtab) {
-    document.querySelectorAll(".sub-tab-btn").forEach(b => b.classList.toggle("sub-tab-active", b.dataset.subtab === subtab));
+    document.querySelectorAll(".subnav a[data-subtab]").forEach(b => b.classList.toggle("active", b.dataset.subtab === subtab));
     const subAudits = document.getElementById("sub-audits");
     const subActivity = document.getElementById("sub-activity");
     const subSecLog = document.getElementById("sub-seclog");
@@ -1520,8 +1505,8 @@
     if (subtab === "activity") loadActivity();
     if (subtab === "seclog") loadSecLog();
   }
-  document.querySelectorAll(".sub-tab-btn").forEach(btn =>
-    btn.addEventListener("click", () => switchHistorySubTab(btn.dataset.subtab))
+  document.querySelectorAll(".subnav a[data-subtab]").forEach(btn =>
+    btn.addEventListener("click", e => { e.preventDefault(); switchHistorySubTab(btn.dataset.subtab); })
   );
 
   // ═════════════════════════════════════════════════════ FILE AUDIT ══════
@@ -1585,8 +1570,11 @@
   document.getElementById("vendor")?.addEventListener("change", syncComplianceSelector);
 
   document.getElementById("config")?.addEventListener("change", function () {
-    document.getElementById("fileLabel").textContent =
-      this.files.length ? this.files[0].name : "Choose a file\u2026";
+    const hasFile = this.files.length > 0;
+    const label = document.getElementById("configField");
+    if (label) { label.classList.toggle("empty", !hasFile); label.classList.toggle("has-file", hasFile); }
+    document.getElementById("fileLabel").textContent = hasFile ? this.files[0].name : "Choose a file\u2026";
+    document.getElementById("fileMeta").textContent = hasFile ? (this.files[0].size / 1024).toFixed(1) + " KB" : "";
     if (!this.files.length) return;
     const file = this.files[0];
     const vendorSel = document.getElementById("vendor");
@@ -2014,10 +2002,18 @@
 
   // ══════════════════════════════════════════════════ COMPARE CONFIGS ══
   document.getElementById("config_a")?.addEventListener("change", function () {
-    document.getElementById("fileLabelA").textContent = this.files.length ? this.files[0].name : "Choose a file\u2026";
+    const hasFile = this.files.length > 0;
+    const lbl = document.getElementById("diffFieldA");
+    if (lbl) { lbl.classList.toggle("empty", !hasFile); lbl.classList.toggle("has-file", hasFile); }
+    document.getElementById("fileLabelA").textContent = hasFile ? this.files[0].name : "Choose a file\u2026";
+    const ma = document.getElementById("fileMetaA"); if (ma) ma.textContent = hasFile ? (this.files[0].size/1024).toFixed(1)+" KB" : "";
   });
   document.getElementById("config_b")?.addEventListener("change", function () {
-    document.getElementById("fileLabelB").textContent = this.files.length ? this.files[0].name : "Choose a file\u2026";
+    const hasFile = this.files.length > 0;
+    const lbl = document.getElementById("diffFieldB");
+    if (lbl) { lbl.classList.toggle("empty", !hasFile); lbl.classList.toggle("has-file", hasFile); }
+    document.getElementById("fileLabelB").textContent = hasFile ? this.files[0].name : "Choose a file\u2026";
+    const mb = document.getElementById("fileMetaB"); if (mb) mb.textContent = hasFile ? (this.files[0].size/1024).toFixed(1)+" KB" : "";
   });
 
   document.getElementById("diffForm")?.addEventListener("submit", async function (e) {
@@ -2967,12 +2963,13 @@
   }
 
   // ── Settings sidebar navigation ──────────────────────────────────────────
-  document.querySelectorAll(".settings-nav-item").forEach(btn => {
-    btn.addEventListener("click", () => {
+  document.querySelectorAll(".settings-nav a[data-pane]").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.preventDefault();
       const pane = btn.dataset.pane;
-      document.querySelectorAll(".settings-nav-item").forEach(b => b.classList.remove("settings-nav-active"));
+      document.querySelectorAll(".settings-nav a[data-pane]").forEach(b => b.classList.remove("active"));
       document.querySelectorAll(".settings-pane").forEach(p => p.classList.remove("active"));
-      btn.classList.add("settings-nav-active");
+      btn.classList.add("active");
       const target = document.getElementById("spane-" + pane);
       if (target) target.classList.add("active");
     });
@@ -3237,7 +3234,7 @@
     if (_activeThresholdScheduleId) renderScheduleThresholds(_activeThresholdScheduleId);
   });
 
-  document.querySelectorAll(".settings-nav-item[data-pane='alerts']").forEach(btn => {
+  document.querySelectorAll(".settings-nav a[data-pane='alerts']").forEach(btn => {
     btn.addEventListener("click", () => {
       loadAlertChannels();
       loadAlertThresholds();
@@ -3320,7 +3317,7 @@
     loadWebhooks();
   });
 
-  document.querySelectorAll(".settings-nav-item[data-pane='webhooks']").forEach(btn => {
+  document.querySelectorAll(".settings-nav a[data-pane='webhooks']").forEach(btn => {
     btn.addEventListener("click", () => loadWebhooks());
   });
 
