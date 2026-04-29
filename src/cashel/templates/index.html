@@ -150,24 +150,16 @@
     <!-- ══════════════════════════════════════════════ AUDIT ══ -->
     <section class="tab-panel" id="tab-audit">
 
-      <!-- v2 Hero -->
+      <!-- Page head -->
       <section class="hero-v2">
         <div>
           <div class="hero-eyebrow">Audit runner</div>
           <h1>Review a firewall<br/><em>in one pass.</em></h1>
         </div>
-        <div class="hero-stats">
-          <div class="stat">
-            <div class="lbl">Last run</div>
-            <div class="num" id="heroLastRun">&mdash;</div>
-          </div>
-          <div class="stat">
-            <div class="lbl">Rules indexed</div>
-            <div class="num" id="heroRulesIndexed">&mdash;</div>
-          </div>
-          <div class="stat">
-            <div class="lbl">Median runtime</div>
-            <div class="num" id="heroMedianRuntime">&mdash;</div>
+        <div style="display:flex;align-items:flex-end;padding-bottom:8px">
+          <div class="seg-v2" role="group" aria-label="Audit mode" id="auditModeSegmented">
+            <button aria-pressed="true" data-mode="single">Single file</button>
+            <button aria-pressed="false" data-mode="bulk">Bulk</button>
           </div>
         </div>
       </section>
@@ -180,16 +172,12 @@
 
           {% if not current_user or current_user.role in ('admin', 'auditor') %}
 
-          <!-- section header with mode toggle -->
+          <!-- section header -->
           <div class="section-head">
             <div>
               <div class="idx">01 &mdash; New audit</div>
               <h2>Configure</h2>
               <div class="desc">Drop a config, pick a compliance lens, and review the results. Nothing leaves this machine.</div>
-            </div>
-            <div class="seg-v2" role="group" aria-label="Audit mode" id="auditModeSegmented">
-              <button aria-pressed="true" data-mode="single">Single file</button>
-              <button aria-pressed="false" data-mode="bulk">Bulk</button>
             </div>
           </div>
 
@@ -315,10 +303,14 @@
             </form>
 
             <!-- Audit Results (below form in main column) -->
-            <div class="hidden" id="resultsSection" style="margin-top:2.5rem;border-top:1px solid var(--line);padding-top:2rem">
-              <div class="results-header" style="margin-bottom:1rem">
-                <h2 style="font-size:18px;font-weight:500;letter-spacing:-0.02em;margin:0">Results</h2>
-                <div style="display:flex;align-items:center;gap:0.75rem;">
+            <div class="hidden" id="resultsSection" style="margin-top:2.5rem">
+              <div class="section-head" style="margin-bottom:1.5rem">
+                <div>
+                  <div class="idx">02 &mdash; Results</div>
+                  <h2>Audit report</h2>
+                  <div class="desc" id="resultsDesc"></div>
+                </div>
+                <div style="display:flex;align-items:center;gap:0.75rem;flex-shrink:0">
                   <span class="detected-vendor hidden" id="detectedVendorTag"></span>
                   <div class="view-toggle" id="findingsViewToggle" title="Toggle compact view">
                     <button class="view-btn view-btn-active" id="viewDetailed">Detailed</button>
@@ -332,16 +324,16 @@
               <div id="findingsPagination" class="findings-pagination hidden"></div>
               <div class="actions-row">
                 <div class="pdf-row hidden" id="pdfRow">
-                  <a id="pdfLink" class="btn-secondary" href="#" download>&#8681; Download PDF</a>
-                  <a id="pdfViewLink" class="btn-secondary" href="#" target="_blank" rel="noopener">&#128196; View PDF</a>
+                  <a id="pdfLink" class="btn-outline" href="#" download>&#8681; PDF</a>
+                  <a id="pdfViewLink" class="btn-outline" href="#" target="_blank" rel="noopener">&#128196; View PDF</a>
                 </div>
                 <div class="remediation-row hidden" id="remediationRow">
                   <button id="remediationPlanBtn" class="btn-primary btn-remediation">&#9881; View Remediation Plan</button>
                 </div>
                 <div class="export-row hidden" id="exportRow">
-                  <button id="exportJsonBtn" class="btn-secondary">&#8681; JSON</button>
-                  <button id="exportCsvBtn"  class="btn-secondary">&#8681; CSV</button>
-                  <button id="exportSarifBtn" class="btn-secondary">&#8681; SARIF</button>
+                  <button id="exportJsonBtn" class="btn-outline">&#8681; JSON</button>
+                  <button id="exportCsvBtn"  class="btn-outline">&#8681; CSV</button>
+                  <button id="exportSarifBtn" class="btn-outline">&#8681; SARIF</button>
                 </div>
                 <div class="archive-row hidden" id="archiveRow">
                   <span class="archive-saved-msg">&#10003; Saved to Audit History &mdash;
@@ -2412,6 +2404,19 @@
       tag.textContent = "Detected: " + (VENDOR_LABELS[data.detected_vendor] || data.detected_vendor);
       tag.classList.remove("hidden");
     } else { tag.classList.add("hidden"); }
+
+    /* Populate results section description */
+    const descEl = document.getElementById("resultsDesc");
+    if (descEl) {
+      const vendor = data.detected_vendor ? (VENDOR_LABELS[data.detected_vendor] || data.detected_vendor) : null;
+      const total  = (data.enriched_findings || data.findings || []).length;
+      const s = data.summary || {};
+      const parts = [];
+      if (vendor)          parts.push("Detected <b>" + vendor + "</b>.");
+      if (total > 0)       parts.push(total + " finding" + (total === 1 ? "" : "s") + " across " + [s.critical > 0 && "Critical", s.high > 0 && "High", s.medium > 0 && "Medium"].filter(Boolean).join(", ") + ".");
+      else                 parts.push("No findings — config looks clean.");
+      descEl.innerHTML = parts.join(" ");
+    }
 
     // Auto-fill device tag from config hostname if the field is still empty
     if (data.detected_hostname) {
