@@ -214,14 +214,14 @@
                     <div class="help">.conf, .cfg, .xml, .set, or .txt up to 25&nbsp;MB.</div>
                   </div>
                   <div class="ctrl">
-                    <label for="config" id="fileFieldV2" class="file-field empty">
-                      <div class="ff-text">
-                        <div class="ff-name" id="fileLabel">Choose or drop a file</div>
-                        <div class="ff-meta" id="fileMeta">No file selected</div>
-                      </div>
-                      <span class="ff-browse">Browse</span>
-                      <input type="file" id="config" name="config" required hidden />
-                    </label>
+                    <div class="file-field" id="configFileField">
+                      <input type="file" id="config" name="config" required class="hidden">
+                      <label for="config" class="file-label">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                        <span>Drop config file or <strong>click to browse</strong></span>
+                        <span class="file-name" id="fileName">No file selected</span>
+                      </label>
+                    </div>
                   </div>
                 </div>
 
@@ -374,14 +374,14 @@
                     <div class="help">Select one or more .conf, .cfg, .xml, .set, or .txt files.</div>
                   </div>
                   <div class="ctrl">
-                    <label for="bulkConfigs" id="bulkFileFieldV2" class="file-field empty">
-                      <div class="ff-text">
-                        <div class="ff-name" id="bulkFileLabel">Choose one or more files</div>
-                        <div class="ff-meta" id="bulkFileMeta">No files selected</div>
-                      </div>
-                      <span class="ff-browse">Browse</span>
-                      <input type="file" id="bulkConfigs" name="configs[]" multiple required hidden />
-                    </label>
+                    <div class="file-field" id="bulkFileField">
+                      <input type="file" id="bulkConfigs" name="configs[]" multiple required class="hidden">
+                      <label for="bulkConfigs" class="file-label">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                        <span>Drop config files or <strong>click to browse</strong></span>
+                        <span class="file-name" id="bulkFileName">No files selected</span>
+                      </label>
+                    </div>
                   </div>
                 </div>
                 <div class="field split">
@@ -2014,24 +2014,23 @@
 
   document.getElementById("vendor")?.addEventListener("change", syncComplianceSelector);
 
-  // v2 file field update helper
-  function updateFileFieldV2(fieldId, nameId, metaId, file) {
+  // file-field update helper
+  function updateFileField(fieldId, fileNameId, file) {
     const field = document.getElementById(fieldId);
     if (!field) return;
+    const nameEl = document.getElementById(fileNameId);
     if (file) {
-      field.classList.remove('empty'); field.classList.add('has-file');
-      const nameEl = document.getElementById(nameId);
-      const metaEl = document.getElementById(metaId);
-      if (nameEl) nameEl.textContent = file.name;
-      if (metaEl) metaEl.textContent = (file.size / 1024).toFixed(1) + ' KB \u00b7 ready';
+      field.classList.add('has-file');
+      if (nameEl) nameEl.textContent = file.name + ' \u00b7 ' + (file.size / 1024).toFixed(1) + ' KB';
     } else {
-      field.classList.add('empty'); field.classList.remove('has-file');
+      field.classList.remove('has-file');
+      if (nameEl) nameEl.textContent = 'No file selected';
     }
   }
 
   document.getElementById("config")?.addEventListener("change", function () {
     const file = this.files[0] || null;
-    updateFileFieldV2('fileFieldV2', 'fileLabel', 'fileMeta', file);
+    updateFileField('configFileField', 'fileName', file);
     if (!file) return;
     const vendorSel = document.getElementById("vendor");
     const reader = new FileReader();
@@ -2043,17 +2042,16 @@
     reader.readAsText(file.slice(0, 32768));
   });
 
-  // Drag-drop on v2 file field
+  // Drag-drop on file-field
   (function() {
-    const ff = document.getElementById('fileFieldV2');
+    const ff = document.getElementById('configFileField');
     const inp = document.getElementById('config');
     if (!ff || !inp) return;
-    ['dragover','dragenter'].forEach(ev => ff.addEventListener(ev, e => { e.preventDefault(); ff.style.borderBottomColor = 'var(--ink)'; }));
-    ff.addEventListener('dragleave', e => { e.preventDefault(); ff.style.borderBottomColor = ''; });
+    ['dragover','dragenter'].forEach(ev => ff.addEventListener(ev, e => { e.preventDefault(); ff.classList.add('drag-over'); }));
+    ff.addEventListener('dragleave', e => { e.preventDefault(); ff.classList.remove('drag-over'); });
     ff.addEventListener('drop', e => {
-      e.preventDefault(); ff.style.borderBottomColor = '';
+      e.preventDefault(); ff.classList.remove('drag-over');
       const f = e.dataTransfer.files[0]; if (!f) return;
-      // assign to input
       const dt = new DataTransfer(); dt.items.add(f); inp.files = dt.files;
       inp.dispatchEvent(new Event('change'));
     });
@@ -2062,20 +2060,17 @@
   // Bulk file field
   document.getElementById("bulkConfigs")?.addEventListener("change", function () {
     const files = this.files;
-    const field = document.getElementById('bulkFileFieldV2');
-    const nameEl = document.getElementById('bulkFileLabel');
-    const metaEl = document.getElementById('bulkFileMeta');
+    const field = document.getElementById('bulkFileField');
+    const nameEl = document.getElementById('bulkFileName');
     if (files && files.length) {
-      if (field) { field.classList.remove('empty'); field.classList.add('has-file'); }
-      if (nameEl) nameEl.textContent = files.length === 1 ? files[0].name : files.length + ' files selected';
-      if (metaEl) {
+      if (field) field.classList.add('has-file');
+      if (nameEl) {
         const total = Array.from(files).reduce((s, f) => s + f.size, 0);
-        metaEl.textContent = (total / 1024).toFixed(1) + ' KB total \u00b7 ready';
+        nameEl.textContent = (files.length === 1 ? files[0].name : files.length + ' files selected') + ' \u00b7 ' + (total / 1024).toFixed(1) + ' KB';
       }
     } else {
-      if (field) { field.classList.add('empty'); field.classList.remove('has-file'); }
-      if (nameEl) nameEl.textContent = 'Choose one or more files';
-      if (metaEl) metaEl.textContent = 'No files selected';
+      if (field) field.classList.remove('has-file');
+      if (nameEl) nameEl.textContent = 'No files selected';
     }
   });
 
@@ -3149,12 +3144,6 @@
   }
 
   // ══════════════════════════════════════════════════════ BULK AUDIT ══
-  document.getElementById("bulkConfigs")?.addEventListener("change", function () {
-    const n = this.files.length;
-    document.getElementById("bulkFileLabel").textContent =
-      n === 0 ? "Choose one or more files\u2026" :
-      n === 1 ? this.files[0].name : n + " files selected";
-  });
 
   document.getElementById("bulkForm")?.addEventListener("submit", async function (e) {
     e.preventDefault();
