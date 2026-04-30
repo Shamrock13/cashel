@@ -194,27 +194,27 @@
             {% endif %}
 
             <form id="auditForm" enctype="multipart/form-data">
-              <div class="form-v2">
+              <div class="form">
 
                 <!-- Device Tag -->
-                <div class="field-v2">
+                <div class="field">
                   <div>
-                    <div class="label-v2">Device tag</div>
-                    <div class="help-v2">Used to label this run in history and diff against future runs.</div>
+                    <div class="label">Device tag</div>
+                    <div class="help">Used to label this run in history and diff against future runs.</div>
                   </div>
-                  <div class="ctrl-v2">
-                    <input class="input-v2" type="text" id="deviceTag" name="tag" placeholder="ASA01, FortiGate-HQ, pa-edge-02&hellip;" autocomplete="off" maxlength="64" required />
+                  <div class="ctrl">
+                    <input class="input" type="text" id="deviceTag" name="tag" placeholder="ASA01, FortiGate-HQ, pa-edge-02&hellip;" autocomplete="off" maxlength="64" required />
                   </div>
                 </div>
 
                 <!-- Config file -->
-                <div class="field-v2">
+                <div class="field">
                   <div>
-                    <div class="label-v2">Config file</div>
-                    <div class="help-v2">.conf, .cfg, .xml, .set, or .txt up to 25&nbsp;MB.</div>
+                    <div class="label">Config file</div>
+                    <div class="help">.conf, .cfg, .xml, .set, or .txt up to 25&nbsp;MB.</div>
                   </div>
-                  <div class="ctrl-v2">
-                    <label for="config" id="fileFieldV2" class="file-field-v2 empty">
+                  <div class="ctrl">
+                    <label for="config" id="fileFieldV2" class="file-field empty">
                       <div class="ff-text">
                         <div class="ff-name" id="fileLabel">Choose or drop a file</div>
                         <div class="ff-meta" id="fileMeta">No file selected</div>
@@ -226,13 +226,13 @@
                 </div>
 
                 <!-- Vendor + Compliance (split) -->
-                <div class="field-v2 split-v2">
+                <div class="field split-v2">
                   <div>
-                    <div class="label-v2">Vendor &amp; compliance</div>
-                    <div class="help-v2">Cashel auto-detects vendor from syntax; override if needed.</div>
+                    <div class="label">Vendor &amp; compliance</div>
+                    <div class="help">Cashel auto-detects vendor from syntax; override if needed.</div>
                   </div>
-                  <div class="ctrl-v2">
-                    <select class="select-v2" id="vendor" name="vendor">
+                  <div class="ctrl">
+                    <select class="select" id="vendor" name="vendor">
                       <option value="auto" selected>Auto-detect (recommended)</option>
                       <option value="aws">AWS Security Group</option>
                       <option value="azure">Azure NSG</option>
@@ -245,7 +245,7 @@
                       <option value="paloalto">Palo Alto Networks</option>
                       <option value="pfsense">pfSense</option>
                     </select>
-                    <select class="select-v2" id="compliance" name="compliance">
+                    <select class="select" id="compliance" name="compliance">
                       <option value="">Compliance &mdash; None</option>
                       <option value="cis">CIS Benchmark</option>
                       <option value="stig">DISA STIG</option>
@@ -258,12 +258,12 @@
                 </div>
 
                 <!-- Options as toggle pills -->
-                <div class="field-v2">
+                <div class="field">
                   <div>
-                    <div class="label-v2">Options</div>
-                    <div class="help-v2">Toggle what happens when the audit completes.</div>
+                    <div class="label">Options</div>
+                    <div class="help">Toggle what happens when the audit completes.</div>
                   </div>
-                  <div class="ctrl-v2">
+                  <div class="ctrl">
                     <div class="toggles-v2">
                       <label class="tgl-v2" id="tglReport" data-key="report">
                         <input type="checkbox" id="report" name="report" value="1" />
@@ -277,7 +277,7 @@
                   </div>
                 </div>
 
-              </div><!-- /form-v2 -->
+              </div><!-- /form -->
 
               <div class="form-actions-v2">
                 <div class="meta-v2" id="auditFormMeta">Ready</div>
@@ -367,14 +367,14 @@
             </div>
 
             <form id="bulkForm" enctype="multipart/form-data">
-              <div class="form-v2">
-                <div class="field-v2">
+              <div class="form">
+                <div class="field">
                   <div>
-                    <div class="label-v2">Config files</div>
-                    <div class="help-v2">Select one or more .conf, .cfg, .xml, .set, or .txt files.</div>
+                    <div class="label">Config files</div>
+                    <div class="help">Select one or more .conf, .cfg, .xml, .set, or .txt files.</div>
                   </div>
-                  <div class="ctrl-v2">
-                    <label for="bulkConfigs" id="bulkFileFieldV2" class="file-field-v2 empty">
+                  <div class="ctrl">
+                    <label for="bulkConfigs" id="bulkFileFieldV2" class="file-field empty">
                       <div class="ff-text">
                         <div class="ff-name" id="bulkFileLabel">Choose one or more files</div>
                         <div class="ff-meta" id="bulkFileMeta">No files selected</div>
@@ -384,12 +384,12 @@
                     </label>
                   </div>
                 </div>
-                <div class="field-v2 split-v2">
+                <div class="field split-v2">
                   <div>
-                    <div class="label-v2">Vendor &amp; compliance</div>
+                    <div class="label">Vendor &amp; compliance</div>
                   </div>
-                  <div class="ctrl-v2">
-                    <select class="select-v2" id="bulkVendor" name="vendor">
+                  <div class="ctrl">
+                    <select class="select" id="bulkVendor" name="vendor">
                       <option value="auto" selected>Auto-detect (recommended)</option>
                       <option value="aws">AWS Security Group</option>
                       <option value="azure">Azure NSG</option>
@@ -402,7 +402,7 @@
                       <option value="paloalto">Palo Alto Networks</option>
                       <option value="pfsense">pfSense</option>
                     </select>
-                    <select class="select-v2" id="bulkCompliance" name="compliance">
+                    <select class="select" id="bulkCompliance" name="compliance">
                       <option value="">Compliance &mdash; None</option>
                       <option value="cis">CIS Benchmark</option>
                       <option value="stig">DISA STIG</option>
@@ -413,9 +413,9 @@
                     </select>
                   </div>
                 </div>
-                <div class="field-v2">
-                  <div><div class="label-v2">Options</div></div>
-                  <div class="ctrl-v2">
+                <div class="field">
+                  <div><div class="label">Options</div></div>
+                  <div class="ctrl">
                     <div class="toggles-v2">
                       <label class="tgl-v2" data-key="bulkArchive">
                         <input type="checkbox" id="bulkArchive" name="archive" value="1" />
@@ -1506,26 +1506,26 @@
             </div>
 
             <div class="sub-head-v2">Activate a license key</div>
-            <div class="form-v2">
-              <div class="field-v2 split-v2">
+            <div class="form">
+              <div class="field split-v2">
                 <div>
-                  <div class="label-v2">License key</div>
-                  <div class="help-v2">Paste the key from your purchase email. Activation is local — no telemetry.</div>
+                  <div class="label">License key</div>
+                  <div class="help">Paste the key from your purchase email. Activation is local — no telemetry.</div>
                 </div>
-                <div class="ctrl-v2">
-                  <input class="input-v2 mono" id="licenseKeyInput" placeholder="CSL-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX" autocomplete="off" style="font-family:'Geist Mono',monospace;font-size:12px;letter-spacing:0.02em" />
+                <div class="ctrl">
+                  <input class="input mono" id="licenseKeyInput" placeholder="CSL-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX" autocomplete="off" style="font-family:'Geist Mono',monospace;font-size:12px;letter-spacing:0.02em" />
                   <button type="button" class="btn-run" id="activateLicenseBtn" style="white-space:nowrap;align-self:flex-end">
                     Activate
                     <span class="btn-arr" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
                   </button>
                 </div>
               </div>
-              <div class="field-v2">
+              <div class="field">
                 <div>
-                  <div class="label-v2">Offline activation</div>
-                  <div class="help-v2">Air-gapped install? Generate a request file, upload it at cashel.dev/activate, then import the response.</div>
+                  <div class="label">Offline activation</div>
+                  <div class="help">Air-gapped install? Generate a request file, upload it at cashel.dev/activate, then import the response.</div>
                 </div>
-                <div class="ctrl-v2">
+                <div class="ctrl">
                   <div style="display:flex;gap:8px;flex-wrap:wrap;">
                     <button type="button" class="btn-ghost-v2" style="border:1px solid var(--line-2);border-radius:999px;padding:8px 14px;font-size:13px;color:var(--ink-2)">Download request</button>
                     <button type="button" class="btn-ghost-v2" style="border:1px solid var(--line-2);border-radius:999px;padding:8px 14px;font-size:13px;color:var(--ink-2)">Import response</button>
