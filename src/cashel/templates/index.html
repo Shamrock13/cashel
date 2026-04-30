@@ -3264,17 +3264,20 @@
       return;
     }
     el.innerHTML = list.map(s => {
-      const freq    = FREQ_LABELS[s.frequency] || s.frequency;
+      const freq    = escHtml(FREQ_LABELS[s.frequency] || s.frequency);
       const vendor  = VENDOR_LABELS[s.vendor]  || s.vendor;
       const comp    = COMP_LABELS[s.compliance||""] || s.compliance || "—";
       const lastRun = s.last_run ? new Date(s.last_run).toLocaleString() : "Never";
       const lastSt  = s.last_status === "ok"    ? `<span class="activity-ok">&#10003; OK</span>` :
                       s.last_status === "error"  ? `<span class="activity-fail">&#10007; Error</span>` : "—";
+      const _dow  = escHtml(DOW_LABELS[s.day_of_week] || s.day_of_week);
+      const _h    = escHtml(String(s.hour  ?? 0).padStart(2,"0"));
+      const _m    = escHtml(String(s.minute ?? 0).padStart(2,"0"));
       const timing  = s.frequency === "weekly"
-        ? `${DOW_LABELS[s.day_of_week]||s.day_of_week} ${String(s.hour).padStart(2,"0")}:${String(s.minute).padStart(2,"0")} UTC`
+        ? `${_dow} ${_h}:${_m} UTC`
         : s.frequency === "hourly"
-        ? `Every hour at :${String(s.minute).padStart(2,"0")}`
-        : `${String(s.hour).padStart(2,"0")}:${String(s.minute).padStart(2,"0")} UTC`;
+        ? `Every hour at :${_m}`
+        : `${_h}:${_m} UTC`;
       const statusClass = s.last_status === "error" ? "status err" : s.enabled ? "status" : "status off";
       const statusLabel = s.last_status === "error" ? "Error" : s.enabled ? "Enabled" : "Disabled";
       return `<div class="sched-card${s.enabled ? "" : " disabled"}" data-id="${escHtml(s.id)}">
