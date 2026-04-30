@@ -2108,10 +2108,10 @@
     if (!activeFilter) return allFindings;
     return allFindings.filter(f => {
       const cls = findingClass(f);
-      if (activeFilter === "critical")   return cls === "finding-critical";
-      if (activeFilter === "high")       return cls === "finding-high";
-      if (activeFilter === "medium")     return cls === "finding-medium";
-      if (activeFilter === "compliance") return cls === "finding-compliance-high" || cls === "finding-compliance-medium";
+      if (activeFilter === "critical")   return cls === "crit";
+      if (activeFilter === "high")       return cls === "high";
+      if (activeFilter === "medium")     return cls === "med";
+      if (activeFilter === "compliance") return cls === "compliance-high" || cls === "compliance-med";
       return true;
     });
   }
@@ -2208,13 +2208,13 @@
   document.getElementById("viewCompact")?.addEventListener("click", () => setFindingsView("compact"));
 
   document.getElementById("summaryGrid")?.addEventListener("click", function (e) {
-    const box = e.target.closest(".summary-box[data-filter]");
+    const box = e.target.closest(".stat[data-filter]");
     if (!box) return;
     const filter = box.dataset.filter;
     const newFilter = (filter === "all" || activeFilter === filter) ? null : filter;
     activeFilter = newFilter;
     currentPage  = 1;
-    document.querySelectorAll("#summaryGrid .summary-box").forEach(b =>
+    document.querySelectorAll("#summaryGrid .stat").forEach(b =>
       b.classList.toggle("filter-active", b === box && newFilter !== null)
     );
     renderFindingsUI();
@@ -2410,7 +2410,7 @@
     else { warn.classList.add("hidden"); }
 
     activeFilter = null; currentPage = 1;
-    document.querySelectorAll("#summaryGrid .summary-box").forEach(b => b.classList.remove("filter-active"));
+    document.querySelectorAll("#summaryGrid .stat").forEach(b => b.classList.remove("filter-active"));
     document.getElementById("summaryGrid").innerHTML = buildSummaryHTML(data.summary);
 
     allFindings = data.enriched_findings || data.findings.map(f => ({ message: f, category: null, remediation: null }));
@@ -2718,10 +2718,10 @@
           </div>
         </div>
         <div class="history-entry-right">
-          <span class="history-badge sev-critical" title="Critical">${crit}</span>
-          <span class="history-badge sev-high" title="High">${hi}</span>
-          <span class="history-badge sev-medium" title="Medium">${med}</span>
-          <span class="history-badge sev-total" title="Total">${tot}</span>
+          <span class="sev-chip crit" title="Critical">${crit}</span>
+          <span class="sev-chip high" title="High">${hi}</span>
+          <span class="sev-chip med" title="Medium">${med}</span>
+          <span class="sev-chip total" title="Total">${tot}</span>
           <button class="btn-secondary btn-sm" data-rem-archive="${escHtml(e.id)}" title="View Remediation Plan">&#9881; Plan</button>
           <a class="btn-secondary btn-sm" href="/archive/${escHtml(e.id)}/export?fmt=json"  download title="Download JSON">JSON</a>
           <a class="btn-secondary btn-sm" href="/archive/${escHtml(e.id)}/export?fmt=csv"   download title="Download CSV">CSV</a>
@@ -2892,9 +2892,9 @@
           <div class="compare-filename">${escHtml(ea.filename)}</div>
           <div class="compare-ts">${escHtml(tsA)}</div>
           <div class="compare-stats">
-            <span class="sev-critical history-badge">${ea.summary.critical || 0} Crit</span>
-            <span class="sev-high history-badge">${ea.summary.high} High</span>
-            <span class="sev-medium history-badge">${ea.summary.medium} Med</span>
+            <span class="sev-chip crit">${ea.summary.critical || 0} Crit</span>
+            <span class="sev-chip high">${ea.summary.high} High</span>
+            <span class="sev-chip med">${ea.summary.medium} Med</span>
           </div>
         </div>
         <div class="compare-arrow ${dirClass}">${dirLabel}</div>
@@ -2903,9 +2903,9 @@
           <div class="compare-filename">${escHtml(eb.filename)}</div>
           <div class="compare-ts">${escHtml(tsB)}</div>
           <div class="compare-stats">
-            <span class="sev-critical history-badge">${eb.summary.critical || 0} Crit</span>
-            <span class="sev-high history-badge">${eb.summary.high} High</span>
-            <span class="sev-medium history-badge">${eb.summary.medium} Med</span>
+            <span class="sev-chip crit">${eb.summary.critical || 0} Crit</span>
+            <span class="sev-chip high">${eb.summary.high} High</span>
+            <span class="sev-chip med">${eb.summary.medium} Med</span>
           </div>
         </div>
       </div>
@@ -3066,44 +3066,42 @@
 
   // ══════════════════════════════════════════════════════════ HELPERS ══
   function buildSummaryHTML(s) {
+    const numCls = (key) => key === "critical" ? "crit" : key === "high" ? "high" : key === "medium" ? "med" : "";
     const items = [
-      { label: "Critical", value: s.critical || 0, cls: "sev-critical", filter: "critical" },
-      { label: "High",     value: s.high,           cls: "sev-high",     filter: "high" },
-      { label: "Medium",   value: s.medium,         cls: "sev-medium",   filter: "medium" },
-      { label: "Total",    value: s.total,           cls: "sev-total",    filter: "all" },
+      { label: "Critical", value: s.critical || 0, numMod: "crit", filter: "critical" },
+      { label: "High",     value: s.high,           numMod: "high", filter: "high" },
+      { label: "Medium",   value: s.medium,         numMod: "med",  filter: "medium" },
+      { label: "Total",    value: s.total,           numMod: "",     filter: "all" },
     ];
-    if (s.cis_high    || s.cis_medium)   { items.push({ label:"CIS High",    value:s.cis_high,    cls:"sev-compliance",filter:"compliance"}); items.push({ label:"CIS Med",     value:s.cis_medium,   cls:"sev-compliance",filter:"compliance"}); }
+    if (s.cis_high    || s.cis_medium)   { items.push({ label:"CIS High",    value:s.cis_high,    numMod:"", filter:"compliance"}); items.push({ label:"CIS Med",     value:s.cis_medium,   numMod:"", filter:"compliance"}); }
     if (s.stig_cat_i  || s.stig_cat_ii || s.stig_cat_iii) {
-      if (s.stig_cat_i)   items.push({ label:"STIG CAT-I",   value:s.stig_cat_i,   cls:"sev-compliance",filter:"compliance"});
-      if (s.stig_cat_ii)  items.push({ label:"STIG CAT-II",  value:s.stig_cat_ii,  cls:"sev-compliance",filter:"compliance"});
-      if (s.stig_cat_iii) items.push({ label:"STIG CAT-III", value:s.stig_cat_iii, cls:"sev-compliance",filter:"compliance"});
+      if (s.stig_cat_i)   items.push({ label:"STIG CAT-I",   value:s.stig_cat_i,   numMod:"", filter:"compliance"});
+      if (s.stig_cat_ii)  items.push({ label:"STIG CAT-II",  value:s.stig_cat_ii,  numMod:"", filter:"compliance"});
+      if (s.stig_cat_iii) items.push({ label:"STIG CAT-III", value:s.stig_cat_iii, numMod:"", filter:"compliance"});
     }
-    if (s.hipaa_high  || s.hipaa_medium) { items.push({ label:"HIPAA High",  value:s.hipaa_high,  cls:"sev-compliance",filter:"compliance"}); items.push({ label:"HIPAA Med",   value:s.hipaa_medium, cls:"sev-compliance",filter:"compliance"}); }
-    if (s.nist_high   || s.nist_medium)  { items.push({ label:"NIST High",   value:s.nist_high,   cls:"sev-compliance",filter:"compliance"}); items.push({ label:"NIST Med",    value:s.nist_medium,  cls:"sev-compliance",filter:"compliance"}); }
-    if (s.pci_high    || s.pci_medium)   { items.push({ label:"PCI High",    value:s.pci_high,    cls:"sev-compliance",filter:"compliance"}); items.push({ label:"PCI Med",     value:s.pci_medium,   cls:"sev-compliance",filter:"compliance"}); }
-    if (s.soc2_high   || s.soc2_medium)  { items.push({ label:"SOC2 High",   value:s.soc2_high,   cls:"sev-compliance",filter:"compliance"}); items.push({ label:"SOC2 Med",    value:s.soc2_medium,  cls:"sev-compliance",filter:"compliance"}); }
-    let html = items.map(i =>
-      `<div class="summary-box ${i.cls}" data-filter="${i.filter}" title="Click to filter">
-         <span class="summary-val">${i.value}</span><span class="summary-lbl">${i.label}</span>
-       </div>`
-    ).join("");
+    if (s.hipaa_high  || s.hipaa_medium) { items.push({ label:"HIPAA High",  value:s.hipaa_high,  numMod:"", filter:"compliance"}); items.push({ label:"HIPAA Med",   value:s.hipaa_medium, numMod:"", filter:"compliance"}); }
+    if (s.nist_high   || s.nist_medium)  { items.push({ label:"NIST High",   value:s.nist_high,   numMod:"", filter:"compliance"}); items.push({ label:"NIST Med",    value:s.nist_medium,  numMod:"", filter:"compliance"}); }
+    if (s.pci_high    || s.pci_medium)   { items.push({ label:"PCI High",    value:s.pci_high,    numMod:"", filter:"compliance"}); items.push({ label:"PCI Med",     value:s.pci_medium,   numMod:"", filter:"compliance"}); }
+    if (s.soc2_high   || s.soc2_medium)  { items.push({ label:"SOC2 High",   value:s.soc2_high,   numMod:"", filter:"compliance"}); items.push({ label:"SOC2 Med",    value:s.soc2_medium,  numMod:"", filter:"compliance"}); }
     if (s.score !== undefined && s.score !== null) {
-      const scoreCls = s.score >= 80 ? "sev-score-good" : s.score >= 50 ? "sev-score-warn" : "sev-score-bad";
-      html += `<div class="summary-box ${scoreCls}" data-filter="" title="Security score (100 \u2212 HIGH\u00d710 \u2212 MEDIUM\u00d73)">
-        <span class="summary-val">${s.score}</span><span class="summary-lbl">Score /100</span>
-      </div>`;
+      const scoreMod = s.score >= 80 ? "ok" : s.score >= 50 ? "med" : "crit";
+      items.push({ label: "Score /100", value: s.score, numMod: scoreMod, filter: "", featured: true });
     }
-    return html;
+    return `<div class="stats">${items.map(i =>
+      `<div class="stat${i.featured ? " featured" : ""}" data-filter="${i.filter}" title="Click to filter">
+         <span class="num${i.numMod ? " " + i.numMod : ""}">${i.value}</span><span class="lbl">${i.label}</span>
+       </div>`
+    ).join("")}</div>`;
   }
 
   function findingClass(f) {
     const msg = typeof f === "object" ? f.message : f;
-    if (msg.includes("[CRITICAL]") && !msg.match(/PCI-|CIS-|NIST-|HIPAA-|SOC2-|STIG-/)) return "finding-critical";
-    if (msg.includes("[HIGH]")   && !msg.match(/PCI-|CIS-|NIST-|HIPAA-|SOC2-|STIG-/)) return "finding-high";
-    if (msg.includes("[MEDIUM]") && !msg.match(/PCI-|CIS-|NIST-|HIPAA-|SOC2-|STIG-/)) return "finding-medium";
-    if (msg.match(/PCI-HIGH|CIS-HIGH|NIST-HIGH|HIPAA-HIGH|SOC2-HIGH|STIG-CAT-I\]/))   return "finding-compliance-high";
-    if (msg.match(/PCI-MEDIUM|CIS-MEDIUM|NIST-MEDIUM|HIPAA-MEDIUM|SOC2-MEDIUM|STIG-CAT-II\]|STIG-CAT-III\]/)) return "finding-compliance-medium";
-    return "finding-info";
+    if (msg.includes("[CRITICAL]") && !msg.match(/PCI-|CIS-|NIST-|HIPAA-|SOC2-|STIG-/)) return "crit";
+    if (msg.includes("[HIGH]")   && !msg.match(/PCI-|CIS-|NIST-|HIPAA-|SOC2-|STIG-/)) return "high";
+    if (msg.includes("[MEDIUM]") && !msg.match(/PCI-|CIS-|NIST-|HIPAA-|SOC2-|STIG-/)) return "med";
+    if (msg.match(/PCI-HIGH|CIS-HIGH|NIST-HIGH|HIPAA-HIGH|SOC2-HIGH|STIG-CAT-I\]/))   return "compliance-high";
+    if (msg.match(/PCI-MEDIUM|CIS-MEDIUM|NIST-MEDIUM|HIPAA-MEDIUM|SOC2-MEDIUM|STIG-CAT-II\]|STIG-CAT-III\]/)) return "compliance-med";
+    return "";
   }
 
   const CATEGORY_LABELS = {
@@ -3121,11 +3119,11 @@
     const remediation= typeof f === "object" ? f.remediation  : null;
     const cls        = findingClass(f);
     const catInfo    = category ? (CATEGORY_LABELS[category] || { label: category, cls: "cat-hygiene" }) : null;
-    const catBadge   = catInfo ? `<span class="finding-cat-badge ${catInfo.cls}">${catInfo.label}</span>` : "";
-    const remDiv     = (!compactView && remediation)
-      ? `<div class="finding-remediation">&#8618; ${escHtml(remediation)}</div>`
+    const tagSpan    = catInfo ? `<span class="tag ${catInfo.cls}">${catInfo.label}</span>` : "";
+    const fixDiv     = (!compactView && remediation)
+      ? `<div class="fix">&#8618; ${escHtml(remediation)}</div>`
       : "";
-    return `<div class="finding ${cls}">${catBadge}<span class="finding-msg">${escHtml(msg)}</span>${remDiv}</div>`;
+    return `<div class="finding${cls ? " " + cls : ""}">${tagSpan}<span class="body">${escHtml(msg)}</span>${fixDiv}</div>`;
   }
 
   function setLoading(btnId, textId, spinnerId, label, loading) {
@@ -3200,10 +3198,10 @@
           <span class="bulk-status-badge badge-ok">&#10003; OK</span>
         </div>
         <div class="bulk-summary-row">
-          <span class="history-badge sev-critical" title="Critical">${s.critical||0} C</span>
-          <span class="history-badge sev-high" title="High">${s.high||0} H</span>
-          <span class="history-badge sev-medium" title="Medium">${s.medium||0} M</span>
-          <span class="history-badge sev-total" title="Total">${s.total||0} Total</span>
+          <span class="sev-chip crit" title="Critical">${s.critical||0} C</span>
+          <span class="sev-chip high" title="High">${s.high||0} H</span>
+          <span class="sev-chip med" title="Medium">${s.medium||0} M</span>
+          <span class="sev-chip total" title="Total">${s.total||0} Total</span>
           ${r.archive_id ? `<span class="bulk-archived">&#10003; Saved to History</span>` : ""}
         </div>
         <details class="bulk-findings-toggle">
