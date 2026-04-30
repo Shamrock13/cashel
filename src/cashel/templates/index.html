@@ -1834,7 +1834,7 @@
     const dot = document.getElementById('accentDot');
     const key = localStorage.getItem('cashel.accent') || 'acid';
     const v = window._ACCENTS?.[key];
-    if (dot && v) dot.style.background = v.a;
+    if (dot && v) dot.style.background = v.acc;
     document.querySelectorAll('.accent-swatch').forEach(b => {
       b.classList.toggle('active', b.dataset.accent === key);
     });
@@ -1867,7 +1867,7 @@
     document.querySelectorAll('#accentSwatchesGeneral .accent-swatch').forEach(btn => {
       const key = btn.dataset.accent;
       const v = window._ACCENTS?.[key];
-      if (v) btn.style.background = v.a;
+      if (v) btn.style.background = v.acc;
       btn.classList.toggle('active', key === curAccent);
     });
   }
@@ -1885,6 +1885,7 @@
   document.querySelectorAll('#accentSwatchesGeneral .accent-swatch').forEach(btn => {
     btn.addEventListener('click', () => {
       window._applyAccent(btn.dataset.accent);
+      applyAccent(btn.dataset.accent);
       _syncAppearanceUI();
       _updateAccentDot();
     });
