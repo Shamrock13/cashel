@@ -1024,47 +1024,47 @@
         <nav class="settings-sidebar" role="navigation" aria-label="Settings sections">
           <div class="settings-nav-group-label">Configuration</div>
 
-          <button class="settings-nav-item settings-nav-active" data-pane="general">
+          <a class="active" data-pane="general" onclick="showSettingsPane('general'); return false;" href="#">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><line x1="2" y1="5" x2="14" y2="5"/><line x1="2" y1="9" x2="14" y2="9"/><line x1="2" y1="13" x2="14" y2="13"/><circle cx="6" cy="5" r="1.75"/><circle cx="10" cy="9" r="1.75"/><circle cx="6" cy="13" r="1.75"/></svg>
             General
-          </button>
+          </a>
 
-          <button class="settings-nav-item" data-pane="email">
+          <a data-pane="email" onclick="showSettingsPane('email'); return false;" href="#">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="3.5" width="14" height="9" rx="1.5"/><path d="M1 5l7 4.5L15 5"/></svg>
             Email (SMTP)
-          </button>
+          </a>
 
           {% if not demo_mode %}
-          <button class="settings-nav-item" data-pane="auth">
+          <a data-pane="auth" onclick="showSettingsPane('auth'); return false;" href="#">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="10" height="8" rx="1.5"/><path d="M5 7V5a3 3 0 0 1 6 0v2"/><circle cx="8" cy="11" r="1" fill="currentColor" stroke="none"/></svg>
             Authentication
-          </button>
+          </a>
           {% endif %}
 
-          <button class="settings-nav-item" data-pane="security">
+          <a data-pane="security" onclick="showSettingsPane('security'); return false;" href="#">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 1.5L2 4v4.5c0 3.5 2.5 6.7 6 7.5 3.5-.8 6-4 6-7.5V4L8 1.5z"/><path d="M5.5 8l2 2 3-3"/></svg>
             Security
-          </button>
+          </a>
 
-          <button class="settings-nav-item" data-pane="syslog">
+          <a data-pane="syslog" onclick="showSettingsPane('syslog'); return false;" href="#">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="1.5" width="14" height="5" rx="1.5"/><rect x="1" y="9.5" width="14" height="5" rx="1.5"/><circle cx="4" cy="4" r="0.8" fill="currentColor" stroke="none"/><circle cx="4" cy="12" r="0.8" fill="currentColor" stroke="none"/><line x1="7" y1="4" x2="12" y2="4"/><line x1="7" y1="12" x2="12" y2="12"/></svg>
             Syslog
-          </button>
+          </a>
 
-          <button class="settings-nav-item" data-pane="alerts">
+          <a data-pane="alerts" onclick="showSettingsPane('alerts'); return false;" href="#">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 1.5a4.5 4.5 0 0 1 4.5 4.5c0 2 .8 3.2 1.5 4H2c.7-.8 1.5-2 1.5-4A4.5 4.5 0 0 1 8 1.5z"/><path d="M6.5 14a1.5 1.5 0 0 0 3 0"/></svg>
             Alert Thresholds
-          </button>
+          </a>
 
-          <button class="settings-nav-item" data-pane="licensing">
+          <a data-pane="licensing" onclick="showSettingsPane('licensing'); return false;" href="#">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>
             Licensing
-          </button>
+          </a>
 
-          <button class="settings-nav-item" data-pane="webhooks">
+          <a data-pane="webhooks" onclick="showSettingsPane('webhooks'); return false;" href="#">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 8a6 6 0 1 1 12 0"/><path d="M5 8a3 3 0 1 1 6 0"/><circle cx="8" cy="8" r="1" fill="currentColor" stroke="none"/><line x1="8" y1="9" x2="8" y2="14.5"/><line x1="5.5" y1="14.5" x2="10.5" y2="14.5"/></svg>
             Webhooks
-          </button>
+          </a>
         </nav>
         {% endif %}
 
@@ -1817,20 +1817,8 @@
 
   // ═══════════════════════════════════════════════════════ LICENSING ══
   function gotoLicensing() {
-    /* Navigate to Settings tab */
-    document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
-    document.querySelectorAll('.nav a').forEach(a => a.classList.remove('active'));
-    const settingsPanel = document.getElementById('tab-settings');
-    const settingsBtn = document.querySelector('.nav a[data-tab="settings"]');
-    if (settingsPanel) settingsPanel.classList.remove('hidden');
-    if (settingsBtn) settingsBtn.classList.add('active');
-    /* Activate Licensing pane */
-    document.querySelectorAll('.settings-pane').forEach(p => p.classList.remove('active'));
-    document.querySelectorAll('.settings-nav-item').forEach(b => b.classList.remove('settings-nav-active'));
-    const licPane = document.getElementById('spane-licensing');
-    const licBtn = document.querySelector('[data-pane="licensing"]');
-    if (licPane) licPane.classList.add('active');
-    if (licBtn) licBtn.classList.add('settings-nav-active');
+    switchTab('settings');
+    showSettingsPane('licensing');
     window.scrollTo(0, 0);
   }
 
@@ -3473,16 +3461,23 @@
   }
 
   // ── Settings sidebar navigation ──────────────────────────────────────────
-  document.querySelectorAll(".settings-nav-item").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const pane = btn.dataset.pane;
-      document.querySelectorAll(".settings-nav-item").forEach(b => b.classList.remove("settings-nav-active"));
-      document.querySelectorAll(".settings-pane").forEach(p => p.classList.remove("active"));
-      btn.classList.add("settings-nav-active");
-      const target = document.getElementById("spane-" + pane);
-      if (target) target.classList.add("active");
-    });
-  });
+  function showSettingsPane(id) {
+    document.querySelectorAll('.settings-nav a').forEach(a => a.classList.remove('active'));
+    document.querySelectorAll('.settings-pane').forEach(p => p.classList.remove('active'));
+    const link = document.querySelector(`.settings-nav a[data-pane="${id}"]`);
+    const pane = document.getElementById(`spane-${id}`);
+    if (link) link.classList.add('active');
+    if (pane) pane.classList.add('active');
+    /* Side-effects for specific panes */
+    if (id === 'alerts') {
+      loadAlertChannels();
+      loadAlertThresholds();
+      loadAlertScheduleSelect();
+    }
+    if (id === 'webhooks') {
+      loadWebhooks();
+    }
+  }
 
   function applySettingsToForm() {
     const reportEl  = document.getElementById("report");
@@ -3743,14 +3738,6 @@
     if (_activeThresholdScheduleId) renderScheduleThresholds(_activeThresholdScheduleId);
   });
 
-  document.querySelectorAll(".settings-nav-item[data-pane='alerts']").forEach(btn => {
-    btn.addEventListener("click", () => {
-      loadAlertChannels();
-      loadAlertThresholds();
-      loadAlertScheduleSelect();
-    });
-  });
-
   // ══════════════════════════════════════════════════ WEBHOOKS ══
   async function loadWebhooks() {
     const res = await fetch("/settings/webhooks");
@@ -3824,10 +3811,6 @@
     document.getElementById("whSecret").value = "";
     document.querySelectorAll(".wh-event-cb").forEach(c => { c.checked = c.value === "audit.complete"; });
     loadWebhooks();
-  });
-
-  document.querySelectorAll(".settings-nav-item[data-pane='webhooks']").forEach(btn => {
-    btn.addEventListener("click", () => loadWebhooks());
   });
 
   // ══════════════════════════════════════════════════ TEST SMTP ══
