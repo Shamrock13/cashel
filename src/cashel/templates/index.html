@@ -631,20 +631,24 @@
                 <option value="pfsense">pfSense</option>
               </select>
             </div>
-            <div class="form-group">
-              <label for="connHost">Host / IP</label>
-              <input type="text" id="connHost" name="host" placeholder="192.168.1.1" autocomplete="off"
-                {% if demo_mode %}value="203.0.113.50" readonly{% endif %} />
-            </div>
-            <div class="form-group">
-              <label for="connPort">SSH Port</label>
-              <input type="text" id="connPort" name="port" value="22" placeholder="22" autocomplete="off"
-                {% if demo_mode %}readonly{% endif %} />
-            </div>
-            <div class="form-group">
-              <label for="connUser">Username</label>
-              <input type="text" id="connUser" name="username" placeholder="admin" autocomplete="off"
-                {% if demo_mode %}value="auditor" readonly{% endif %} />
+            <div class="field triple" style="grid-column:1/-1">
+              <div class="ctrl">
+                <div class="form-group">
+                  <label for="connHost">Host / IP</label>
+                  <input type="text" id="connHost" name="host" placeholder="192.168.1.1" autocomplete="off"
+                    {% if demo_mode %}value="203.0.113.50" readonly{% endif %} />
+                </div>
+                <div class="form-group">
+                  <label for="connUser">Username</label>
+                  <input type="text" id="connUser" name="username" placeholder="admin" autocomplete="off"
+                    {% if demo_mode %}value="auditor" readonly{% endif %} />
+                </div>
+                <div class="form-group">
+                  <label for="connPort">SSH Port</label>
+                  <input type="text" id="connPort" name="port" value="22" placeholder="22" autocomplete="off"
+                    {% if demo_mode %}readonly{% endif %} />
+                </div>
+              </div>
             </div>
             {% if not demo_mode %}
             <div class="form-group" style="grid-column:1/-1">
@@ -2567,22 +2571,23 @@
     const unchanged = data.unchanged || [];
 
     document.getElementById("diffSummary").innerHTML = `
-      <div class="diff-stat-row">
-        <span class="diff-stat diff-stat-added">+${added.length} added</span>
-        <span class="diff-stat diff-stat-removed">&#8722;${removed.length} removed</span>
-        <span class="diff-stat diff-stat-unchanged">${unchanged.length} unchanged</span>
+      <div class="diff-summary">
+        <span class="diff-chip add">+${added.length} added</span>
+        <span class="diff-chip rem">&#8722;${removed.length} removed</span>
+        <span class="diff-chip same">${unchanged.length} unchanged</span>
       </div>
       <p class="diff-files">${escHtml(data.filename_a)} &rarr; ${escHtml(data.filename_b)}</p>`;
 
     const renderGroup = (elId, items, cls, label) => {
       const el = document.getElementById(elId);
       if (!items.length) { el.innerHTML = ""; return; }
-      el.innerHTML = `<div class="diff-group-label ${cls}-label">${label} (${items.length})</div>` +
-        items.map(r => `<div class="diff-row ${cls}">${escHtml(r)}</div>`).join("");
+      el.innerHTML = `<div class="diff-group"><h4>${label} (${items.length})</h4>` +
+        items.map(r => `<div class="diff-line ${cls}">${escHtml(r)}</div>`).join("") +
+        `</div>`;
     };
-    renderGroup("diffAdded",     added,     "diff-added",     "&#43; Added");
-    renderGroup("diffRemoved",   removed,   "diff-removed",   "&#8722; Removed");
-    renderGroup("diffUnchanged", unchanged, "diff-unchanged", "&#8799; Unchanged");
+    renderGroup("diffAdded",     added,     "add", "&#43; Added");
+    renderGroup("diffRemoved",   removed,   "rem", "&#8722; Removed");
+    renderGroup("diffUnchanged", unchanged, "",    "&#8799; Unchanged");
   }
 
   // ════════════════════════════════════════════════════ LIVE CONNECT ══════
@@ -2917,12 +2922,14 @@
         <div class="compare-delta-box"><span class="delta-label">Total &Delta;</span>${deltaStr(d.total)}</div>
       </div>
       ${data.resolved_findings.length ? `
-        <div class="diff-group-label diff-added-label">&#10003; Resolved Issues (${data.resolved_findings.length})</div>
-        ${data.resolved_findings.map(f => `<div class="diff-row diff-added">${escHtml(f)}</div>`).join("")}
+        <div class="diff-group"><h4>&#10003; Resolved Issues (${data.resolved_findings.length})</h4>
+        ${data.resolved_findings.map(f => `<div class="diff-line add">${escHtml(f)}</div>`).join("")}
+        </div>
       ` : ""}
       ${data.new_findings.length ? `
-        <div class="diff-group-label diff-removed-label">&#9888; New Issues (${data.new_findings.length})</div>
-        ${data.new_findings.map(f => `<div class="diff-row diff-removed">${escHtml(f)}</div>`).join("")}
+        <div class="diff-group"><h4>&#9888; New Issues (${data.new_findings.length})</h4>
+        ${data.new_findings.map(f => `<div class="diff-line rem">${escHtml(f)}</div>`).join("")}
+        </div>
       ` : ""}
       ${!data.resolved_findings.length && !data.new_findings.length ? `
         <div class="finding finding-pass">[PASS] No change in findings between the two audits.</div>
