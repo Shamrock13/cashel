@@ -565,6 +565,7 @@ def plan_to_pdf(plan: dict, output_path: str) -> str:
         _COMP,
         _PASS,
     )
+    from .export import TOOL_VERSION
 
     _EFFORT_COLORS = {
         "quick-fix": (26, 128, 85),  # green
@@ -584,25 +585,25 @@ def plan_to_pdf(plan: dict, output_path: str) -> str:
     class RemediationReport(CashelReport):
         def header(self):
             self.set_fill_color(*_NAVY)
-            self.rect(0, 0, 210, 30, "F")
+            self.rect(0, 0, 210, 34, "F")
             self.set_text_color(*_WHITE)
-            self.set_font("Helvetica", "B", 17)
-            self.set_xy(12, 8)
+            self.set_font("Helvetica", "B", 20)
+            self.set_xy(12, 9)
             self.cell(120, 9, "Cashel")
-            self.set_font("Helvetica", "", 8)
+            self.set_font("Helvetica", "B", 8)
             self.set_text_color(180, 200, 235)
-            self.set_xy(12, 19)
-            self.cell(120, 6, "Remediation Plan")
-            self.set_xy(0, 19)
+            self.set_xy(12, 22)
+            self.cell(120, 6, f"Remediation report  |  Cashel {TOOL_VERSION}")
+            self.set_xy(0, 22)
             self.cell(
                 198,
                 6,
                 f"Generated: {plan.get('generated', '')}",
                 align="R",
             )
-            self.set_fill_color(126, 174, 255)  # blue accent for remediation
-            self.rect(0, 29.5, 210, 0.6, "F")
-            self.set_y(36)
+            self.set_fill_color(255, 104, 128)
+            self.rect(0, 33.4, 210, 0.7, "F")
+            self.set_y(40)
 
     pdf = RemediationReport()
     pdf.set_auto_page_break(auto=True, margin=18)
@@ -614,7 +615,7 @@ def plan_to_pdf(plan: dict, output_path: str) -> str:
     pdf.set_fill_color(*_LIGHT_BG)
     y = pdf.get_y()
     pdf.rect(10, y, 190, 10, "F")
-    meta = f"Device: {plan.get('filename', 'N/A')}   |   Vendor: {vendor_name}   |   Framework: {framework}   |   Steps: {plan['total_steps']}"
+    meta = f"File: {plan.get('filename', 'N/A')}   |   Vendor: {vendor_name}   |   Framework: {framework}   |   Steps: {plan['total_steps']}"
     pdf.set_font("Helvetica", "", 8)
     pdf.set_text_color(*_MUTED)
     pdf.set_xy(13, y + 2)
@@ -697,7 +698,7 @@ def plan_to_pdf(plan: dict, output_path: str) -> str:
                     pdf.add_page()
                     y = pdf.get_y()
 
-                # Step header bar
+                # Step card
                 pdf.set_fill_color(*bar_color)
                 pdf.rect(10, y, 3, row_h, "F")
                 pdf.set_fill_color(*bg)
@@ -734,7 +735,7 @@ def plan_to_pdf(plan: dict, output_path: str) -> str:
                     pdf.set_text_color(*_MUTED)
                     pdf.set_font("Helvetica", "", 6.5)
                     pdf.set_xy(17, cur_y)
-                    pdf.multi_cell(inner_w - 4, 3.8, _sanitize("-> " + guidance))
+                    pdf.multi_cell(inner_w - 4, 3.8, _sanitize("Guidance: " + guidance))
                     cur_y = pdf.get_y() + 1
 
                 # CLI commands

@@ -10,7 +10,6 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" nonce="{{ g.csp_nonce }}"></script>
   <script nonce="{{ g.csp_nonce }}">
 (function(){
   var html = document.documentElement;
@@ -319,16 +318,17 @@
                   <a id="pdfLink" class="hidden" href="#" download>Report PDF</a>
                 </div>
                 <div class="remediation-row hidden" id="remediationRow">
-                  <button id="remediationPlanBtn" class="btn-primary">View remediation plan</button>
+                  <button id="remediationPlanBtn" class="btn-primary">View Remediation Plan</button>
                 </div>
                 <div class="download-menu hidden" id="exportRow">
                   <button id="downloadMenuBtn" class="btn-outline" type="button" aria-haspopup="true" aria-expanded="false">Download</button>
                   <div class="download-menu-panel hidden" id="downloadMenuPanel" role="menu">
+                    <a id="downloadReportPdf" class="hidden" href="#" download role="menuitem">Report PDF</a>
+                    <button id="downloadRemediationPdf" class="hidden" type="button" role="menuitem">Remediation PDF</button>
                     <button id="exportJsonBtn" type="button" role="menuitem">JSON</button>
                     <button id="exportCsvBtn" type="button" role="menuitem">CSV</button>
                     <button id="exportSarifBtn" type="button" role="menuitem">SARIF</button>
-                    <a id="downloadReportPdf" class="hidden" href="#" download role="menuitem">Report PDF</a>
-                    <button id="downloadRemediationPdf" class="hidden" type="button" role="menuitem">Remediation PDF</button>
+                    <button id="downloadRemediationMd" class="hidden" type="button" role="menuitem">Markdown</button>
                   </div>
                 </div>
                 <div class="archive-row hidden" id="archiveRow">
@@ -442,7 +442,12 @@
             </form>
 
             <div class="hidden" id="bulkResults" style="margin-top:2.5rem;border-top:1px solid var(--line);padding-top:2rem">
-              <h2 style="font-size:18px;font-weight:500;letter-spacing:-0.02em;margin:0 0 1.25rem">Bulk Results</h2>
+              <div class="section-head" style="margin:0 0 1.5rem">
+                <div>
+                  <div class="idx">02 &mdash; Bulk results</div>
+                  <h2 id="bulkResultsTitle">Runs complete</h2>
+                </div>
+              </div>
               <div id="bulkResultsList"></div>
             </div>
 
@@ -866,8 +871,9 @@
           </div>
         </div>
         <div id="trendsEmpty" class="hidden"><p class="text-muted">No trend data yet. Save two or more audits for the same device to see trends.</p></div>
-        <div id="trendsChartWrap" style="position:relative;max-height:320px;">
-          <canvas id="trendsChart"></canvas>
+        <div id="trendsChartWrap" class="chart">
+          <div class="chart-legend" id="trendsLegend"></div>
+          <svg id="trendsChartSvg" viewBox="0 0 600 180" preserveAspectRatio="none" role="img" aria-label="Score over time"></svg>
         </div>
       </div>
 
@@ -1833,7 +1839,7 @@
 
   <!-- Footer -->
   <footer class="foot">
-    <span>Cashel v1.5.1</span>
+    <span>Cashel v2.0.0</span>
     <span>© 2026 Cashel Security</span>
   </footer>
 
@@ -2435,11 +2441,11 @@
   });
 
   // ═══════════════════════════════════════════════ TRENDS CHART ══
-  let trendsChartInstance = null;
   let trendsData = [];
 
   const CHART_COLORS = [
-    "#4488FF","#FF6868","#44BB88","#FFAA00","#AA44FF","#FF8844","#44CCFF","#FF44AA"
+    "var(--acc)", "var(--crit)", "var(--ok)", "var(--med)",
+    "var(--violet, #9d7bf4)", "var(--teal, #14c8bd)", "var(--ink-3)", "var(--high)"
   ];
 
   async function loadTrends() {
@@ -2499,63 +2505,44 @@
     });
 
     const allTimestamps = [...new Set(scored.map(e => e.timestamp))].sort();
-    const labels = allTimestamps.map(ts => {
-      const d = new Date(ts);
-      return d.toLocaleDateString() + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    });
-
     const devices = Object.keys(byDevice);
-    const datasets = devices.map((dev, i) => {
+    const legend = document.getElementById("trendsLegend");
+    legend.innerHTML = devices.map((dev, i) => {
+      const color = CHART_COLORS[i % CHART_COLORS.length];
+      return `<span><span class="dot" style="background:${color};"></span>${escHtml(dev)}</span>`;
+    }).join("");
+
+    const width = 600;
+    const xStart = allTimestamps.length > 1 ? 80 : 300;
+    const xEnd = allTimestamps.length > 1 ? 520 : 300;
+    const xFor = ts => {
+      const idx = allTimestamps.indexOf(ts);
+      if (allTimestamps.length <= 1) return xStart;
+      return xStart + ((xEnd - xStart) * idx / (allTimestamps.length - 1));
+    };
+    const yFor = score => 170 - Math.max(0, Math.min(100, Number(score))) * 1.3;
+
+    let svg = `
+      <line x1="0" y1="40" x2="${width}" y2="40" stroke="var(--line)" stroke-dasharray="2 3"/>
+      <line x1="0" y1="90" x2="${width}" y2="90" stroke="var(--line)" stroke-dasharray="2 3"/>
+      <line x1="0" y1="140" x2="${width}" y2="140" stroke="var(--line)" stroke-dasharray="2 3"/>
+    `;
+
+    devices.forEach((dev, i) => {
       const color = CHART_COLORS[i % CHART_COLORS.length];
       const points = allTimestamps.map(ts => {
         const entry = byDevice[dev].find(e => e.timestamp === ts);
-        return entry ? entry.score : null;
-      });
-      return {
-        label: dev,
-        data: points,
-        borderColor: color,
-        backgroundColor: color + "22",
-        pointBackgroundColor: color,
-        tension: 0.3,
-        spanGaps: true,
-        pointRadius: 4,
-        pointHoverRadius: 6,
-      };
-    });
-
-    const isDark = document.documentElement.getAttribute("data-theme") === "dark";
-    const gridColor  = isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)";
-    const tickColor  = isDark ? "#9999BB" : "#6B6B8A";
-
-    if (trendsChartInstance) trendsChartInstance.destroy();
-    const trendsCanvas = document.getElementById("trendsChart");
-    if (!trendsCanvas) return;
-    trendsChartInstance = new Chart(trendsCanvas, {
-      type: "line",
-      data: { labels, datasets },
-      options: {
-        responsive: true,
-        maintainAspectRatio: true,
-        interaction: { mode: "index", intersect: false },
-        plugins: {
-          legend: { labels: { color: tickColor, font: { size: 11 } } },
-          tooltip: {
-            callbacks: {
-              label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y !== null ? ctx.parsed.y + "/100" : "—"}`
-            }
-          }
-        },
-        scales: {
-          x: { ticks: { color: tickColor, maxRotation: 30, font: { size: 10 } }, grid: { color: gridColor } },
-          y: {
-            min: 0, max: 100,
-            ticks: { color: tickColor, callback: v => v + "/100", font: { size: 10 } },
-            grid: { color: gridColor },
-          }
-        }
+        return entry ? { x: xFor(ts), y: yFor(entry.score), score: entry.score } : null;
+      }).filter(Boolean);
+      if (points.length > 1) {
+        const d = points.map((p, idx) => `${idx === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
+        svg += `<path d="${d}" fill="none" stroke="${color}" stroke-width="1.5"/>`;
       }
+      points.forEach(p => {
+        svg += `<circle cx="${p.x}" cy="${p.y}" r="4" fill="${color}"><title>${escHtml(dev)}: ${escHtml(String(p.score))}/100</title></circle>`;
+      });
     });
+    document.getElementById("trendsChartSvg").innerHTML = svg;
   }
 
   document.getElementById("refreshTrendsBtn")?.addEventListener("click", loadTrends);
@@ -2654,9 +2641,11 @@
     if (hasFindings) {
       remRow.classList.remove("hidden");
       document.getElementById("downloadRemediationPdf").classList.remove("hidden");
+      document.getElementById("downloadRemediationMd").classList.remove("hidden");
     } else {
       remRow.classList.add("hidden");
       document.getElementById("downloadRemediationPdf").classList.add("hidden");
+      document.getElementById("downloadRemediationMd").classList.add("hidden");
     }
   }
 
@@ -2682,7 +2671,7 @@
   function exportJSON() {
     if (!lastAuditData) return;
     const payload = {
-      tool: "Cashel", version: "1.5.1",
+      tool: "Cashel", version: "2.0.0",
       filename:  lastAuditData.filename  || "",
       vendor:    lastAuditData.vendor    || "",
       timestamp: new Date().toISOString(),
@@ -2735,7 +2724,7 @@
       version: "2.1.0",
       "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
       runs: [{
-        tool: {driver: {name:"Cashel", version:"1.5.1", informationUri:"https://github.com/Shamrock13/cashel", rules: Object.values(seenRules)}},
+        tool: {driver: {name:"Cashel", version:"2.0.0", informationUri:"https://github.com/Shamrock13/cashel", rules: Object.values(seenRules)}},
         results,
       }],
     };
@@ -2791,6 +2780,34 @@
       URL.revokeObjectURL(url);
     } catch (err) {
       alert("Remediation PDF download failed: " + err.message);
+    }
+  });
+
+  document.getElementById("downloadRemediationMd")?.addEventListener("click", async () => {
+    if (!lastAuditData) return;
+    try {
+      const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content
+                     || document.querySelector('input[name="csrf_token"]')?.value || '';
+      const payload = {
+        findings: lastAuditData.enriched_findings || lastAuditData.findings || [],
+        vendor: lastAuditData.detected_vendor || lastAuditData.vendor || "",
+        filename: lastAuditData.filename || "",
+        compliance: lastAuditData.compliance || null,
+        summary: lastAuditData.summary || {},
+      };
+      const res = await fetch("/remediation-plan?fmt=markdown", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error("Download failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = _exportBasename() + "_remediation.md"; a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert("Remediation Markdown download failed: " + err.message);
     }
   });
 
@@ -3472,57 +3489,64 @@
     _bulkResultsData = results;
     const el = document.getElementById("bulkResultsList");
     if (!results.length) { el.innerHTML = `<p class="text-muted">No files processed.</p>`; return; }
+    document.getElementById("bulkResultsTitle").textContent = `${results.length} run${results.length === 1 ? "" : "s"} complete`;
     el.innerHTML = results.map((r, i) => {
       const vendor = VENDOR_LABELS[r.vendor] || r.vendor || "Unknown";
       const s = r.summary || {};
       if (r.status === "error") {
-        return `<div class="bulk-result-row bulk-result-error">
-          <div class="bulk-result-header">
-            <span class="bulk-filename">${escHtml(r.filename)}</span>
-            <span class="bulk-status-badge badge-fail">&#10007; Error</span>
+        return `<div class="bulk-item bulk-result-error">
+          <div class="bulk-item-head">
+            <div>
+              <div class="fname">${escHtml(r.filename)}</div>
+              <div class="bulk-meta">Audit failed</div>
+            </div>
+            <span class="bulk-status-badge badge-fail">Error</span>
           </div>
           <div class="alert alert-error" style="margin:0.5rem 0 0">${escHtml(r.error || "Unknown error")}</div>
         </div>`;
       }
       const scoreVal = s.score !== undefined ? s.score : "—";
-      const scoreCls = s.score >= 80 ? "score-good" : s.score >= 50 ? "score-warn" : "score-bad";
-      return `<div class="bulk-result-row">
-        <div class="bulk-result-header">
-          <span class="bulk-filename">${escHtml(r.filename)}</span>
-          <span class="bulk-vendor-tag">${escHtml(vendor)}</span>
-          <span class="bulk-score ${scoreCls}">${scoreVal}/100</span>
-          <span class="bulk-status-badge badge-ok">&#10003; OK</span>
-        </div>
-        <div class="bulk-summary-row">
-          <span class="sev-chip crit" title="Critical">${s.critical||0} C</span>
-          <span class="sev-chip high" title="High">${s.high||0} H</span>
-          <span class="sev-chip med" title="Medium">${s.medium||0} M</span>
-          <span class="sev-chip total" title="Total">${s.total||0} Total</span>
-          ${r.archive_id ? `<span class="bulk-archived">&#10003; Saved to History</span>` : ""}
-        </div>
-        <details class="bulk-findings-toggle">
-          <summary>${(r.enriched_findings||r.findings||[]).length} finding(s) &mdash; click to expand</summary>
-          <div class="bulk-findings-list">${(r.enriched_findings||[]).length
-            ? (r.enriched_findings).map(f => buildFindingHTML(f)).join("")
-            : (r.findings||[]).map(f => `<div class="finding finding-info">${escHtml(f)}</div>`).join("")
-            || `<div class="finding finding-pass">[PASS] No issues found</div>`}
+      const findingsCount = (r.enriched_findings || r.findings || []).length;
+      return `<div class="bulk-item">
+        <div class="bulk-item-head">
+          <div>
+            <div class="fname">${escHtml(r.filename)}</div>
+            <div class="bulk-meta">${escHtml(vendor)} &middot; ${findingsCount} finding${findingsCount === 1 ? "" : "s"}${r.archive_id ? " &middot; saved to history" : ""}</div>
+            <div class="summary-row">
+              <span class="sev-chip crit" title="Critical">${s.critical||0}C</span>
+              <span class="sev-chip high" title="High">${s.high||0}H</span>
+              <span class="sev-chip med" title="Medium">${s.medium||0}M</span>
+              <span class="sev-chip total" title="Total">${s.total||0} Total</span>
+            </div>
           </div>
-        </details>
-        ${(r.enriched_findings||r.findings||[]).length > 0
-          ? `<button class="btn-outline btn-sm bulk-rem-btn" data-rem-idx="${i}">View Remediation Plan</button>`
-          : ''}
+          <div class="bulk-score-stack">
+            <div class="bulk-score-line">
+              <div class="score-big">${scoreVal}<span>/100</span></div>
+              <span class="bulk-status-badge badge-ok">OK</span>
+            </div>
+            <div class="bulk-actions">
+              <button class="btn-outline btn-sm bulk-results-btn" data-result-idx="${i}">View Results</button>
+              ${findingsCount > 0 ? `<button class="btn-outline btn-sm bulk-rem-btn" data-rem-idx="${i}">View Remediation Plan</button>` : ''}
+            </div>
+          </div>
+        </div>
       </div>`;
     }).join("");
     document.getElementById("bulkResults").classList.remove("hidden");
 
-    /* Attach remediation plan buttons for bulk results (event delegation) */
-    document.getElementById("bulkResultsList")?.addEventListener("click", (e) => {
-      const btn = e.target.closest(".bulk-rem-btn");
-      if (!btn) return;
-      const idx = parseInt(btn.dataset.remIdx, 10);
+    /* Attach bulk result and remediation plan buttons (event delegation) */
+    document.getElementById("bulkResultsList").onclick = (e) => {
+      const resultBtn = e.target.closest(".bulk-results-btn");
+      const remBtn = e.target.closest(".bulk-rem-btn");
+      const idx = resultBtn ? parseInt(resultBtn.dataset.resultIdx, 10)
+                : remBtn ? parseInt(remBtn.dataset.remIdx, 10)
+                : NaN;
+      if (Number.isNaN(idx)) return;
       const r = _bulkResultsData[idx];
       if (!r) return;
-      if (window._openBulkRemediation) {
+      if (resultBtn && window._openBulkResults) {
+        window._openBulkResults(r);
+      } else if (remBtn && window._openBulkRemediation) {
         window._openBulkRemediation({
           findings: r.enriched_findings || r.findings || [],
           vendor: r.vendor || "",
@@ -3530,7 +3554,7 @@
           summary: r.summary || {},
         });
       }
-    });
+    };
   }
 
   // ══════════════════════════════════════════════════════ SCHEDULES ══
@@ -4538,16 +4562,43 @@
 
   </script>
 
+  <!-- ═══════════ Bulk Result Modal ═══════════ -->
+  <div class="modal-overlay hidden" id="bulkResultModal" role="dialog" aria-modal="true" aria-label="Bulk audit result">
+    <div class="modal bulk-result-modal">
+      <div class="modal-head">
+        <div class="modal-brand">
+          <svg viewBox="0 0 120 120" width="18" height="18" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <rect x="0" y="0" width="120" height="120" rx="22" fill="var(--ink)" />
+            <path d="M24 86 V42 H38 V58 H52 V42 H68 V58 H82 V42 H96 V86 Z" fill="var(--acc)" />
+          </svg>
+          <span>Cashel</span>
+          <span class="sep">/</span>
+          <span class="kind">Audit result</span>
+        </div>
+        <button class="modal-close" id="bulkResultModalClose" aria-label="Close">&times;</button>
+      </div>
+      <div id="bulkResultModalBody"></div>
+    </div>
+  </div>
+
   <!-- ═══════════ Remediation Plan Modal ═══════════ -->
   <div class="modal-overlay hidden" id="remediationModal" role="dialog" aria-modal="true" aria-label="Remediation Plan">
     <div class="modal remediation-modal">
       <div class="modal-head">
-        <h3>Remediation Plan</h3>
+        <div class="modal-brand">
+          <svg viewBox="0 0 120 120" width="18" height="18" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <rect x="0" y="0" width="120" height="120" rx="22" fill="var(--ink)" />
+            <path d="M24 86 V42 H38 V58 H52 V42 H68 V58 H82 V42 H96 V86 Z" fill="var(--acc)" />
+          </svg>
+          <span>Cashel</span>
+          <span class="sep">/</span>
+          <span class="kind">Remediation report</span>
+        </div>
         <div class="modal-tools">
           {% if not demo_mode %}
-          <button class="btn-outline btn-sm" id="remPlanOpenPdf" title="Open as PDF in new tab">&#x2197; Open PDF</button>
-          <button class="btn-outline btn-sm" id="remPlanDownloadPdf" title="Download PDF">&#8681; PDF</button>
-          <button class="btn-outline btn-sm" id="remPlanDownloadMd" title="Download Markdown">MD</button>
+          <button class="btn-outline btn-sm" id="remPlanOpenPdf" title="Open as PDF in new tab">Open PDF</button>
+          <button class="btn-outline btn-sm" id="remPlanDownloadPdf" title="Download PDF">Download PDF</button>
+          <button class="btn-outline btn-sm" id="remPlanDownloadMd" title="Download Markdown">Markdown</button>
           {% endif %}
           <button class="modal-close" id="remediationModalClose" aria-label="Close">&times;</button>
         </div>
@@ -4563,13 +4614,23 @@
     const modal = document.getElementById("remediationModal");
     const body  = document.getElementById("remediationModalBody");
     const closeBtn = document.getElementById("remediationModalClose");
+    const bulkModal = document.getElementById("bulkResultModal");
+    const bulkBody = document.getElementById("bulkResultModalBody");
+    const bulkCloseBtn = document.getElementById("bulkResultModalClose");
 
     function openRemediationModal() { modal.classList.remove("hidden"); document.body.style.overflow = "hidden"; }
     function closeRemediationModal() { modal.classList.add("hidden"); document.body.style.overflow = ""; }
+    function openBulkResultModal() { bulkModal.classList.remove("hidden"); document.body.style.overflow = "hidden"; }
+    function closeBulkResultModal() { bulkModal.classList.add("hidden"); document.body.style.overflow = ""; }
 
     closeBtn.addEventListener("click", closeRemediationModal);
     modal.addEventListener("click", (e) => { if (e.target === modal) closeRemediationModal(); });
-    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !modal.classList.contains("hidden")) closeRemediationModal(); });
+    bulkCloseBtn.addEventListener("click", closeBulkResultModal);
+    bulkModal.addEventListener("click", (e) => { if (e.target === bulkModal) closeBulkResultModal(); });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !modal.classList.contains("hidden")) closeRemediationModal();
+      if (e.key === "Escape" && !bulkModal.classList.contains("hidden")) closeBulkResultModal();
+    });
 
     const EFFORT_BADGES = {
       "quick-fix":     '<span class="rem-badge rem-badge-quick">Quick Fix</span>',
@@ -4758,6 +4819,34 @@
     /* Expose for bulk results and history entries */
     window._openBulkRemediation = function(payload) { fetchAndShowPlan(payload); };
     window._renderRemPlan = renderPlanHTML;
+    window._openBulkResults = function(result) {
+      const s = result.summary || {};
+      const vendor = (typeof VENDOR_LABELS !== "undefined" && VENDOR_LABELS[result.vendor]) || result.vendor || "Unknown";
+      const findings = result.enriched_findings || result.findings || [];
+      bulkBody.innerHTML = `
+        <div class="bulk-detail">
+          <div class="rem-summary-bar">
+            <div class="rem-metric"><div class="k">Score</div><div class="v">${s.score != null ? escH(String(s.score)) + '/100' : 'N/A'}</div></div>
+            <div class="rem-metric"><div class="k">Critical</div><div class="v">${s.critical || 0}</div></div>
+            <div class="rem-metric"><div class="k">High</div><div class="v">${s.high || 0}</div></div>
+            <div class="rem-metric"><div class="k">Medium</div><div class="v">${s.medium || 0}</div></div>
+          </div>
+          <div class="bulk-detail-meta">
+            <div><span>File</span><b>${escH(result.filename || 'N/A')}</b></div>
+            <div><span>Vendor</span><b>${escH(vendor)}</b></div>
+            <div><span>Status</span><b>${escH(result.status || 'ok')}</b></div>
+            <div><span>Total findings</span><b>${s.total || findings.length || 0}</b></div>
+          </div>
+          <div class="bulk-detail-findings">
+            ${findings.length
+              ? findings.map(f => typeof buildFindingHTML === "function"
+                  ? buildFindingHTML(f)
+                  : `<div class="finding finding-info">${escH(typeof f === "string" ? f : (f.message || ""))}</div>`).join("")
+              : `<div class="finding finding-pass">[PASS] No issues found</div>`}
+          </div>
+        </div>`;
+      openBulkResultModal();
+    };
 
     /* Wire up buttons — connect (SSH) audit */
     let lastConnectData = null;

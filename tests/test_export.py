@@ -96,6 +96,8 @@ def test_json_structure_enriched():
     """JSON output must contain all required top-level keys."""
     out = json.loads(to_json(ENTRY_ENRICHED))
     assert out["tool"] == "Cashel"
+    assert out["version"] == "2.0.0"
+    assert TOOL_VERSION == "2.0.0"
     assert out["vendor"] == "asa"
     assert out["filename"] == "asa-lab.cfg"
     assert out["summary"]["total"] == 3

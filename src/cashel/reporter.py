@@ -140,7 +140,7 @@ class CashelReport(FPDF):
         self.cell(
             0,
             5,
-            f"Cashel v1.5.1   |   Firewall Security Auditor   |   Page {self.page_no()}",
+            f"Cashel v2.0.0   |   Firewall Security Auditor   |   Page {self.page_no()}",
             align="C",
         )
 

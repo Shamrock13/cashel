@@ -1,6 +1,6 @@
 [project]
 name = "cashel"
-version = "1.5.1"
+version = "2.0.0"
 description = "Firewall configuration auditing tool"
 authors = [
     {name = "Your Name", email = "you@example.com"}
