@@ -466,19 +466,21 @@ html[data-theme="dark"] .log-tag.diff { color: var(--acc); }
 
 /* === SECTION 3: Designer additions === */
 
-.accent-cycle-btn {
+.engine-status-btn {
   width: 22px; height: 22px; border-radius: 50%;
   border: 2px solid var(--line-2);
   display: grid; place-items: center;
   cursor: pointer; transition: border-color .15s;
   background: transparent; padding: 0;
 }
-.accent-cycle-btn:hover { border-color: var(--ink-2); }
-.accent-cycle-btn .dot {
+.engine-status-btn:hover { border-color: var(--ink-2); }
+.engine-status-btn .dot {
   width: 12px; height: 12px; border-radius: 50%;
-  background: var(--acc);
+  background: var(--ok);
   transition: background .2s ease;
 }
+.engine-status-btn.offline .dot { background: var(--crit); }
+.nav .tail.offline .dot { background: var(--crit); }
 
 .accent-swatches {
   display: flex; gap: 10px; align-items: center; flex-wrap: wrap;

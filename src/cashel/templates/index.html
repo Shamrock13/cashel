@@ -89,9 +89,8 @@
           <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>
         </svg>
       </button>
-      <!-- TODO(codex): Move engine online status and uptime into this topbar status control. -->
-      <button class="accent-cycle-btn" id="accentCycleBtn" aria-label="Change accent color" title="Cycle accent color">
-        <span class="dot" id="accentDot"></span>
+      <button class="engine-status-btn" id="engineStatusBtn" data-engine-started-at="{{ engine_started_at_ms }}" aria-label="Engine online" title="Engine online">
+        <span class="dot" id="engineStatusDot"></span>
       </button>
       <span class="license-chip{% if not licensed %} unlicensed{% endif %}" id="licenseChip" role="button" tabindex="0" onclick="gotoLicensing()" title="{% if licensed %}Open Licensing settings{% else %}Compliance checks disabled — click to activate a license{% endif %}">
         <span class="dot" id="licDot"></span>
@@ -136,9 +135,9 @@
       <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="8" cy="8" r="2.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.2 3.2l1.4 1.4M11.4 11.4l1.4 1.4M3.2 12.8l1.4-1.4M11.4 4.6l1.4-1.4"/></svg>My Account
     </a>
     {% endif %}
-    <div class="tail">
+    <div class="tail" id="engineStatus" data-engine-started-at="{{ engine_started_at_ms }}" aria-live="polite">
       <span class="dot"></span>
-      Engine online &middot; 14d uptime
+      <span id="engineStatusText">Engine online &middot; starting uptime</span>
     </div>
   </nav>
 
@@ -1901,23 +1900,66 @@
     if (saved) applyAccent(saved);
   })();
 
-  // ═══════════════════════════════════════════════ ACCENT CYCLE BUTTON ══
-  const ACCENT_ORDER = ['acid','blue','violet','amber','rose','teal','mono'];
+  // ═══════════════════════════════ ENGINE STATUS / UPTIME ══
+  (function initEngineStatus() {
+    const statusEl = document.getElementById("engineStatus");
+    const statusBtn = document.getElementById("engineStatusBtn");
+    const statusText = document.getElementById("engineStatusText");
+    if (!statusEl || !statusText) return;
+
+    let engineStartedAt = Number(statusEl.dataset.engineStartedAt || statusBtn?.dataset.engineStartedAt || 0);
+    let engineOnline = true;
+
+    function formatUptime(ms) {
+      const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+      const days = Math.floor(totalSeconds / 86400);
+      const hours = Math.floor((totalSeconds % 86400) / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+      if (days > 0) return `${days}d ${hours}h ${minutes}m`;
+      if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
+      if (minutes > 0) return `${minutes}m ${seconds}s`;
+      return `${seconds}s`;
+    }
+
+    function renderEngineStatus() {
+      const uptime = engineStartedAt ? formatUptime(Date.now() - engineStartedAt) : "starting";
+      const label = engineOnline ? `Engine online · ${uptime} uptime` : "Engine offline · audit engine unavailable";
+      statusText.textContent = label;
+      statusEl.classList.toggle("offline", !engineOnline);
+      statusBtn?.classList.toggle("offline", !engineOnline);
+      statusBtn?.setAttribute("aria-label", label);
+      statusBtn?.setAttribute("title", label);
+    }
+
+    async function refreshEngineHealth() {
+      try {
+        const res = await fetch("/health", { cache: "no-store" });
+        if (!res.ok) throw new Error("health check failed");
+        const data = await res.json();
+        engineOnline = !!data.ok;
+        if (Number.isFinite(data.uptime_seconds)) {
+          engineStartedAt = Date.now() - (data.uptime_seconds * 1000);
+        }
+      } catch (_) {
+        engineOnline = false;
+      }
+      renderEngineStatus();
+    }
+
+    renderEngineStatus();
+    setInterval(renderEngineStatus, 1000);
+    setInterval(refreshEngineHealth, 30000);
+    refreshEngineHealth();
+  })();
+
+  // ═══════════════════════════════ ACCENT STATE ══
   function _updateAccentDot() {
-    const dot = document.getElementById('accentDot');
     const key = localStorage.getItem('cashel.accent') || 'acid';
-    const v = window._ACCENTS?.[key];
-    if (dot && v) dot.style.background = v.acc;
     document.querySelectorAll('.accent-swatch').forEach(b => {
       b.classList.toggle('active', b.dataset.accent === key);
     });
   }
-  document.getElementById('accentCycleBtn')?.addEventListener('click', function() {
-    const cur = localStorage.getItem('cashel.accent') || 'acid';
-    const next = ACCENT_ORDER[(ACCENT_ORDER.indexOf(cur) + 1) % ACCENT_ORDER.length];
-    applyAccent(next);
-    _updateAccentDot();
-  });
   _updateAccentDot();
 
   // ═══════════════════════════════ APPEARANCE SECTION (settings pane) ══
