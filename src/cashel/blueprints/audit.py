@@ -39,7 +39,7 @@ from cashel.activity_log import (
     ACTION_CONFIG_DIFF,
 )
 from cashel.license import check_license, DEMO_MODE
-from cashel.reporter import generate_report
+from cashel.reporter import generate_report, write_report_sidecar
 from cashel.settings import get_settings
 
 REPORTS_FOLDER = os.environ.get("REPORTS_FOLDER", "/tmp/cashel_reports")
@@ -436,6 +436,14 @@ def run_audit():
                 vendor,
                 compliance,
                 output_path=report_path,
+                summary=summary,
+            )
+            write_report_sidecar(
+                report_path,
+                findings=findings,
+                filename=upload.filename,
+                vendor=vendor,
+                compliance=compliance,
                 summary=summary,
             )
             report_filename = report_name

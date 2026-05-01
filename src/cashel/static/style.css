@@ -465,6 +465,57 @@ html[data-theme="dark"] .log-tag.diff { color: var(--acc); }
 .modal { background: var(--surface); border-radius: 14px; padding: 32px; max-width: 680px; width: calc(100% - 48px); max-height: 80vh; overflow-y: auto; position: relative; }
 .modal h3 { font-size: 18px; font-weight: 500; letter-spacing: -0.02em; margin: 0 0 16px; }
 .modal-close { position: absolute; top: 16px; right: 16px; }
+.modal-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 28px; padding-bottom: 24px; border-bottom: 1px solid var(--line); }
+.modal-head h3 { margin: 0; font-size: 26px; letter-spacing: -0.03em; }
+.modal-head .modal-close { position: static; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; color: var(--ink); font-size: 22px; line-height: 1; }
+.modal-head .modal-close:hover { background: var(--tint); }
+.modal-tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.modal-form { border-top: 0; }
+.modal-form .field { grid-template-columns: minmax(180px, 260px) minmax(0, 1fr); gap: 36px; padding: 28px 0; }
+.modal-actions { display: flex; gap: 10px; justify-content: flex-end; align-items: center; margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--line); }
+.webhook-modal { width: min(860px, calc(100% - 48px)); max-width: 860px; padding: 44px 52px 40px; max-height: min(880px, calc(100vh - 64px)); }
+.webhook-modal .input { font-size: 18px; }
+.event-picker { display: grid; gap: 10px; justify-items: start; max-width: 100%; }
+.event-picker .tgl { max-width: 100%; min-width: min(290px, 100%); justify-content: flex-start; overflow: hidden; }
+.event-picker .tgl span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.remediation-modal { width: min(1180px, calc(100% - 64px)); max-width: 1180px; padding: 40px 46px; max-height: min(900px, calc(100vh - 64px)); }
+.remediation-modal #remediationModalBody { padding-top: 4px; }
+.rem-plan { display: grid; gap: 28px; }
+.rem-summary-bar { display: grid; grid-template-columns: repeat(4, minmax(130px, 1fr)); gap: 12px; }
+.rem-metric { border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; background: var(--bg); }
+.rem-metric .k { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-3); font-weight: 500; }
+.rem-metric .v { margin-top: 6px; font-size: 22px; font-weight: 500; letter-spacing: -0.03em; color: var(--ink); }
+.rem-disclaimer { padding: 16px 18px; border-left: 3px solid var(--med); background: color-mix(in oklab, var(--med) 8%, transparent); color: var(--ink-2); border-radius: 0 8px 8px 0; line-height: 1.55; }
+.rem-phase { border-top: 1px solid var(--line); padding-top: 24px; }
+.rem-phase-title { margin: 0 0 14px; font-size: 20px; font-weight: 500; letter-spacing: -0.02em; }
+.rem-step { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin-bottom: 12px; background: var(--surface); }
+.rem-step-header { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 14px 18px; border-bottom: 1px solid var(--line); background: var(--tint); }
+.rem-step-num { font-weight: 500; color: var(--ink); margin-right: 4px; }
+.rem-badge { display: inline-flex; align-items: center; min-height: 22px; padding: 3px 8px; border-radius: 999px; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 600; background: var(--line); color: var(--ink-2); }
+.rem-badge-critical { background: color-mix(in oklab, var(--crit) 14%, transparent); color: var(--crit); }
+.rem-badge-high { background: color-mix(in oklab, var(--high) 14%, transparent); color: var(--high); }
+.rem-badge-medium { background: color-mix(in oklab, var(--med) 18%, transparent); color: color-mix(in oklab, var(--med) 70%, var(--ink)); }
+.rem-badge-quick { background: color-mix(in oklab, var(--acc) 18%, transparent); color: var(--acc-ink); }
+.rem-badge-moderate { background: var(--tint); color: var(--ink-2); }
+.rem-badge-change { background: var(--ink); color: var(--bg); }
+.rem-step-body { display: grid; gap: 14px; padding: 16px 18px 18px; }
+.rem-step-desc { font-size: 15px; line-height: 1.5; color: var(--ink); }
+.rem-guidance, .rem-consolidated { color: var(--ink-2); line-height: 1.55; }
+.rem-consolidated ul { margin: 8px 0 0; padding-left: 18px; }
+.rem-commands { border: 1px solid var(--line); border-radius: 8px; background: var(--bg); overflow: hidden; }
+.rem-commands-label { padding: 9px 12px; border-bottom: 1px solid var(--line); color: var(--ink-3); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 500; }
+.rem-commands pre { margin: 0; padding: 14px 16px; overflow: auto; white-space: pre-wrap; word-break: break-word; font: 12px/1.55 'Geist Mono', ui-monospace, monospace; color: var(--ink); }
+.rem-empty, .rem-loading { padding: 42px 0; text-align: center; color: var(--ink-3); }
+@media (max-width: 860px) {
+  .webhook-modal, .remediation-modal { width: calc(100% - 28px); padding: 28px 22px; max-height: calc(100vh - 28px); }
+  .modal-form .field { grid-template-columns: 1fr; gap: 12px; }
+  .rem-summary-bar { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 560px) {
+  .rem-summary-bar { grid-template-columns: 1fr; }
+  .modal-actions { flex-direction: column-reverse; align-items: stretch; }
+  .modal-actions .btn-outline, .modal-actions .btn-primary { justify-content: center; }
+}
 
 .score-bar { width: 100%; height: 4px; background: var(--line); border-radius: 2px; margin-top: 8px; overflow: hidden; }
 .score-bar-fill { height: 100%; border-radius: 2px; background: var(--ok); transition: width .5s ease; }

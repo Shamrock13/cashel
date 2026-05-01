@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
+import os
 from fpdf import FPDF
-from datetime import datetime
+from datetime import datetime, timezone
 
 # Brand colors (matching web light mode)
 _NAVY = (30, 64, 128)  # #1E4080 header
@@ -55,6 +57,41 @@ VENDOR_DISPLAY = {
     "aws": "AWS Security Group",
     "azure": "Azure NSG",
 }
+
+
+def report_sidecar_path(output_path: str) -> str:
+    """Return the JSON sidecar path for a generated PDF report."""
+    root, _ext = os.path.splitext(output_path)
+    return f"{root}.json"
+
+
+def write_report_sidecar(
+    output_path: str,
+    *,
+    findings,
+    filename: str,
+    vendor: str,
+    compliance=None,
+    summary=None,
+    report_id: str | None = None,
+    generated_at: str | None = None,
+) -> str:
+    """Persist metadata used by the HTML report viewer next to the PDF."""
+    generated = generated_at or datetime.now(timezone.utc).isoformat()
+    payload = {
+        "report_id": report_id or os.path.splitext(os.path.basename(output_path))[0],
+        "pdf_filename": os.path.basename(output_path),
+        "filename": filename,
+        "vendor": vendor,
+        "compliance": compliance,
+        "summary": summary or {},
+        "findings": findings or [],
+        "generated_at": generated,
+    }
+    path = report_sidecar_path(output_path)
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump(payload, fh, indent=2, sort_keys=True)
+    return path
 
 
 class CashelReport(FPDF):

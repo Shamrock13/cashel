@@ -1725,12 +1725,12 @@
 
           <!-- Add/Edit Webhook modal -->
           <div id="addWebhookModal" class="modal-overlay hidden" role="dialog" aria-modal="true">
-            <div class="modal" style="max-width:520px">
-              <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px">
+            <div class="modal webhook-modal">
+              <div class="modal-head">
                 <h3>Add Webhook</h3>
                 <button class="modal-close" id="addWebhookModalClose">&times;</button>
               </div>
-              <div class="form">
+              <div class="form modal-form">
                 <div class="field">
                   <div>
                     <div class="label">Name</div>
@@ -1754,10 +1754,12 @@
                     <div class="label">Events</div>
                     <div class="help">Choose which events trigger delivery.</div>
                   </div>
-                  <div class="ctrl" style="justify-items:start">
-                    <label class="tgl on"><input type="checkbox" class="wh-event-cb" value="audit.complete" checked /><span class="mark"></span>audit.complete</label>
-                    <label class="tgl"><input type="checkbox" class="wh-event-cb" value="alert.threshold_breach" /><span class="mark"></span>alert.threshold_breach</label>
-                    <label class="tgl"><input type="checkbox" class="wh-event-cb" value="alert.threshold_clear" /><span class="mark"></span>alert.threshold_clear</label>
+                  <div class="ctrl">
+                    <div class="event-picker" role="group" aria-label="Webhook events">
+                      <label class="tgl on"><input type="checkbox" class="wh-event-cb" value="audit.complete" checked /><span class="mark"></span><span>audit.complete</span></label>
+                      <label class="tgl"><input type="checkbox" class="wh-event-cb" value="alert.threshold_breach" /><span class="mark"></span><span>alert.threshold_breach</span></label>
+                      <label class="tgl"><input type="checkbox" class="wh-event-cb" value="alert.threshold_clear" /><span class="mark"></span><span>alert.threshold_clear</span></label>
+                    </div>
                   </div>
                 </div>
                 <div class="field">
@@ -1771,7 +1773,7 @@
                 </div>
               </div>
               <p class="field-error" id="whError" style="display:none"></p>
-              <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px">
+              <div class="modal-actions">
                 <button class="btn-outline" id="addWebhookModalCancel">Cancel</button>
                 <button class="btn-primary" id="saveWebhookBtn">Save</button>
               </div>
@@ -4036,7 +4038,7 @@
     const rows = await res.json();
     const container = document.getElementById("webhooksTable");
     const noMsg = document.getElementById("noWebhooksMsg");
-    if (!rows.length) { if (noMsg) noMsg.style.display = ""; return; }
+    if (!rows.length) { if (noMsg) noMsg.style.display = ""; container.innerHTML = ""; return; }
     if (noMsg) noMsg.style.display = "none";
     container.innerHTML = `
       <table class="data-table" style="width:100%">
@@ -4073,14 +4075,40 @@
     });
   }
 
-  document.getElementById("addWebhookBtn")?.addEventListener("click", () => {
+  function resetWebhookModal() {
+    document.getElementById("whName").value = "";
+    document.getElementById("whUrl").value = "";
+    document.getElementById("whSecret").value = "";
+    document.getElementById("whError").style.display = "none";
+    document.querySelectorAll(".wh-event-cb").forEach(c => {
+      c.checked = c.value === "audit.complete";
+      c.closest(".tgl")?.classList.toggle("on", c.checked);
+    });
+  }
+
+  function openWebhookModal() {
+    resetWebhookModal();
     document.getElementById("addWebhookModal").classList.remove("hidden");
+    document.body.style.overflow = "hidden";
+    setTimeout(() => document.getElementById("whName")?.focus(), 0);
+  }
+
+  function closeWebhookModal() {
+    document.getElementById("addWebhookModal").classList.add("hidden");
+    document.body.style.overflow = "";
+    resetWebhookModal();
+  }
+
+  document.getElementById("addWebhookBtn")?.addEventListener("click", () => {
+    openWebhookModal();
   });
   ["addWebhookModalClose","addWebhookModalCancel"].forEach(id => {
     document.getElementById(id)?.addEventListener("click", () => {
-      document.getElementById("addWebhookModal").classList.add("hidden");
-      document.getElementById("whError").style.display = "none";
+      closeWebhookModal();
     });
+  });
+  document.getElementById("addWebhookModal")?.addEventListener("click", e => {
+    if (e.target.id === "addWebhookModal") closeWebhookModal();
   });
   document.getElementById("saveWebhookBtn")?.addEventListener("click", async () => {
     const name   = document.getElementById("whName").value.trim();
@@ -4089,6 +4117,11 @@
     const secret = document.getElementById("whSecret").value;
     const errEl  = document.getElementById("whError");
     errEl.style.display = "none";
+    if (!events.length) {
+      errEl.textContent = "Choose at least one event.";
+      errEl.style.display = "";
+      return;
+    }
     const res = await fetch("/settings/webhooks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -4096,14 +4129,7 @@
     });
     const j = await res.json();
     if (!res.ok) { errEl.textContent = j.error || "Save failed."; errEl.style.display = ""; return; }
-    document.getElementById("addWebhookModal").classList.add("hidden");
-    document.getElementById("whName").value = "";
-    document.getElementById("whUrl").value = "";
-    document.getElementById("whSecret").value = "";
-    document.querySelectorAll(".wh-event-cb").forEach(c => {
-      c.checked = c.value === "audit.complete";
-      c.closest(".tgl")?.classList.toggle("on", c.checked);
-    });
+    closeWebhookModal();
     loadWebhooks();
   });
 
@@ -4476,10 +4502,10 @@
 
   <!-- ═══════════ Remediation Plan Modal ═══════════ -->
   <div class="modal-overlay hidden" id="remediationModal" role="dialog" aria-modal="true" aria-label="Remediation Plan">
-    <div class="modal remediation-modal" style="max-width:860px">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px">
+    <div class="modal remediation-modal">
+      <div class="modal-head">
         <h3>Remediation Plan</h3>
-        <div style="display:flex;gap:0.5rem;align-items:center;">
+        <div class="modal-tools">
           {% if not demo_mode %}
           <button class="btn-outline btn-sm" id="remPlanOpenPdf" title="Open as PDF in new tab">&#x2197; Open PDF</button>
           <button class="btn-outline btn-sm" id="remPlanDownloadPdf" title="Download PDF">&#8681; PDF</button>
@@ -4528,12 +4554,12 @@
 
       /* Summary bar */
       const s = plan.summary || {};
-      html += '<div class="rem-summary-bar">'
-        + `<span><strong>${plan.total_steps}</strong> steps</span>`
-        + (s.score != null ? `<span>Score: <strong>${s.score}/100</strong></span>` : '')
-        + `<span>Device: <strong>${escH(plan.filename || 'N/A')}</strong></span>`
-        + `<span>Vendor: <strong>${escH(plan.vendor || '')}</strong></span>`
-        + '</div>';
+      html += '<div class="rem-summary-bar">';
+      html += `<div class="rem-metric"><div class="k">Steps</div><div class="v">${plan.total_steps || 0}</div></div>`;
+      html += `<div class="rem-metric"><div class="k">Score</div><div class="v">${s.score != null ? escH(String(s.score)) + '/100' : 'N/A'}</div></div>`;
+      html += `<div class="rem-metric"><div class="k">Device</div><div class="v">${escH(plan.filename || 'N/A')}</div></div>`;
+      html += `<div class="rem-metric"><div class="k">Vendor</div><div class="v">${escH(plan.vendor || 'N/A')}</div></div>`;
+      html += '</div>';
 
       /* Disclaimer */
       if (plan.disclaimer) {
@@ -4551,6 +4577,7 @@
           html += `<div class="rem-step-header">`;
           html += `<span class="rem-step-num">Step ${step.step}</span> ${sevBadge} ${effortBadge}`;
           html += `</div>`;
+          html += '<div class="rem-step-body">';
           html += `<div class="rem-step-desc">${escH(step.description)}</div>`;
 
           if (step.consolidated_count) {
@@ -4571,6 +4598,7 @@
           if (step.suggested_commands) {
             html += `<div class="rem-commands"><div class="rem-commands-label">Suggested Commands</div><pre>${escH(step.suggested_commands)}</pre></div>`;
           }
+          html += '</div>'; /* /rem-step-body */
           html += '</div>'; /* /rem-step */
         }
         html += '</div>'; /* /rem-phase */
