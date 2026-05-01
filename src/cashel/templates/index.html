@@ -89,7 +89,7 @@
           <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>
         </svg>
       </button>
-      <span class="license-chip{% if not licensed %} unlicensed{% endif %}" id="licenseChip" role="button" tabindex="0" onclick="gotoLicensing()" title="{% if licensed %}Open Licensing settings{% else %}Compliance checks disabled — click to activate a license{% endif %}">
+      <span class="license-chip{% if not licensed %} unlicensed{% endif %}" id="licenseChip" role="button" tabindex="0" title="{% if licensed %}Open Licensing settings{% else %}Compliance checks disabled — click to activate a license{% endif %}">
         <span class="dot" id="licDot"></span>
         <span id="licenseText">{% if licensed %}Licensed{% else %}Unlicensed{% endif %}</span>
         {% if not licensed %}
@@ -797,12 +797,12 @@
 
       <!-- History sub-tabs: Audit History / Activity Log -->
       <nav class="subnav">
-        <a class="active" data-subtab="audits" onclick="switchHistorySubTab('audits'); return false;" href="#">&#128337; Audit History</a>
+        <a class="active" data-subtab="audits" href="#">Audit history</a>
         {% if not current_user or current_user.role == 'admin' %}
-        <a data-subtab="activity" onclick="switchHistorySubTab('activity'); return false;" href="#">&#128203; Activity Log</a>
+        <a data-subtab="activity" href="#">Activity log</a>
         {% endif %}
         {% if not current_user or current_user.role in ('admin', 'auditor') %}
-        <a data-subtab="seclog" onclick="switchHistorySubTab('seclog'); return false;" href="#">&#128274; Security Log</a>
+        <a data-subtab="seclog" href="#">Security log</a>
         {% endif %}
       </nav>
 
@@ -811,9 +811,8 @@
       <div>
         <div class="section-head">
           <div>
-            <div class="idx">01 &mdash; Audit runs</div>
-            <h2>Audit history</h2>
-            <div class="desc">Saved audits. Select two entries and click Compare.</div>
+            <h2>Saved audits</h2>
+            <div class="desc">Select two entries and click compare.</div>
           </div>
           <button class="btn-outline" id="refreshHistoryBtn">Refresh</button>
         </div>
@@ -2067,6 +2066,14 @@
   }
   navLinks.forEach(a => a.addEventListener("click", e => { e.preventDefault(); switchTab(a.dataset.tab); }));
 
+  document.getElementById("licenseChip")?.addEventListener("click", gotoLicensing);
+  document.getElementById("licenseChip")?.addEventListener("keydown", e => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      gotoLicensing();
+    }
+  });
+
   // ════════════════════════════════════════ AUDIT MODE TOGGLE (v2 segmented) ══
   function switchAuditMode(mode) {
     // v2 segmented control
@@ -2106,6 +2113,12 @@
     if (subtab === "activity") loadActivity();
     if (subtab === "seclog") loadSecLog();
   }
+  document.querySelectorAll(".subnav a[data-subtab]").forEach(link => {
+    link.addEventListener("click", e => {
+      e.preventDefault();
+      switchHistorySubTab(link.dataset.subtab);
+    });
+  });
 
   // ═════════════════════════════════════════════════════ FILE AUDIT ══════
   // ── CSRF: attach token to every non-GET fetch automatically ─────────────────
@@ -2896,7 +2909,7 @@
       const ts     = e.timestamp ? new Date(e.timestamp).toLocaleString() : "—";
       const vendor = VENDOR_LABELS[e.vendor] || e.vendor;
       const crit = e.summary?.critical || 0, hi = e.summary?.high || 0, med = e.summary?.medium || 0, tot = e.summary?.total || 0;
-      const primaryName = e.tag ? escHtml(e.tag) + " <span style='font-weight:400;color:var(--text-muted)'>v" + (e.version || 1) + "</span>" : escHtml(e.filename);
+      const primaryName = e.tag ? escHtml(e.tag) + " <span style='font-weight:400;color:var(--ink-3)'>v" + (e.version || 1) + "</span>" : escHtml(e.filename);
       const secondaryMeta = e.tag ? escHtml(e.filename) + " &bull; " + escHtml(vendor) + " &bull; " + escHtml(ts) : escHtml(vendor) + " &bull; " + escHtml(ts);
       return `<div class="list-row" data-id="${escHtml(e.id)}">
         <label class="check" title="Select to compare">
@@ -2914,24 +2927,22 @@
           <span class="sev-chip total" title="Total">${tot}</span>
         </div>
         <div style="display:flex;gap:0.4rem;align-items:center;flex-wrap:wrap;">
-          <button class="btn-outline btn-sm" data-rem-archive="${escHtml(e.id)}" title="View Remediation Plan">&#9881; Plan</button>
+          <button class="btn-outline btn-sm" data-rem-archive="${escHtml(e.id)}" title="View Remediation Plan">Plan</button>
           <a class="btn-outline btn-sm" href="/archive/${escHtml(e.id)}/export?fmt=json"  download title="Download JSON">JSON</a>
-          <a class="btn-outline btn-sm" href="/archive/${escHtml(e.id)}/export?fmt=csv"   download title="Download CSV">CSV</a>
-          <a class="btn-outline btn-sm" href="/archive/${escHtml(e.id)}/export?fmt=sarif" download title="Download SARIF">SARIF</a>
           ${(userRole === 'admin' || userRole === 'auditor')
-            ? `<button class="btn-outline btn-sm" data-evidence-bundle="${escHtml(e.id)}" title="Download Evidence Bundle (ZIP)">&#128196; Bundle</button>`
+            ? `<button class="btn-outline btn-sm" data-evidence-bundle="${escHtml(e.id)}" title="Download Evidence Bundle (ZIP)">Bundle</button>`
             : ''
           }
           ${userRole === 'admin'
-            ? `<button class="btn-danger btn-sm" data-delete="${escHtml(e.id)}" title="Delete">&#128465;</button>`
-            : `<button class="btn-danger btn-sm" disabled title="Deletion requires Admin role" style="opacity:0.4;cursor:not-allowed">&#128465;</button>`
+            ? `<button class="btn-danger btn-sm iconless" data-delete="${escHtml(e.id)}" title="Delete">Delete</button>`
+            : `<button class="btn-danger btn-sm iconless" disabled title="Deletion requires Admin role" style="opacity:0.4;cursor:not-allowed">Delete</button>`
           }
         </div>
       </div>`;
     }).join("") + `
     <div class="history-compare-bar" id="compareBar">
       <span id="compareBarText">Select two entries to compare</span>
-      <button class="btn-primary btn-sm" id="compareBtn" disabled>Compare Selected</button>
+      <button class="btn-primary btn-sm" id="compareBtn" disabled>Compare selected</button>
     </div>`;
 
     el.querySelectorAll(".history-check").forEach(cb => {
@@ -3167,7 +3178,7 @@
         </div>
         <div style="display:flex;gap:0.4rem;align-items:center;">
           <span class="status ${ok ? "" : "status-fail"}">${ok ? "&#10003; OK" : "&#10007; Failed"}</span>
-          <button class="btn-danger btn-sm" data-delete-activity="${escHtml(e.id)}" title="Delete">&#128465;</button>
+          <button class="btn-danger btn-sm iconless" data-delete-activity="${escHtml(e.id)}" title="Delete">Delete</button>
         </div>
       </div>`;
     }).join("");
