@@ -262,7 +262,7 @@ button { cursor: pointer; border: 0; background: transparent; }
 .list-row .right-meta { text-align: right; font-size: 12px; color: var(--ink-3); }
 
 /* Settings layout */
-.settings { display: grid; grid-template-columns: 240px 1fr; gap: 48px; margin-top: 32px; }
+.settings { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 48px; margin-top: 32px; }
 .settings-nav { border-right: 1px solid var(--line); padding-right: 24px; }
 .settings-nav .group { font-size: 11px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px; }
 .settings-nav a { display: flex; align-items: center; gap: 10px; padding: 8px 0; color: var(--ink-2); font-size: 14px; cursor: pointer; text-decoration: none; position: relative; }
@@ -276,6 +276,10 @@ button { cursor: pointer; border: 0; background: transparent; }
 
 .settings-main h2 { font-size: 24px; font-weight: 500; letter-spacing: -0.02em; margin: 0 0 8px; }
 .settings-main .section-desc { color: var(--ink-2); font-size: 14px; max-width: 60ch; margin-bottom: 0; }
+.settings-main .form { border-top: 1px solid var(--line); }
+.settings-main .field { grid-template-columns: minmax(240px, 320px) minmax(0, 1fr); gap: 36px; padding: 30px 0; }
+.settings-main .field .help { max-width: 32ch; }
+.settings-footer { display: flex; gap: 12px; align-items: center; margin-top: 28px; padding-top: 0; }
 .sub-head { font-size: 11px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em; margin: 32px 0 16px; padding-top: 20px; border-top: 1px solid var(--line); }
 .sub-head:first-child { border-top: 0; padding-top: 0; margin-top: 24px; }
 
@@ -420,6 +424,7 @@ html[data-theme="dark"] .log-tag.diff { color: var(--acc); }
 @media (max-width: 960px) {
   .shell { padding: 0 24px; }
   .field { grid-template-columns: 1fr; gap: 12px; }
+  .settings-main .field { grid-template-columns: 1fr; gap: 12px; }
   .field.split .ctrl, .field.triple .ctrl { grid-template-columns: 1fr; }
   .settings { grid-template-columns: 1fr; gap: 24px; }
   .settings-nav { border-right: 0; border-bottom: 1px solid var(--line); padding: 0 0 16px; }
@@ -495,22 +500,6 @@ html[data-theme="dark"] .log-tag.diff { color: var(--acc); }
 .bulk-item .summary-row { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
 
 /* === SECTION 3: Designer additions === */
-
-.engine-status-btn {
-  width: 22px; height: 22px; border-radius: 50%;
-  border: 2px solid var(--line-2);
-  display: grid; place-items: center;
-  cursor: pointer; transition: border-color .15s;
-  background: transparent; padding: 0;
-}
-.engine-status-btn:hover { border-color: var(--ink-2); }
-.engine-status-btn .dot {
-  width: 12px; height: 12px; border-radius: 50%;
-  background: var(--ok);
-  transition: background .2s ease;
-}
-.engine-status-btn.offline .dot { background: var(--crit); }
-.nav .tail.offline .dot { background: var(--crit); }
 
 .accent-swatches {
   display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
