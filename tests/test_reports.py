@@ -326,6 +326,16 @@ class TestModalMarkup(unittest.TestCase):
         for glyph in ("&#8681;", "&#128196;", "&#10003;"):
             self.assertNotIn(glyph, action_area)
 
+    def test_download_menu_flows_right_from_pill(self):
+        style_path = os.path.join(
+            os.path.dirname(__file__), "..", "src", "cashel", "static", "style.css"
+        )
+        with open(style_path, encoding="utf-8") as fh:
+            css = fh.read()
+
+        self.assertIn(".download-menu-panel { position: absolute; top: calc(100% + 10px); left: 0;", css)
+        self.assertNotIn(".download-menu-panel { position: absolute; top: calc(100% + 10px); right: 0;", css)
+
     def test_bulk_results_use_modal_actions_not_details(self):
         body = self._index_template()
         bulk_fn = body[body.index("function renderBulkResults") : body.index("// ══════════════════════════════════════════════════════ SCHEDULES")]
@@ -352,6 +362,93 @@ class TestModalMarkup(unittest.TestCase):
         self.assertIn(">Markdown<", rem_modal)
         for glyph in ("&#x2197;", "&#8681;"):
             self.assertNotIn(glyph, rem_modal)
+
+    def test_remediation_open_pdf_uses_synchronous_blank_tab(self):
+        body = self._index_template()
+
+        self.assertIn('const win = window.open("", "_blank", "noopener");', body)
+        self.assertIn("win.location.href = url;", body)
+        self.assertNotIn("Popup blocked", body)
+
+    def test_history_and_schedule_actions_are_clickable(self):
+        body = self._index_template()
+
+        self.assertIn('data-rem-archive="${escHtml(e.id)}"', body)
+        self.assertIn(">Remediation</button>", body)
+        self.assertNotIn(">Plan</button>", body)
+        self.assertIn("window._openArchiveRemediation", body)
+        self.assertIn("data-sched-menu", body)
+        self.assertIn("data-sched-run", body)
+        self.assertIn("data-sched-edit", body)
+        self.assertIn("data-sched-del", body)
+        self.assertIn("data-sched-toggle", body)
+
+    def test_schedule_form_sections_and_notification_targets(self):
+        body = self._index_template()
+        schedule = body[
+            body.index('<form id="scheduleForm">') : body.index("</form>", body.index('<form id="scheduleForm">'))
+        ]
+        labels = [
+            '<div class="label">Name &amp; platform</div>',
+            '<div class="label">Endpoint</div>',
+            '<div class="label">Device label</div>',
+            '<div class="label">Authentication</div>',
+            '<div class="label">Cadence</div>',
+            '<div class="label">Notifications</div>',
+            '<div class="label">Notification targets <span class="opt-tag">Optional</span></div>',
+            '<div class="label">Status</div>',
+        ]
+        positions = [schedule.index(label) for label in labels]
+        self.assertEqual(positions, sorted(positions))
+        self.assertIn("Alert on CRITICAL findings", schedule)
+        self.assertIn("Alert on HIGH findings", schedule)
+        self.assertIn("Alert on audit errors", schedule)
+        self.assertIn("schedTargetSlack", schedule)
+        self.assertIn("schedTargetTeams", schedule)
+        self.assertIn("schedTargetEmail", schedule)
+        self.assertIn(">Save schedule<", schedule)
+
+    def test_activity_and_security_logs_use_colored_tags(self):
+        body = self._index_template()
+        style_path = os.path.join(
+            os.path.dirname(__file__), "..", "src", "cashel", "static", "style.css"
+        )
+        with open(style_path, encoding="utf-8") as fh:
+            css = fh.read()
+
+        self.assertIn('class="log-tag ${e.action ? escHtml(e.action) : ""}${ok ? "" : " fail"}"', body)
+        self.assertIn('class="log-tag ${e.event ? escHtml(e.event) : ""}${ok ? "" : " fail"}"', body)
+        for selector in (
+            ".log-tag.file_audit",
+            ".log-tag.ssh_connect",
+            ".log-tag.config_diff",
+            ".log-tag.login_success",
+            ".log-tag.user_created",
+            ".log-tag.login_failure",
+        ):
+            self.assertIn(selector, css)
+
+    def test_license_purchase_and_activate_button_are_polished(self):
+        body = self._index_template()
+        style_path = os.path.join(
+            os.path.dirname(__file__), "..", "src", "cashel", "static", "style.css"
+        )
+        with open(style_path, encoding="utf-8") as fh:
+            css = fh.read()
+
+        self.assertIn('href="https://shamrock13.gumroad.com/l/cashel"', body)
+        self.assertIn('class="btn-outline license-buy-link"', body)
+        self.assertIn('class="btn-primary btn-activate-license" id="activateLicenseBtn">Activate</button>', body)
+        self.assertIn(".license-activation-field .ctrl", css)
+        self.assertIn(".btn-activate-license", css)
+
+    def test_theme_auto_option_is_available(self):
+        body = self._index_template()
+
+        self.assertIn('id="setThemeAuto"', body)
+        self.assertIn("data-theme-pref", body)
+        self.assertIn("prefers-color-scheme: dark", body)
+        self.assertIn("applyTheme('auto')", body)
 
     def test_trends_chart_uses_handoff_svg_not_chartjs(self):
         body = self._index_template()

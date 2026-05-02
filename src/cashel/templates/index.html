@@ -22,9 +22,15 @@
     teal:   { acc: 'oklch(0.78 0.14 185)', ink: 'oklch(0.24 0.08 190)' },
     mono:   { acc: 'oklch(0.78 0.01 260)', ink: 'oklch(0.22 0.01 260)' }
   };
+  var media = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+  function resolveTheme(t) {
+    return t === 'auto' ? (media && media.matches ? 'dark' : 'light') : t;
+  }
   function applyTheme(t) {
-    html.setAttribute('data-theme', t);
-    try { localStorage.setItem('cashel.theme', t); } catch(e) {}
+    var pref = (t === 'auto' || t === 'dark' || t === 'light') ? t : 'light';
+    html.setAttribute('data-theme-pref', pref);
+    html.setAttribute('data-theme', resolveTheme(pref));
+    try { localStorage.setItem('cashel.theme', pref); } catch(e) {}
   }
   function applyAccent(key) {
     var a = ACCENTS[key] || ACCENTS.acid;
@@ -35,6 +41,13 @@
   var t = 'light';
   try { t = localStorage.getItem('cashel.theme') || 'light'; } catch(e) {}
   applyTheme(t);
+  if (media) {
+    var onSystemThemeChange = function() {
+      if (html.getAttribute('data-theme-pref') === 'auto') applyTheme('auto');
+    };
+    if (media.addEventListener) media.addEventListener('change', onSystemThemeChange);
+    else if (media.addListener) media.addListener(onSystemThemeChange);
+  }
   var accent = 'acid';
   try { accent = localStorage.getItem('cashel.accent') || 'acid'; } catch(e) {}
   applyAccent(accent);
@@ -769,7 +782,7 @@
         <div class="summary-grid" id="connSummaryGrid"></div>
         <div id="connFindingsList"></div>
         <div class="remediation-row hidden" id="connRemediationRow">
-          <button id="connRemediationPlanBtn" class="btn-primary btn-remediation">&#9881; View Remediation Plan</button>
+          <button id="connRemediationPlanBtn" class="btn-primary btn-remediation">View Remediation Plan</button>
         </div>
         <div class="archive-row hidden" id="connArchiveRow">
           <span class="archive-saved-msg">&#10003; Result saved to Audit History &mdash;
@@ -954,7 +967,12 @@
             <h2>Scheduled audits</h2>
             <div class="desc">Automatically run SSH audits on a recurring schedule. Results are saved to Audit History.</div>
           </div>
-          <button class="btn-outline" id="refreshSchedulesBtn">Refresh</button>
+          <div class="schedule-toolbar">
+            <button class="btn-outline" id="refreshSchedulesBtn">Refresh</button>
+            {% if not demo_mode and (not current_user or current_user.role != 'viewer') %}
+            <button class="btn-primary" id="newScheduleBtn" type="button">+ New schedule</button>
+            {% endif %}
+          </div>
         </div>
         {% if demo_mode %}
         <div class="banner" style="margin-bottom:24px">
@@ -995,21 +1013,20 @@
                 </select>
               </div>
             </div>
-            <div class="field triple">
+            <div class="field split">
               <div>
                 <div class="label">Endpoint</div>
-                <div class="help">SSH target and credentials for the scheduled pull.</div>
+                <div class="help">Host and SSH port for the scheduled pull.</div>
               </div>
               <div class="ctrl">
                 <input class="input" type="text" id="schedHost" name="host" placeholder="Host / IP" autocomplete="off" required />
                 <input class="input" type="text" id="schedPort" name="port" value="22" placeholder="SSH port" autocomplete="off" />
-                <input class="input" type="text" id="schedUser" name="username" placeholder="Username" autocomplete="off" required />
               </div>
             </div>
             <div class="field split">
               <div>
-                <div class="label">Audit defaults</div>
-                <div class="help">Device label and optional compliance framework for every run.</div>
+                <div class="label">Device label</div>
+                <div class="help">Optional device label and compliance framework for every run.</div>
               </div>
               <div class="ctrl">
                 <input class="input" type="text" id="schedTag" name="tag" placeholder="Device tag, e.g. ASA01" maxlength="64" autocomplete="off" />
@@ -1024,12 +1041,13 @@
                 </select>
               </div>
             </div>
-            <div class="field">
+            <div class="field split">
               <div>
-                <div class="label">Password</div>
-                <div class="help">Leave blank when editing to keep the existing saved secret.</div>
+                <div class="label">Authentication</div>
+                <div class="help">Username and password for SSH. Leave password blank when editing to keep the saved secret.</div>
               </div>
               <div class="ctrl">
+                <input class="input" type="text" id="schedUser" name="username" placeholder="Username" autocomplete="off" required />
                 <input class="input" type="password" id="schedPass" name="password" placeholder="leave blank to keep existing" autocomplete="new-password" />
               </div>
             </div>
@@ -1068,15 +1086,15 @@
             <!-- Notifications -->
             <div class="field">
               <div>
-                <div class="label">Status &amp; notifications</div>
-                <div class="help">Enable the schedule and decide when alerts should fire.</div>
+                <div class="label">Notifications</div>
+                <div class="help">Choose which schedule events should trigger an alert.</div>
               </div>
               <div class="ctrl">
                 <div class="toggles">
-                <label class="tgl on" id="schedEnabledToggle">
-                  <input type="checkbox" id="schedEnabled" name="enabled" checked />
+                <label class="tgl" id="schedNotifyCriticalToggle">
+                  <input type="checkbox" id="schedNotifyCritical" />
                   <span class="mark"></span>
-                  Enabled
+                  Alert on CRITICAL findings
                 </label>
                 <label class="tgl" id="schedNotifyFindingToggle">
                   <input type="checkbox" id="schedNotifyFinding" />
@@ -1091,23 +1109,46 @@
                 </div>
               </div>
             </div>
-            <div class="field triple">
+            <div class="field schedule-target-row">
               <div>
                 <div class="label">Notification targets <span class="opt-tag">Optional</span></div>
-                <div class="help">Send alerts to Slack, Teams, or email when selected conditions trigger.</div>
+                <div class="help">Pick targets, then fill the matching fields in-line.</div>
               </div>
               <div class="ctrl">
-                <input class="input" type="url" id="schedSlackWebhook" placeholder="Slack webhook URL" autocomplete="off" maxlength="512" />
-                <input class="input" type="url" id="schedTeamsWebhook" placeholder="Teams webhook URL" autocomplete="off" maxlength="512" />
-                <input class="input" type="email" id="schedNotifyEmail" placeholder="ops@example.com" autocomplete="off" maxlength="254" />
+                <div class="schedule-target-picker">
+                  <button class="btn-outline btn-sm" id="schedTargetMenuBtn" type="button">Targets</button>
+                  <div class="schedule-target-menu hidden" id="schedTargetMenu">
+                    <label><input type="checkbox" id="schedTargetSlack" /> Slack</label>
+                    <label><input type="checkbox" id="schedTargetTeams" /> Teams</label>
+                    <label><input type="checkbox" id="schedTargetEmail" /> Email</label>
+                  </div>
+                </div>
+                <input class="input schedule-target-field hidden" type="url" id="schedSlackWebhook" placeholder="Slack webhook URL" autocomplete="off" maxlength="512" />
+                <input class="input schedule-target-field hidden" type="url" id="schedTeamsWebhook" placeholder="Teams webhook URL" autocomplete="off" maxlength="512" />
+                <input class="input schedule-target-field hidden" type="email" id="schedNotifyEmail" placeholder="ops@example.com" autocomplete="off" maxlength="254" />
+              </div>
+            </div>
+            <div class="field">
+              <div>
+                <div class="label">Status</div>
+                <div class="help">Enable or pause this recurring audit.</div>
+              </div>
+              <div class="ctrl">
+                <div class="toggles">
+                  <label class="tgl on" id="schedEnabledToggle">
+                    <input type="checkbox" id="schedEnabled" name="enabled" checked />
+                    <span class="mark"></span>
+                    Enabled
+                  </label>
+                </div>
               </div>
             </div>
           </div>
-          <div style="display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap;padding-top:28px">
-            <button type="submit" class="btn-primary" id="schedSaveBtn">Save Schedule</button>
-            <button type="button" class="btn-outline" id="schedCancelBtn">Cancel</button>
-            <span class="settings-saved-msg hidden" id="schedSavedMsg">&#10003; Saved</span>
+          <div class="form-actions schedule-form-actions">
+            <span class="settings-saved-msg hidden" id="schedSavedMsg">Saved</span>
             <span class="alert-inline hidden" id="schedErrorMsg"></span>
+            <button type="button" class="btn-outline" id="schedCancelBtn">Cancel</button>
+            <button type="submit" class="btn-primary" id="schedSaveBtn">Save schedule</button>
           </div>
         </form>
       </div>
@@ -1190,6 +1231,7 @@
                 </div>
                 <div class="ctrl" style="justify-items:start">
                   <div class="seg" role="group" aria-label="Theme">
+                    <button type="button" id="setThemeAuto" aria-pressed="false">Auto</button>
                     <button type="button" id="setThemeLight" aria-pressed="true">Light</button>
                     <button type="button" id="setThemeDark" aria-pressed="false">Dark</button>
                   </div>
@@ -1655,17 +1697,14 @@
 
             <div class="sub-head">Activate a license key</div>
             <div class="form">
-              <div class="field split">
+              <div class="field split license-activation-field">
                 <div>
                   <div class="label">License key</div>
                   <div class="help">Paste the key from your purchase email. Activation is local — no telemetry.</div>
                 </div>
                 <div class="ctrl">
                   <input class="input mono" id="licenseKeyInput" placeholder="CSL-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX" autocomplete="off" />
-                  <button type="button" class="btn-primary" id="activateLicenseBtn" style="white-space:nowrap;align-self:flex-end">
-                    Activate
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-                  </button>
+                  <button type="button" class="btn-primary btn-activate-license" id="activateLicenseBtn">Activate</button>
                 </div>
               </div>
               <div class="field">
@@ -1692,7 +1731,7 @@
 
             <div style="padding-top:28px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
               <button type="button" class="btn-danger" id="deactivateLicenseBtn" style="{% if not licensed %}display:none;{% endif %}">Deactivate license</button>
-              <a href="https://cashel.dev" target="_blank" rel="noopener" class="btn-outline">Buy a license &rarr;</a>
+              <a href="https://shamrock13.gumroad.com/l/cashel" target="_blank" rel="noopener" class="btn-outline license-buy-link">Buy a license</a>
               <span style="margin-left:auto;color:var(--ink-3);font-size:13px;">Need help? <a href="mailto:support@cashel.dev" class="ulink">support@cashel.dev</a></span>
             </div>
 
@@ -1853,14 +1892,17 @@
     window._applyTheme(theme);
     // update theme toggle icon
     const icon = document.getElementById('themeIcon');
+    const pref = html.getAttribute('data-theme-pref') || theme;
+    const effective = html.getAttribute('data-theme') || 'light';
     if (icon) {
-      if (theme === 'dark') {
+      if (effective === 'dark') {
         icon.innerHTML = '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" fill="currentColor"/>';
         icon.setAttribute('viewBox','0 0 24 24');
       } else {
         icon.innerHTML = '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>';
         icon.setAttribute('viewBox','0 0 24 24');
       }
+      icon.closest('button')?.setAttribute('title', pref === 'auto' ? 'Theme: Auto' : 'Toggle theme (⌘J)');
     }
   }
 
@@ -1873,7 +1915,7 @@
   }
 
   // Init from current data-theme (already set in head)
-  applyTheme(html.getAttribute('data-theme') || 'light');
+  applyTheme(html.getAttribute('data-theme-pref') || html.getAttribute('data-theme') || 'light');
 
   // Theme toggle button
   document.getElementById("themeToggle")?.addEventListener("click", () => {
@@ -1889,6 +1931,17 @@
       applyTheme(cur === 'dark' ? 'light' : 'dark');
     }
   });
+  const systemTheme = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+  if (systemTheme) {
+    const syncAutoTheme = () => {
+      if ((html.getAttribute('data-theme-pref') || 'light') === 'auto') {
+        applyTheme('auto');
+        _syncAppearanceUI();
+      }
+    };
+    if (systemTheme.addEventListener) systemTheme.addEventListener('change', syncAutoTheme);
+    else if (systemTheme.addListener) systemTheme.addListener(syncAutoTheme);
+  }
 
   // Restore saved accent
   (function() {
@@ -1956,9 +2009,11 @@
   // ═══════════════════════════════ APPEARANCE SECTION (settings pane) ══
   function _syncAppearanceUI() {
     // Theme seg buttons
-    const curTheme = html.getAttribute('data-theme') || 'light';
+    const curTheme = html.getAttribute('data-theme-pref') || html.getAttribute('data-theme') || 'light';
+    const btnAuto  = document.getElementById('setThemeAuto');
     const btnLight = document.getElementById('setThemeLight');
     const btnDark  = document.getElementById('setThemeDark');
+    if (btnAuto)  btnAuto.setAttribute('aria-pressed',  String(curTheme === 'auto'));
     if (btnLight) btnLight.setAttribute('aria-pressed', String(curTheme === 'light'));
     if (btnDark)  btnDark.setAttribute('aria-pressed',  String(curTheme === 'dark'));
 
@@ -1972,13 +2027,18 @@
     });
   }
 
+  document.getElementById('setThemeAuto')?.addEventListener('click', () => {
+    applyTheme('auto');
+    _syncAppearanceUI();
+    _updateAccentDot();
+  });
   document.getElementById('setThemeLight')?.addEventListener('click', () => {
-    window._applyTheme('light');
+    applyTheme('light');
     _syncAppearanceUI();
     _updateAccentDot();
   });
   document.getElementById('setThemeDark')?.addEventListener('click', () => {
-    window._applyTheme('dark');
+    applyTheme('dark');
     _syncAppearanceUI();
     _updateAccentDot();
   });
@@ -3040,8 +3100,8 @@
           <span class="sev-chip med" title="Medium">${med}</span>
           <span class="sev-chip total" title="Total">${tot}</span>
         </div>
-        <div style="display:flex;gap:0.4rem;align-items:center;flex-wrap:wrap;">
-          <button class="btn-outline btn-sm" data-rem-archive="${escHtml(e.id)}" title="View Remediation Plan">Plan</button>
+        <div class="history-actions">
+          <button class="btn-outline btn-sm" data-rem-archive="${escHtml(e.id)}" title="View Remediation Plan">Remediation</button>
           <a class="btn-outline btn-sm" href="/archive/${escHtml(e.id)}/export?fmt=json"  download title="Download JSON">JSON</a>
           ${(userRole === 'admin' || userRole === 'auditor')
             ? `<button class="btn-outline btn-sm" data-evidence-bundle="${escHtml(e.id)}" title="Download Evidence Bundle (ZIP)">Bundle</button>`
@@ -3088,24 +3148,8 @@
     el.querySelectorAll("[data-rem-archive]").forEach(btn => {
       btn.addEventListener("click", async function () {
         const archiveId = this.dataset.remArchive;
-        const modal = document.getElementById("remediationModal");
-        const body  = document.getElementById("remediationModalBody");
-        modal.classList.remove("hidden");
-        document.body.style.overflow = "hidden";
-        body.innerHTML = '<div class="rem-loading">Generating remediation plan&hellip;</div>';
-        try {
-          const res = await fetch(`/archive/${archiveId}/remediation-plan?fmt=json`);
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const plan = await res.json();
-          /* Reuse the renderPlanHTML function from the remediation modal scope */
-          if (window._renderRemPlan) {
-            body.innerHTML = window._renderRemPlan(plan);
-          } else {
-            body.innerHTML = '<pre>' + JSON.stringify(plan, null, 2) + '</pre>';
-          }
-        } catch (err) {
-          body.innerHTML = `<div class="alert alert-error">Failed: ${escHtml(err.message)}</div>`;
-        }
+        if (window._openArchiveRemediation) await window._openArchiveRemediation(archiveId);
+        else alert("Remediation viewer is still loading. Please try again.");
       });
     });
 
@@ -3284,13 +3328,13 @@
       const ok     = e.success;
       const errMsg = e.error ? `<span class="activity-error">${escHtml(e.error)}</span>` : "";
       return `<div class="log-row ${ok ? "" : "log-row-fail"}">
-        <span class="log-tag ${e.action ? escHtml(e.action) : ""}">${escHtml(action)}</span>
+        <span class="log-tag ${e.action ? escHtml(e.action) : ""}${ok ? "" : " fail"}">${escHtml(action)}</span>
         <div>
           <div class="log-body">${escHtml(e.label)}</div>
           <div class="log-meta">${vendor ? escHtml(vendor) + " &bull; " : ""}${escHtml(ts)}${errMsg ? " &bull; " + errMsg : ""}</div>
         </div>
         <div style="display:flex;gap:0.4rem;align-items:center;">
-          <span class="status ${ok ? "" : "status-fail"}">${ok ? "&#10003; OK" : "&#10007; Failed"}</span>
+          <span class="status ${ok ? "" : "status-fail"}">${ok ? "OK" : "Failed"}</span>
           <button class="btn-danger btn-sm iconless" data-delete-activity="${escHtml(e.id)}" title="Delete">Delete</button>
         </div>
       </div>`;
@@ -3356,12 +3400,12 @@
       const target = e.target ? ` → ${escHtml(e.target)}` : "";
       const ip     = e.ip_address ? escHtml(e.ip_address) : "";
       return `<div class="log-row ${ok ? "" : "log-row-fail"}">
-        <span class="log-tag ${ok ? "" : "fail"}">${escHtml(label)}</span>
+        <span class="log-tag ${e.event ? escHtml(e.event) : ""}${ok ? "" : " fail"}">${escHtml(label)}</span>
         <div>
           <div class="log-body">${actor}${target}</div>
           <div class="log-meta">${escHtml(ts)}${ip ? " &bull; " + ip : ""}</div>
         </div>
-        <span class="status ${ok ? "" : "status-fail"}">${ok ? "&#10003;" : "&#10007;"}</span>
+        <span class="status ${ok ? "" : "status-fail"}">${ok ? "OK" : "Failed"}</span>
       </div>`;
     }).join("");
   }
@@ -3586,8 +3630,8 @@
       const vendor  = VENDOR_LABELS[s.vendor]  || s.vendor;
       const comp    = COMP_LABELS[s.compliance||""] || s.compliance || "—";
       const lastRun = s.last_run ? new Date(s.last_run).toLocaleString() : "Never";
-      const lastSt  = s.last_status === "ok"    ? `<span class="activity-ok">&#10003; OK</span>` :
-                      s.last_status === "error"  ? `<span class="activity-fail">&#10007; Error</span>` : "—";
+      const lastSt  = s.last_status === "ok"    ? `<span class="activity-ok">OK</span>` :
+                      s.last_status === "error"  ? `<span class="activity-fail">Error</span>` : "—";
       const _dow  = escHtml(DOW_LABELS[s.day_of_week] || s.day_of_week);
       const _h    = escHtml(String(s.hour  ?? 0).padStart(2,"0"));
       const _m    = escHtml(String(s.minute ?? 0).padStart(2,"0"));
@@ -3602,14 +3646,25 @@
         <div>
           <span class="name">${escHtml(s.name)}</span>
           <div class="meta">${escHtml(vendor)} &bull; ${escHtml(s.host)} &bull; ${freq} @ ${timing} &bull; Compliance: ${escHtml(comp)}</div>
-          <div class="last-run">Last run: ${escHtml(lastRun)}${s.last_error ? ` &mdash; <span class="activity-error">${escHtml(s.last_error)}</span>` : ""}</div>
+          <div class="last-run">Last run: ${escHtml(lastRun)} &bull; ${lastSt}${s.last_error ? ` &mdash; <span class="activity-error">${escHtml(s.last_error)}</span>` : ""}</div>
         </div>
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+        <div class="sched-card-actions">
+          ${(!DEMO_MODE && canManageSchedules) ? `
+          <label class="schedule-switch" title="${s.enabled ? "Pause schedule" : "Enable schedule"}">
+            <input type="checkbox" data-sched-toggle="${escHtml(s.id)}" ${s.enabled ? "checked" : ""} />
+            <span></span>
+          </label>
+          ` : ""}
           <span class="${statusClass}">${statusLabel}</span>
           ${(!DEMO_MODE && canManageSchedules) ? `
-          <button class="btn-outline btn-sm" data-sched-run="${escHtml(s.id)}" title="Run now">&#9654; Run Now</button>
-          <button class="btn-outline btn-sm" data-sched-edit="${escHtml(s.id)}" title="Edit">&#9998; Edit</button>
-          <button class="btn-danger btn-sm"    data-sched-del="${escHtml(s.id)}"  title="Delete">&#128465;</button>
+          <div class="schedule-overflow">
+            <button class="btn-outline btn-sm schedule-menu-btn" data-sched-menu="${escHtml(s.id)}" type="button">More</button>
+            <div class="schedule-menu hidden" data-sched-menu-panel="${escHtml(s.id)}">
+              <button type="button" data-sched-run="${escHtml(s.id)}">Run now</button>
+              <button type="button" data-sched-edit="${escHtml(s.id)}">Edit</button>
+              <button type="button" class="danger" data-sched-del="${escHtml(s.id)}">Delete</button>
+            </div>
+          </div>
           ` : ""}
         </div>
       </div>`;
@@ -3634,11 +3689,13 @@
     document.getElementById("schedMinute").value       = s.minute !== undefined ? s.minute : 0;
     document.getElementById("schedDow").value          = s.day_of_week || "mon";
     document.getElementById("schedEnabled").checked         = !!s.enabled;
+    document.getElementById("schedNotifyCritical").checked  = !!s.notify_on_critical;
     document.getElementById("schedNotifyFinding").checked   = !!s.notify_on_finding;
     document.getElementById("schedNotifyError").checked     = !!s.notify_on_error;
     document.getElementById("schedSlackWebhook").value      = s.notify_slack_webhook || "";
     document.getElementById("schedTeamsWebhook").value      = s.notify_teams_webhook || "";
     document.getElementById("schedNotifyEmail").value       = s.notify_email || "";
+    syncScheduleTargetFields(true);
     syncScheduleTogglePills();
     toggleScheduleFreqFields(s.frequency || "daily");
     document.getElementById("scheduleFormCard").scrollIntoView({ behavior: "smooth", block: "start" });
@@ -3650,28 +3707,68 @@
   }
 
   function syncScheduleTogglePills() {
-    ["schedEnabled", "schedNotifyFinding", "schedNotifyError"].forEach(id => {
+    ["schedEnabled", "schedNotifyCritical", "schedNotifyFinding", "schedNotifyError"].forEach(id => {
       const input = document.getElementById(id);
       input?.closest(".tgl")?.classList.toggle("on", !!input.checked);
     });
+  }
+
+  function syncScheduleTargetFields(fromValues = false) {
+    const pairs = [
+      ["schedTargetSlack", "schedSlackWebhook"],
+      ["schedTargetTeams", "schedTeamsWebhook"],
+      ["schedTargetEmail", "schedNotifyEmail"],
+    ];
+    pairs.forEach(([checkId, fieldId]) => {
+      const check = document.getElementById(checkId);
+      const field = document.getElementById(fieldId);
+      if (!check || !field) return;
+      if (fromValues) check.checked = !!field.value.trim();
+      field.classList.toggle("hidden", !check.checked);
+      if (!check.checked && !fromValues) field.value = "";
+    });
+    const active = pairs
+      .filter(([checkId]) => document.getElementById(checkId)?.checked)
+      .map(([checkId]) => checkId.replace("schedTarget", ""));
+    const btn = document.getElementById("schedTargetMenuBtn");
+    if (btn) btn.textContent = active.length ? `Targets: ${active.join(", ")}` : "Targets";
   }
 
   document.getElementById("schedFrequency")?.addEventListener("change", function () {
     toggleScheduleFreqFields(this.value);
   });
 
-  ["schedEnabled", "schedNotifyFinding", "schedNotifyError"].forEach(id => {
+  ["schedEnabled", "schedNotifyCritical", "schedNotifyFinding", "schedNotifyError"].forEach(id => {
     document.getElementById(id)?.addEventListener("change", syncScheduleTogglePills);
   });
+  ["schedTargetSlack", "schedTargetTeams", "schedTargetEmail"].forEach(id => {
+    document.getElementById(id)?.addEventListener("change", () => syncScheduleTargetFields(false));
+  });
+  document.getElementById("schedTargetMenuBtn")?.addEventListener("click", () => {
+    document.getElementById("schedTargetMenu")?.classList.toggle("hidden");
+  });
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest?.(".schedule-target-picker")) document.getElementById("schedTargetMenu")?.classList.add("hidden");
+    if (!e.target.closest?.(".schedule-overflow")) {
+      document.querySelectorAll(".schedule-menu").forEach(menu => menu.classList.add("hidden"));
+    }
+  });
 
-  document.getElementById("schedCancelBtn")?.addEventListener("click", function () {
+  function resetScheduleForm() {
     document.getElementById("scheduleForm").reset();
     document.getElementById("scheduleId").value = "";
-    document.getElementById("scheduleFormTitle").textContent = "New Schedule";
+    document.getElementById("scheduleFormTitle").textContent = "New schedule";
     document.getElementById("schedSavedMsg").classList.add("hidden");
     document.getElementById("schedErrorMsg").classList.add("hidden");
+    syncScheduleTargetFields(false);
     syncScheduleTogglePills();
     toggleScheduleFreqFields("daily");
+  }
+
+  document.getElementById("schedCancelBtn")?.addEventListener("click", resetScheduleForm);
+  document.getElementById("newScheduleBtn")?.addEventListener("click", () => {
+    resetScheduleForm();
+    document.getElementById("scheduleFormCard").scrollIntoView({ behavior: "smooth", block: "start" });
   });
 
   document.getElementById("scheduleForm")?.addEventListener("submit", async function (e) {
@@ -3690,11 +3787,12 @@
       minute:      parseInt(document.getElementById("schedMinute").value) || 0,
       day_of_week:          document.getElementById("schedDow").value,
       enabled:              document.getElementById("schedEnabled").checked,
+      notify_on_critical:   document.getElementById("schedNotifyCritical").checked,
       notify_on_finding:    document.getElementById("schedNotifyFinding").checked,
       notify_on_error:      document.getElementById("schedNotifyError").checked,
-      notify_slack_webhook: document.getElementById("schedSlackWebhook").value.trim(),
-      notify_teams_webhook: document.getElementById("schedTeamsWebhook").value.trim(),
-      notify_email:         document.getElementById("schedNotifyEmail").value.trim(),
+      notify_slack_webhook: document.getElementById("schedTargetSlack").checked ? document.getElementById("schedSlackWebhook").value.trim() : "",
+      notify_teams_webhook: document.getElementById("schedTargetTeams").checked ? document.getElementById("schedTeamsWebhook").value.trim() : "",
+      notify_email:         document.getElementById("schedTargetEmail").checked ? document.getElementById("schedNotifyEmail").value.trim() : "",
     };
     const pass = document.getElementById("schedPass").value;
     if (pass) payload.password = pass;
@@ -3720,6 +3818,7 @@
       if (!schedId) {
         this.reset();
         document.getElementById("scheduleId").value = "";
+        syncScheduleTargetFields(false);
         syncScheduleTogglePills();
         toggleScheduleFreqFields("daily");
       }
@@ -3736,8 +3835,26 @@
     const runBtn  = e.target.closest("[data-sched-run]");
     const editBtn = e.target.closest("[data-sched-edit]");
     const delBtn  = e.target.closest("[data-sched-del]");
+    const menuBtn = e.target.closest("[data-sched-menu]");
+    const toggle = e.target.closest("[data-sched-toggle]");
 
-    if (runBtn) {
+    if (menuBtn) {
+      const panel = this.querySelector(`[data-sched-menu-panel="${CSS.escape(menuBtn.dataset.schedMenu)}"]`);
+      document.querySelectorAll(".schedule-menu").forEach(menu => {
+        if (menu !== panel) menu.classList.add("hidden");
+      });
+      panel?.classList.toggle("hidden");
+    } else if (toggle) {
+      const sched = schedulesData.find(s => s.id === toggle.dataset.schedToggle);
+      if (!sched) return;
+      toggle.disabled = true;
+      await fetch("/schedules/" + toggle.dataset.schedToggle, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: toggle.checked }),
+      });
+      await loadSchedules();
+    } else if (runBtn) {
       runBtn.disabled = true;
       await fetch("/schedules/" + runBtn.dataset.schedRun + "/run", { method: "POST" });
       runBtn.disabled = false;
@@ -4708,11 +4825,13 @@
 
     /* Store the last plan data for PDF/MD download */
     let lastPlanPayload = null;
+    let lastArchiveRemediationId = null;
 
     async function fetchAndShowPlan(auditData) {
       openRemediationModal();
       body.innerHTML = '<div class="rem-loading">Generating remediation plan&hellip;</div>';
       lastPlanPayload = auditData;
+      lastArchiveRemediationId = null;
 
       try {
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content
@@ -4733,36 +4852,56 @@
       }
     }
 
+    window._openArchiveRemediation = async function(archiveId) {
+      openRemediationModal();
+      body.innerHTML = '<div class="rem-loading">Loading remediation plan&hellip;</div>';
+      lastArchiveRemediationId = archiveId;
+      try {
+        const res = await fetch(`/archive/${archiveId}/remediation-plan?fmt=json`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const plan = await res.json();
+        lastPlanPayload = {
+          findings: plan.findings || [],
+          vendor: plan.vendor || "",
+          filename: plan.filename || "",
+          summary: plan.summary || {},
+          compliance: plan.compliance || "",
+        };
+        body.innerHTML = renderPlanHTML(plan);
+      } catch (err) {
+        body.innerHTML = `<div class="alert alert-error">Failed to load remediation plan: ${escH(err.message)}</div>`;
+      }
+    };
+
     /* Download helpers (non-demo only) */
     {% if not demo_mode %}
     document.getElementById("remPlanOpenPdf")?.addEventListener("click", async () => {
       if (!lastPlanPayload) return;
+      const win = window.open("", "_blank", "noopener");
+      if (!win) {
+        alert("Could not open a new tab for the PDF. Please allow popups for this site.");
+        return;
+      }
+      win.document.write("<!doctype html><title>Preparing PDF</title><body style='font-family:system-ui,sans-serif;padding:24px'>Preparing remediation PDF...</body>");
       try {
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content
                        || document.querySelector('input[name="csrf_token"]')?.value || '';
-        const res = await fetch("/remediation-plan?fmt=pdf&inline=1", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
-          body: JSON.stringify(lastPlanPayload),
-        });
+        const res = lastArchiveRemediationId
+          ? await fetch(`/archive/${lastArchiveRemediationId}/remediation-plan?fmt=pdf&inline=1`)
+          : await fetch("/remediation-plan?fmt=pdf&inline=1", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
+              body: JSON.stringify(lastPlanPayload),
+            });
         if (!res.ok) throw new Error("PDF generation failed");
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
-        // window.open returns null when blocked by popup blocker (doesn't throw)
-        const win = window.open(url, "_blank", "noopener");
-        if (!win) {
-          URL.revokeObjectURL(url);
-          alert("Popup blocked — please allow popups for this site to open the PDF.");
-          return;
-        }
-        // Revoke after the PDF has had time to load; also revoke if open throws
-        try {
-          setTimeout(() => URL.revokeObjectURL(url), 60000);
-        } catch (_) {
-          URL.revokeObjectURL(url);
-          throw _;
-        }
-      } catch (err) { alert("Could not open PDF: " + err.message); }
+        win.location.href = url;
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+      } catch (err) {
+        try { win.close(); } catch (_) {}
+        alert("Could not open PDF: " + err.message);
+      }
     });
 
     document.getElementById("remPlanDownloadPdf")?.addEventListener("click", async () => {
@@ -4770,11 +4909,13 @@
       try {
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content
                        || document.querySelector('input[name="csrf_token"]')?.value || '';
-        const res = await fetch("/remediation-plan?fmt=pdf", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
-          body: JSON.stringify(lastPlanPayload),
-        });
+        const res = lastArchiveRemediationId
+          ? await fetch(`/archive/${lastArchiveRemediationId}/remediation-plan?fmt=pdf`)
+          : await fetch("/remediation-plan?fmt=pdf", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
+              body: JSON.stringify(lastPlanPayload),
+            });
         if (!res.ok) throw new Error("Download failed");
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
@@ -4789,11 +4930,13 @@
       try {
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content
                        || document.querySelector('input[name="csrf_token"]')?.value || '';
-        const res = await fetch("/remediation-plan?fmt=markdown", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
-          body: JSON.stringify(lastPlanPayload),
-        });
+        const res = lastArchiveRemediationId
+          ? await fetch(`/archive/${lastArchiveRemediationId}/remediation-plan?fmt=markdown`)
+          : await fetch("/remediation-plan?fmt=markdown", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
+              body: JSON.stringify(lastPlanPayload),
+            });
         if (!res.ok) throw new Error("Download failed");
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);

@@ -237,7 +237,7 @@ button { cursor: pointer; border: 0; background: transparent; }
 .actions-row .btn-primary, .actions-row .btn-outline { text-decoration: none; }
 .report-row, .remediation-row { display: flex; gap: 8px; align-items: center; }
 .download-menu { position: relative; display: inline-flex; }
-.download-menu-panel { position: absolute; top: calc(100% + 10px); right: 0; width: max-content; max-width: min(680px, calc(100vw - 48px)); padding: 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); box-shadow: 0 18px 40px -24px oklch(0 0 0 / .35); z-index: 20; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.download-menu-panel { position: absolute; top: calc(100% + 10px); left: 0; width: max-content; max-width: min(680px, calc(100vw - 48px)); padding: 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); box-shadow: 0 18px 40px -24px oklch(0 0 0 / .35); z-index: 20; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-start; }
 .download-menu-panel button, .download-menu-panel a { display: inline-flex; align-items: center; justify-content: center; min-height: 34px; padding: 0 14px; border: 1px solid var(--line); border-radius: 999px; color: var(--ink-2); font-size: 13px; text-decoration: none; text-align: center; white-space: nowrap; background: var(--bg); }
 .download-menu-panel button:hover, .download-menu-panel a:hover { border-color: var(--ink); color: var(--ink); background: var(--tint); }
 .archive-row { margin-left: auto; color: var(--ink-3); font-size: 13px; }
@@ -267,6 +267,8 @@ button { cursor: pointer; border: 0; background: transparent; }
 .sev-chip.med  { background: color-mix(in oklab, var(--med) 20%, transparent); color: var(--med); }
 .sev-chip.total { background: var(--ink); color: var(--bg); }
 .list-row .right-meta { text-align: right; font-size: 12px; color: var(--ink-3); }
+.history-actions { display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap; justify-content:flex-end; }
+.history-actions a, .history-actions button { text-decoration:none; }
 .history-list { border-top: 1px solid var(--line); }
 .history-list > .list-row:first-child { border-top: 0; }
 .history-compare-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 24px 0 0; color: var(--ink-3); font-size: 13px; }
@@ -355,6 +357,12 @@ html[data-theme="dark"] .run-row .rn-score.bad  { color: oklch(0.78 0.18 25); }
 .lic-meta-row .val { color: var(--ink); font-weight: 500; }
 .lic-meta-row .val.mono { font-family: 'Geist Mono', monospace; font-weight: 400; font-size: 11px; }
 .input.mono { font-family: 'Geist Mono', monospace; font-size: 12px; letter-spacing: 0.02em; }
+.form-actions { display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap; }
+.btn-activate-license { align-self:center; min-height:38px; padding:0 18px; white-space:nowrap; }
+.license-activation-field .ctrl { grid-template-columns:minmax(0, 1fr) auto; gap:18px; align-items:end; }
+.license-buy-link { text-decoration:none; }
+.license-buy-link:hover { text-decoration:none; }
+.lic-card + .sub-head { margin-top:32px; }
 .lic-features { display: grid; grid-template-columns: 1fr 1fr; gap: 20px 48px; padding-top: 4px; }
 @media (max-width: 720px) { .lic-features { grid-template-columns: 1fr; } }
 .lic-feat { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: start; }
@@ -364,6 +372,7 @@ html[data-theme="dark"] .run-row .rn-score.bad  { color: oklch(0.78 0.18 25); }
 .ulink { color: var(--ink-2); text-decoration: underline; cursor: pointer; }
 
 /* Schedule card */
+.schedule-toolbar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:flex-end; }
 .sched-card { display: grid; grid-template-columns: 1fr auto; gap: 24px; padding: 20px 24px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); margin-bottom: 10px; }
 .sched-card .name { font-size: 16px; font-weight: 500; letter-spacing: -0.01em; }
 .sched-card .meta { font-size: 13px; color: var(--ink-3); margin-top: 4px; }
@@ -372,6 +381,26 @@ html[data-theme="dark"] .run-row .rn-score.bad  { color: oklch(0.78 0.18 25); }
 .sched-card .status.err { background: color-mix(in oklab, var(--crit) 12%, var(--surface)); color: var(--crit); }
 .sched-card.disabled .name { color: var(--ink-3); }
 .sched-card .last-run { font-size: 12px; color: var(--ink-3); margin-top: 6px; font-family: 'Geist Mono', monospace; }
+.sched-card-actions { display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end; position:relative; }
+.schedule-switch { width:34px; height:20px; border-radius:999px; position:relative; display:inline-flex; align-items:center; background:var(--line); cursor:pointer; }
+.schedule-switch input { appearance:none; position:absolute; inset:0; opacity:0; cursor:pointer; }
+.schedule-switch span { width:16px; height:16px; border-radius:50%; background:var(--surface); box-shadow:0 1px 4px oklch(0 0 0 / .18); transform:translateX(2px); transition:transform .16s, background .16s; }
+.schedule-switch input:checked + span { transform:translateX(16px); background:var(--acc); }
+.schedule-overflow { position:relative; }
+.schedule-menu { position:absolute; top:calc(100% + 8px); right:0; z-index:18; min-width:132px; padding:6px; border:1px solid var(--line); border-radius:12px; background:var(--surface); box-shadow:0 18px 40px -24px oklch(0 0 0 / .35); display:grid; gap:2px; }
+.schedule-menu button { width:100%; border:0; background:transparent; color:var(--ink-2); text-align:left; padding:8px 10px; border-radius:8px; font-size:13px; }
+.schedule-menu button:hover { background:var(--tint); color:var(--ink); }
+.schedule-menu button.danger { color:var(--crit); }
+.schedule-form-actions { justify-content:flex-end; padding-top:28px; }
+.schedule-form-actions .settings-saved-msg, .schedule-form-actions .alert-inline { margin-right:auto; }
+.schedule-target-row .ctrl { display:flex; align-items:center; gap:10px; flex-wrap:nowrap; }
+.schedule-target-picker { position:relative; flex:0 0 auto; }
+.schedule-target-menu { position:absolute; top:calc(100% + 8px); left:0; z-index:18; min-width:150px; padding:8px; border:1px solid var(--line); border-radius:12px; background:var(--surface); box-shadow:0 18px 40px -24px oklch(0 0 0 / .35); display:grid; gap:4px; }
+.schedule-target-menu label { display:flex; align-items:center; gap:8px; padding:7px 8px; border-radius:8px; font-size:13px; color:var(--ink-2); cursor:pointer; }
+.schedule-target-menu label:hover { background:var(--tint); color:var(--ink); }
+.schedule-target-field { min-width:0; flex:1 1 220px; }
+.activity-ok { color:var(--ok); }
+.activity-fail, .activity-error { color:var(--crit); }
 
 
 /* Diff view */
@@ -387,15 +416,20 @@ html[data-theme="dark"] .run-row .rn-score.bad  { color: oklch(0.78 0.18 25); }
 .diff-line.rem { border-left-color: var(--crit); background: color-mix(in oklab, var(--crit) 6%, var(--surface)); }
 
 /* Activity log */
-.log-row { display: grid; grid-template-columns: 100px 1fr auto; gap: 20px; padding: 14px 0; border-bottom: 1px solid var(--line); align-items: center; }
+.log-row { display: grid; grid-template-columns: 118px 1fr auto; gap: 20px; padding: 14px 0; border-bottom: 1px solid var(--line); align-items: center; }
 .log-tag { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; padding: 4px 10px; border-radius: 4px; background: var(--tint); color: var(--ink-2); font-weight: 500; text-align: center; }
-.log-tag.audit { background: color-mix(in oklab, var(--low) 15%, transparent); color: var(--low); }
-.log-tag.diff { background: color-mix(in oklab, var(--acc) 20%, transparent); color: color-mix(in oklab, var(--acc) 80%, var(--ink)); }
-html[data-theme="dark"] .log-tag.diff { color: var(--acc); }
-.log-tag.user { background: color-mix(in oklab, var(--med) 15%, transparent); color: var(--med); }
+.log-tag.file_audit, .log-tag.audit { background: color-mix(in oklab, var(--low) 14%, var(--surface)); color: color-mix(in oklab, var(--low) 72%, var(--ink)); }
+.log-tag.ssh_connect { background: color-mix(in oklab, var(--acc) 16%, var(--surface)); color: color-mix(in oklab, var(--acc) 68%, var(--ink)); }
+.log-tag.config_diff, .log-tag.archive_compare, .log-tag.diff { background: color-mix(in oklab, var(--med) 18%, var(--surface)); color: color-mix(in oklab, var(--med) 65%, var(--ink)); }
+.log-tag.login_success, .log-tag.logout { background: color-mix(in oklab, var(--ok) 15%, var(--surface)); color: color-mix(in oklab, var(--ok) 70%, var(--ink)); }
+.log-tag.user_created, .log-tag.password_changed, .log-tag.api_key_generated, .log-tag.settings_changed { background: color-mix(in oklab, var(--med) 18%, var(--surface)); color: color-mix(in oklab, var(--med) 62%, var(--ink)); }
+.log-tag.license_changed { background: color-mix(in oklab, var(--acc) 18%, var(--surface)); color: color-mix(in oklab, var(--acc) 70%, var(--ink)); }
+.log-tag.login_failure, .log-tag.account_lockout, .log-tag.invalid_api_key, .log-tag.user_deleted, .log-tag.api_key_revoked, .log-tag.fail { background: color-mix(in oklab, var(--crit) 12%, var(--surface)); color: var(--crit); }
+.log-row-fail .log-tag { background: color-mix(in oklab, var(--crit) 12%, var(--surface)); color: var(--crit); }
 .log-row .log-body { font-size: 14px; }
 .log-row .log-meta { font-size: 12px; color: var(--ink-3); margin-top: 3px; font-family: 'Geist Mono', monospace; }
 .log-row .status { font-size: 12px; color: var(--ok); display: inline-flex; align-items: center; gap: 6px; }
+.log-row .status.status-fail { color: var(--crit); }
 
 /* Chart placeholder */
 .chart { border: 1px solid var(--line); border-radius: 12px; padding: 24px; height: 240px; position: relative; background: var(--surface); }
@@ -436,6 +470,9 @@ html[data-theme="dark"] .log-tag.diff { color: var(--acc); }
   .field { grid-template-columns: 1fr; gap: 12px; }
   .settings-main .field { grid-template-columns: 1fr; gap: 12px; }
   .field.split .ctrl, .field.triple .ctrl { grid-template-columns: 1fr; }
+  .schedule-target-row .ctrl { flex-wrap:wrap; }
+  .sched-card { grid-template-columns:1fr; }
+  .sched-card-actions { justify-content:flex-start; }
   .settings { grid-template-columns: 1fr; gap: 24px; }
   .settings-nav { border-right: 0; border-bottom: 1px solid var(--line); padding: 0 0 16px; }
   .stats { grid-template-columns: repeat(2, 1fr); }

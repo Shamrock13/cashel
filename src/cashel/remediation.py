@@ -564,6 +564,8 @@ def plan_to_pdf(plan: dict, output_path: str) -> str:
         _MEDIUM_BG,
         _COMP,
         _PASS,
+        _CRITICAL,
+        _CRITICAL_BG,
     )
     from .export import TOOL_VERSION
 
@@ -585,16 +587,16 @@ def plan_to_pdf(plan: dict, output_path: str) -> str:
     class RemediationReport(CashelReport):
         def header(self):
             self.set_fill_color(*_NAVY)
-            self.rect(0, 0, 210, 34, "F")
+            self.rect(0, 0, 210, 42, "F")
             self.set_text_color(*_WHITE)
-            self.set_font("Helvetica", "B", 20)
-            self.set_xy(12, 9)
+            self.set_font("Helvetica", "B", 24)
+            self.set_xy(12, 10)
             self.cell(120, 9, "Cashel")
-            self.set_font("Helvetica", "B", 8)
+            self.set_font("Helvetica", "B", 8.5)
             self.set_text_color(180, 200, 235)
-            self.set_xy(12, 22)
+            self.set_xy(12, 28)
             self.cell(120, 6, f"Remediation report  |  Cashel {TOOL_VERSION}")
-            self.set_xy(0, 22)
+            self.set_xy(0, 28)
             self.cell(
                 198,
                 6,
@@ -602,8 +604,8 @@ def plan_to_pdf(plan: dict, output_path: str) -> str:
                 align="R",
             )
             self.set_fill_color(255, 104, 128)
-            self.rect(0, 33.4, 210, 0.7, "F")
-            self.set_y(40)
+            self.rect(0, 41.3, 210, 0.8, "F")
+            self.set_y(50)
 
     pdf = RemediationReport()
     pdf.set_auto_page_break(auto=True, margin=18)
@@ -614,13 +616,13 @@ def plan_to_pdf(plan: dict, output_path: str) -> str:
     framework = plan["compliance"].upper() if plan.get("compliance") else "None"
     pdf.set_fill_color(*_LIGHT_BG)
     y = pdf.get_y()
-    pdf.rect(10, y, 190, 10, "F")
+    pdf.rect(10, y, 190, 13, "F")
     meta = f"File: {plan.get('filename', 'N/A')}   |   Vendor: {vendor_name}   |   Framework: {framework}   |   Steps: {plan['total_steps']}"
-    pdf.set_font("Helvetica", "", 8)
+    pdf.set_font("Helvetica", "B", 8)
     pdf.set_text_color(*_MUTED)
-    pdf.set_xy(13, y + 2)
+    pdf.set_xy(13, y + 3.5)
     pdf.cell(184, 6, _sanitize(meta))
-    pdf.set_y(y + 13)
+    pdf.set_y(y + 17)
 
     # Summary boxes
     summary = plan.get("summary", {})
@@ -631,7 +633,9 @@ def plan_to_pdf(plan: dict, output_path: str) -> str:
             summary.get("medium", 0),
             summary.get("total", 0),
             score=summary.get("score"),
+            critical=summary.get("critical", 0),
         )
+        pdf.ln(3)
 
     # Disclaimer
     if plan.get("disclaimer"):
@@ -639,12 +643,12 @@ def plan_to_pdf(plan: dict, output_path: str) -> str:
         pdf.set_draw_color(*_MEDIUM)
         y = pdf.get_y()
         pdf.set_line_width(0.4)
-        pdf.rect(10, y, 190, 12, "FD")
+        pdf.rect(10, y, 190, 14, "FD")
         pdf.set_font("Helvetica", "B", 7)
         pdf.set_text_color(*_MEDIUM)
-        pdf.set_xy(13, y + 2)
+        pdf.set_xy(13, y + 3)
         pdf.multi_cell(184, 4, _sanitize(plan["disclaimer"]))
-        pdf.set_y(y + 15)
+        pdf.set_y(y + 18)
 
     # Divider
     pdf.set_draw_color(*_BORDER)
@@ -663,8 +667,8 @@ def plan_to_pdf(plan: dict, output_path: str) -> str:
 
             for step in phase["steps"]:
                 if step["severity"] == "CRITICAL":
-                    sev_color = (153, 0, 0)
-                    bg = (255, 230, 230)
+                    sev_color = _CRITICAL
+                    bg = _CRITICAL_BG
                 elif step["severity"] == "HIGH":
                     sev_color = _HIGH
                     bg = _HIGH_BG
@@ -682,16 +686,16 @@ def plan_to_pdf(plan: dict, output_path: str) -> str:
                 desc_lines = max(
                     1, (len(desc) + int(inner_w / char_w) - 1) // int(inner_w / char_w)
                 )
-                row_h: float = 14 + desc_lines * 4
+                row_h: float = 18 + desc_lines * 4.4
                 if guidance:
                     g_lines = max(
                         1,
                         (len(guidance) + int(inner_w / 2.0) - 1) // int(inner_w / 2.0),
                     )
-                    row_h += g_lines * 3.8 + 2
+                    row_h += g_lines * 4 + 6
                 if cmds:
                     c_lines = cmds.count("\n") + 1
-                    row_h += c_lines * 3.5 + 6
+                    row_h += c_lines * 3.6 + 9
 
                 y = pdf.get_y()
                 if y + row_h > 272:
@@ -700,55 +704,64 @@ def plan_to_pdf(plan: dict, output_path: str) -> str:
 
                 # Step card
                 pdf.set_fill_color(*bar_color)
-                pdf.rect(10, y, 3, row_h, "F")
-                pdf.set_fill_color(*bg)
-                pdf.rect(13, y, 187, row_h, "F")
+                pdf.rect(10, y, 3.5, row_h, "F")
+                pdf.set_fill_color(*_WHITE)
+                pdf.set_draw_color(*_BORDER)
+                pdf.set_line_width(0.25)
+                pdf.rect(13.5, y, 186.5, row_h, "FD")
 
-                cur_y = y + 2
+                cur_y = y + 3.2
 
                 # Step number + severity + effort badges
-                pdf.set_font("Helvetica", "B", 8)
-                pdf.set_text_color(*sev_color)
+                pdf.set_font("Helvetica", "B", 9)
+                pdf.set_text_color(*_TEXT)
                 pdf.set_xy(15, cur_y)
-                pdf.cell(20, 5, f"Step {step['step']}")
+                pdf.cell(22, 5, f"Step {step['step']}")
 
+                pdf.set_fill_color(*bg)
+                pdf.set_draw_color(*sev_color)
                 pdf.set_font("Helvetica", "B", 6.5)
-                pdf.set_xy(35, cur_y)
-                pdf.cell(15, 5, f"[{step['severity']}]")
+                pdf.set_text_color(*sev_color)
+                pdf.set_xy(38, cur_y)
+                pdf.cell(22, 5, step["severity"], border=1, align="C", fill=True)
 
                 pdf.set_text_color(*effort_color)
                 pdf.set_font("Helvetica", "", 6.5)
-                pdf.set_xy(50, cur_y)
+                pdf.set_xy(63, cur_y)
                 effort_label = _EFFORT_ICONS.get(step["effort"], step["effort"])
-                pdf.cell(30, 5, effort_label)
-                cur_y += 7
+                pdf.cell(38, 5, effort_label)
+                cur_y += 8
 
                 # Finding description
                 pdf.set_text_color(*_TEXT)
-                pdf.set_font("Courier", "", 7)
-                pdf.set_xy(15, cur_y)
-                pdf.multi_cell(inner_w, 4, _sanitize(desc))
-                cur_y = pdf.get_y() + 1
+                pdf.set_font("Helvetica", "", 8)
+                pdf.set_xy(17, cur_y)
+                pdf.multi_cell(inner_w - 4, 4.4, _sanitize(desc))
+                cur_y = pdf.get_y() + 2
 
                 # Guidance
                 if guidance:
+                    pdf.set_fill_color(*_LIGHT_BG)
+                    g_y = cur_y
+                    g_h = max(7, ((len(guidance) + int(inner_w / 2.0) - 1) // int(inner_w / 2.0)) * 4 + 4)
+                    pdf.rect(17, g_y, inner_w - 4, g_h, "F")
                     pdf.set_text_color(*_MUTED)
-                    pdf.set_font("Helvetica", "", 6.5)
-                    pdf.set_xy(17, cur_y)
-                    pdf.multi_cell(inner_w - 4, 3.8, _sanitize("Guidance: " + guidance))
-                    cur_y = pdf.get_y() + 1
+                    pdf.set_font("Helvetica", "", 6.8)
+                    pdf.set_xy(19, g_y + 2)
+                    pdf.multi_cell(inner_w - 8, 4, _sanitize("Guidance: " + guidance))
+                    cur_y = g_y + g_h + 2
 
                 # CLI commands
                 if cmds:
-                    pdf.set_fill_color(240, 240, 248)
+                    pdf.set_fill_color(244, 246, 252)
                     cmd_y = cur_y
                     cmd_lines = cmds.count("\n") + 1
-                    cmd_h = cmd_lines * 3.5 + 3
+                    cmd_h = cmd_lines * 3.6 + 5
                     pdf.rect(17, cmd_y, inner_w - 4, cmd_h, "F")
-                    pdf.set_text_color(60, 60, 100)
+                    pdf.set_text_color(50, 57, 92)
                     pdf.set_font("Courier", "", 6.5)
-                    pdf.set_xy(19, cmd_y + 1.5)
-                    pdf.multi_cell(inner_w - 8, 3.5, _sanitize(cmds))
+                    pdf.set_xy(19, cmd_y + 2)
+                    pdf.multi_cell(inner_w - 8, 3.6, _sanitize(cmds))
 
                 pdf.set_y(y + row_h + 2)
 
