@@ -1,4 +1,6 @@
 # Services considered insecure if allowed to broad destinations
+import shlex
+
 from .models.findings import make_finding
 
 _INSECURE_SERVICES = {"TELNET", "HTTP", "FTP", "TFTP", "SNMP"}
@@ -72,6 +74,14 @@ def _policy_evidence(p):
         f"logtraffic={p.get('logtraffic') or 'unset'}",
         f"status={p.get('status') or 'unset'}",
         f"utm-status={p.get('utm-status') or 'unset'}",
+        f"schedule={p.get('schedule') or 'unset'}",
+        f"nat={p.get('nat') or 'unset'}",
+        f"comments={p.get('comments') or 'unset'}",
+        f"av-profile={p.get('av-profile') or 'unset'}",
+        f"ips-sensor={p.get('ips-sensor') or 'unset'}",
+        f"application-list={p.get('application-list') or 'unset'}",
+        f"webfilter-profile={p.get('webfilter-profile') or 'unset'}",
+        f"profile-protocol-options={p.get('profile-protocol-options') or 'unset'}",
     ]
     return "; ".join(fields)
 
@@ -89,7 +99,24 @@ def _policy_metadata(p):
         "logtraffic": p.get("logtraffic", ""),
         "status": p.get("status", ""),
         "utm_status": p.get("utm-status", ""),
+        "schedule": p.get("schedule", ""),
+        "nat": p.get("nat", ""),
+        "comments": p.get("comments", ""),
+        "av_profile": p.get("av-profile", ""),
+        "ips_sensor": p.get("ips-sensor", ""),
+        "application_list": p.get("application-list", ""),
+        "webfilter_profile": p.get("webfilter-profile", ""),
+        "profile_protocol_options": p.get("profile-protocol-options", ""),
     }
+
+
+def _set_values(line, prefix):
+    return [x.strip('"') for x in shlex.split(line.replace(prefix, "", 1).strip())]
+
+
+def _set_value(line, prefix):
+    values = _set_values(line, prefix)
+    return " ".join(values)
 
 
 def parse_fortinet(filepath):
@@ -119,51 +146,58 @@ def parse_fortinet(filepath):
                 "logtraffic": "",
                 "status": "enable",
                 "utm-status": "",
+                "schedule": "",
+                "nat": "",
+                "comments": "",
+                "av-profile": "",
+                "ips-sensor": "",
+                "application-list": "",
+                "webfilter-profile": "",
+                "profile-protocol-options": "",
             }
 
         elif current_policy is not None:
             if line.startswith("set name "):
-                current_policy["name"] = line.split("set name ")[1].strip('"')
+                current_policy["name"] = _set_value(line, "set name ")
             elif line.startswith("set srcintf "):
-                current_policy["srcintf"] = [
-                    x.strip('"')
-                    for x in line.replace("set srcintf ", "").strip().split()
-                ]
+                current_policy["srcintf"] = _set_values(line, "set srcintf ")
             elif line.startswith("set dstintf "):
-                current_policy["dstintf"] = [
-                    x.strip('"')
-                    for x in line.replace("set dstintf ", "").strip().split()
-                ]
+                current_policy["dstintf"] = _set_values(line, "set dstintf ")
             elif line.startswith("set srcaddr "):
-                current_policy["srcaddr"] = [
-                    x.strip('"')
-                    for x in line.replace("set srcaddr ", "").strip().split()
-                ]
+                current_policy["srcaddr"] = _set_values(line, "set srcaddr ")
             elif line.startswith("set dstaddr "):
-                current_policy["dstaddr"] = [
-                    x.strip('"')
-                    for x in line.replace("set dstaddr ", "").strip().split()
-                ]
+                current_policy["dstaddr"] = _set_values(line, "set dstaddr ")
             elif line.startswith("set service "):
-                current_policy["service"] = [
-                    x.strip('"')
-                    for x in line.replace("set service ", "").strip().split()
-                ]
+                current_policy["service"] = _set_values(line, "set service ")
             elif line.startswith("set action "):
-                current_policy["action"] = (
-                    line.split("set action ")[1].strip().strip('"')
-                )
+                current_policy["action"] = _set_value(line, "set action ")
             elif line.startswith("set logtraffic "):
-                current_policy["logtraffic"] = (
-                    line.split("set logtraffic ")[1].strip().strip('"')
-                )
+                current_policy["logtraffic"] = _set_value(line, "set logtraffic ")
             elif line.startswith("set status "):
-                current_policy["status"] = (
-                    line.split("set status ")[1].strip().strip('"')
-                )
+                current_policy["status"] = _set_value(line, "set status ")
             elif line.startswith("set utm-status "):
-                current_policy["utm-status"] = (
-                    line.split("set utm-status ")[1].strip().strip('"')
+                current_policy["utm-status"] = _set_value(line, "set utm-status ")
+            elif line.startswith("set schedule "):
+                current_policy["schedule"] = _set_value(line, "set schedule ")
+            elif line.startswith("set nat "):
+                current_policy["nat"] = _set_value(line, "set nat ")
+            elif line.startswith("set comments "):
+                current_policy["comments"] = _set_value(line, "set comments ")
+            elif line.startswith("set av-profile "):
+                current_policy["av-profile"] = _set_value(line, "set av-profile ")
+            elif line.startswith("set ips-sensor "):
+                current_policy["ips-sensor"] = _set_value(line, "set ips-sensor ")
+            elif line.startswith("set application-list "):
+                current_policy["application-list"] = _set_value(
+                    line, "set application-list "
+                )
+            elif line.startswith("set webfilter-profile "):
+                current_policy["webfilter-profile"] = _set_value(
+                    line, "set webfilter-profile "
+                )
+            elif line.startswith("set profile-protocol-options "):
+                current_policy["profile-protocol-options"] = _set_value(
+                    line, "set profile-protocol-options "
                 )
             elif line == "next":
                 policies.append(current_policy)
@@ -300,10 +334,14 @@ def check_redundant_rules_forti(policies):
     for p in policies:
         name = _policy_name(p)
         sig = (
+            tuple(sorted(p.get("srcintf", []))),
+            tuple(sorted(p.get("dstintf", []))),
             tuple(sorted(p.get("srcaddr", []))),
             tuple(sorted(p.get("dstaddr", []))),
             tuple(sorted(p.get("service", []))),
             p.get("action", ""),
+            p.get("schedule", ""),
+            p.get("nat", ""),
         )
         if sig in seen:
             findings.append(
