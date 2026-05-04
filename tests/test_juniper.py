@@ -6,10 +6,13 @@ Run with:  python3 tests/test_juniper.py
 import os
 import sys
 import tempfile
+import json
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
+from cashel.export import to_csv, to_json, to_sarif
 from cashel.juniper import (
+    _f,
     _parse_set_style,
     _parse_hierarchical,
     check_any_any_juniper,
@@ -19,6 +22,7 @@ from cashel.juniper import (
     check_system_juniper,
     audit_juniper,
 )
+from cashel.remediation import generate_plan
 from cashel.rule_quality import check_shadow_rules_juniper
 
 # ── Sample configs ────────────────────────────────────────────────────────────
@@ -194,11 +198,42 @@ def test_hier_parse_deny_action():
 # ══════════════════════════════════════════════ POLICY CHECKS ══
 
 
+def test_juniper_legacy_helper_shape_still_works():
+    finding = _f("LOW", "hygiene", "[LOW] Legacy Juniper finding", "Fix it.")
+
+    assert finding["severity"] == "LOW"
+    assert finding["category"] == "hygiene"
+    assert finding["message"] == "[LOW] Legacy Juniper finding"
+    assert finding["remediation"] == "Fix it."
+    assert finding["vendor"] == "juniper"
+
+
 def test_any_any_detects_violation():
     policies = _parse_set_style(SET_STYLE_RISKY)
     findings = check_any_any_juniper(policies)
     assert len(findings) >= 1
     assert all(f["severity"] == "CRITICAL" for f in findings)
+
+
+def test_any_any_finding_has_enriched_policy_metadata():
+    policies = _parse_set_style(SET_STYLE_RISKY)
+    finding = check_any_any_juniper(policies)[0]
+
+    assert finding["id"] == "CASHEL-JUNIPER-EXPOSURE-001"
+    assert finding["vendor"] == "juniper"
+    assert finding["title"]
+    assert "allow-all" in finding["evidence"]
+    assert finding["affected_object"] == "allow-all"
+    assert finding["rule_name"] == "allow-all"
+    assert finding["confidence"] == "high"
+    assert finding["metadata"]["policy_name"] == "allow-all"
+    assert finding["metadata"]["from_zone"] == "trust"
+    assert finding["metadata"]["to_zone"] == "untrust"
+    assert finding["metadata"]["source_address"] == ["any"]
+    assert finding["metadata"]["destination_address"] == ["any"]
+    assert finding["metadata"]["application"] == ["any"]
+    assert finding["metadata"]["action"] == "permit"
+    assert finding["suggested_commands"]
 
 
 def test_any_any_clean_config():
@@ -212,6 +247,17 @@ def test_missing_log_detects():
     # allow-all and allow-telnet both missing log
     assert len(findings) >= 1
     assert all(f["severity"] == "MEDIUM" for f in findings)
+
+
+def test_missing_log_finding_has_log_metadata():
+    policies = _parse_set_style(SET_STYLE_RISKY)
+    finding = check_missing_log_juniper(policies)[0]
+
+    assert finding["id"] == "CASHEL-JUNIPER-LOGGING-001"
+    assert finding["metadata"]["log"] is False
+    assert finding["metadata"]["session_init"] is False
+    assert finding["metadata"]["session_close"] is False
+    assert "session-init session-close" in "\n".join(finding["suggested_commands"])
 
 
 def test_missing_log_clean():
@@ -254,6 +300,20 @@ def test_system_detects_telnet():
     assert any("Telnet" in m for m in msgs)
     telnet_findings = [f for f in findings if "Telnet" in f["message"]]
     assert all(f["severity"] == "CRITICAL" for f in telnet_findings)
+
+
+def test_system_telnet_finding_has_raw_config_evidence():
+    finding = next(
+        f for f in check_system_juniper(SET_STYLE_RISKY) if "Telnet" in f["message"]
+    )
+
+    assert finding["id"] == "CASHEL-JUNIPER-MANAGEMENT-001"
+    assert finding["vendor"] == "juniper"
+    assert finding["evidence"] == "set system services telnet"
+    assert finding["affected_object"] == "system services telnet"
+    assert finding["metadata"]["subsystem"] == "system services"
+    assert finding["metadata"]["service_name"] == "telnet"
+    assert finding["suggested_commands"] == ["delete system services telnet"]
 
 
 def test_system_detects_snmp_community():
@@ -320,6 +380,80 @@ def test_audit_juniper_risky():
         assert "HIGH" in severities
     finally:
         os.unlink(path)
+
+
+def test_audit_juniper_findings_are_backward_compatible_dicts():
+    path = _write_tmp(SET_STYLE_RISKY)
+    try:
+        findings, policies = audit_juniper(path)
+    finally:
+        os.unlink(path)
+
+    assert policies
+    assert findings
+    for finding in findings:
+        assert isinstance(finding, dict)
+        assert finding["severity"]
+        assert finding["category"]
+        assert finding["message"]
+        assert "remediation" in finding
+        assert finding["id"].startswith("CASHEL-JUNIPER-")
+        assert finding["vendor"] == "juniper"
+        assert finding["title"]
+        assert finding["evidence"]
+        assert finding["confidence"]
+        assert isinstance(finding["metadata"], dict)
+
+
+def test_juniper_remediation_plan_consumes_commands_and_evidence():
+    finding = check_missing_log_juniper(_parse_set_style(SET_STYLE_RISKY))[0]
+    plan = generate_plan([finding], "juniper")
+    step = plan["phases"][0]["steps"][0]
+
+    assert step["id"] == "CASHEL-JUNIPER-LOGGING-001"
+    assert step["title"] == finding["title"]
+    assert step["evidence"] == finding["evidence"]
+    assert "session-init session-close" in step["suggested_commands"]
+
+
+def test_juniper_exports_preserve_enriched_fields():
+    finding = check_any_any_juniper(_parse_set_style(SET_STYLE_RISKY))[0]
+    entry = {
+        "filename": "srx.conf",
+        "vendor": "juniper",
+        "findings": [finding],
+        "summary": {"total": 1},
+    }
+
+    json_out = json.loads(to_json(entry))
+    assert json_out["findings"][0]["id"] == "CASHEL-JUNIPER-EXPOSURE-001"
+    assert json_out["findings"][0]["metadata"]["from_zone"] == "trust"
+
+    csv_out = to_csv(entry)
+    assert "CASHEL-JUNIPER-EXPOSURE-001" in csv_out
+    assert "allow-all" in csv_out
+
+    sarif_out = json.loads(to_sarif(entry))
+    result = sarif_out["runs"][0]["results"][0]
+    rule = sarif_out["runs"][0]["tool"]["driver"]["rules"][0]
+    assert result["ruleId"] == "CASHEL-JUNIPER-EXPOSURE-001"
+    assert result["properties"]["evidence"] == finding["evidence"]
+    assert rule["id"] == "CASHEL-JUNIPER-EXPOSURE-001"
+
+
+def test_juniper_old_and_plain_findings_remain_compatible():
+    old_dict = {
+        "severity": "HIGH",
+        "category": "management",
+        "message": "[HIGH] Telnet service enabled.",
+        "remediation": "Disable telnet.",
+    }
+    plan = generate_plan([old_dict, "[LOW] Plain archive finding"], "juniper")
+
+    assert plan["total_steps"] == 1
+    step = plan["phases"][0]["steps"][0]
+    assert step["description"] == old_dict["message"]
+    assert "delete system services telnet" in step["suggested_commands"]
 
 
 def test_audit_juniper_hierarchical():
