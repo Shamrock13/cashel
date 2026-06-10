@@ -233,6 +233,21 @@ def test_api_audit_endpoint_smoke(ci_client):
     assert payload["data"]["archive_id"]
 
 
+def test_api_vendors_returns_fidelity_records(ci_client):
+    resp = ci_client.get("/api/v1/vendors")
+
+    assert resp.status_code == 200
+    payload = resp.get_json()
+    assert payload["ok"] is True
+    records = payload["data"]
+    by_vendor = {r["vendor"]: r for r in records}
+    assert "cisco" not in by_vendor
+    assert by_vendor["asa"]["maturity"] == "mature"
+    assert by_vendor["gcp"]["maturity"] == "experimental"
+    for record in records:
+        assert record["enrichment"] in ("full", "partial")
+
+
 def test_api_compliance_runs_without_legacy_access_state(ci_client):
     resp = ci_client.post(
         "/api/v1/audit",

@@ -15,6 +15,7 @@ from pathlib import Path
 
 from .audit_engine import _build_summary
 from .export import TOOL_NAME, TOOL_VERSION
+from .fidelity import vendor_fidelity
 
 # Severity ranks: higher number = more severe. "info" never trips a gate.
 SEVERITY_ORDER = {"critical": 4, "high": 3, "medium": 2, "low": 1, "info": 0}
@@ -138,6 +139,7 @@ def build_gate_document(
         "vendor": vendor,
         "compliance": compliance,
         "provenance": config_provenance(file),
+        "fidelity": vendor_fidelity(vendor),
         **result,
         "findings": findings,
     }

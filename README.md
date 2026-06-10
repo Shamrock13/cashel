@@ -65,6 +65,8 @@ Cashel intentionally does not claim equal depth for every parser. Current maturi
 
 > Cisco note: Cashel exposes Cisco ASA and FTD under a single Cisco option in the UI. The platform can auto-detect ASA vs. FTD from config content and apply relevant checks.
 
+Fidelity is machine-readable: `GET /api/v1/vendors` returns each vendor's maturity and enrichment level, and CLI audit / gate output states the parser fidelity of the vendor being audited.
+
 Full list of current checks: [docs/checks.md](docs/checks.md)
 
 ---

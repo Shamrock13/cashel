@@ -166,6 +166,8 @@ def test_gate_cli_json_output_is_machine_readable():
     assert doc["vendor"] == "asa"
     assert doc["passed"] is False
     assert doc["provenance"]["config_sha256"]
+    assert doc["fidelity"]["vendor"] == "asa"
+    assert doc["fidelity"]["maturity"] == "mature"
     assert doc["policy"] == {"fail_on": "high", "min_score": None}
     assert isinstance(doc["findings"], list) and doc["findings"]
 

@@ -298,6 +298,52 @@ def api_remediation_plan(entry_id):
         return _api_err(f"Unknown format '{fmt}'. Use json or markdown.", 400)
 
 
+@api_bp.route("/vendors", methods=["GET"])
+def api_vendors():
+    """List supported vendors with parser fidelity (maturity and enrichment).
+    ---
+    tags:
+      - Vendors
+    security:
+      - ApiKeyHeader: []
+    responses:
+      200:
+        description: Per-vendor fidelity records.
+        schema:
+          type: object
+          properties:
+            ok:
+              type: boolean
+            data:
+              type: array
+              items:
+                type: object
+                properties:
+                  vendor:
+                    type: string
+                  display:
+                    type: string
+                  maturity:
+                    type: string
+                    enum: [mature, partial, experimental]
+                  enrichment:
+                    type: string
+                    enum: [full, partial]
+                  notes:
+                    type: string
+            error:
+              type: string
+    """
+    from cashel.fidelity import vendor_fidelity
+
+    return _api_ok(
+        sorted(
+            (vendor_fidelity(v) for v in ALL_VENDORS if v != "cisco"),
+            key=lambda r: r["vendor"],
+        )
+    )
+
+
 @api_bp.route("/history", methods=["GET"])
 def api_history():
     """List audit history (metadata only, no findings payload).

@@ -91,7 +91,13 @@ def audit(
 
     vendor = _resolve_vendor(vendor, file)
 
-    typer.echo(f"\nCashel v2.0.0 — Starting audit of {file} ({vendor})\n")
+    from .fidelity import vendor_fidelity
+
+    fid = vendor_fidelity(vendor)
+    typer.echo(f"\nCashel v2.0.0 — Starting audit of {file} ({vendor})")
+    typer.echo(
+        f"Parser fidelity: {fid['maturity']} (enrichment: {fid['enrichment']})\n"
+    )
 
     findings, parse, extra_data = run_vendor_audit(vendor, file)
 
@@ -199,8 +205,14 @@ def gate(
         )
         typer.echo(json.dumps(doc, indent=2, default=str))
     else:
+        from .fidelity import vendor_fidelity
+
+        fid = vendor_fidelity(vendor)
         c = result["counts"]
         typer.echo(f"\nCashel gate — {file} ({vendor})")
+        typer.echo(
+            f"Parser fidelity: {fid['maturity']} (enrichment: {fid['enrichment']})"
+        )
         typer.echo(
             f"Score: {result['score']}  "
             f"critical:{c['critical']} high:{c['high']} "
