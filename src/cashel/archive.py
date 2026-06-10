@@ -97,6 +97,26 @@ def save_audit(filename, vendor, findings, summary, config_path=None, tag=None):
     return entry_id, entry
 
 
+def latest_entry_for_tag(tag, vendor):
+    """Most recent archived audit for a tag+vendor pair, or None.
+
+    Used as the drift-detection baseline for scheduled audits.
+    """
+    if not tag:
+        return None
+    conn = get_conn()
+    row = conn.execute(
+        """
+        SELECT * FROM audits WHERE tag=? AND vendor=?
+        ORDER BY timestamp DESC, version DESC LIMIT 1
+        """,
+        (tag, vendor),
+    ).fetchone()
+    if row is None:
+        return None
+    return _row_to_dict(row)
+
+
 def list_archive():
     """Return all archived entries sorted newest-first."""
     conn = get_conn()

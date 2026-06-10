@@ -313,7 +313,10 @@ def test_scheduled_compliance_runs_without_legacy_access_state(tmp_path, monkeyp
     monkeypatch.setattr(
         archive_mod,
         "save_audit",
-        lambda *args, **_kwargs: (saved_findings.extend(args[2]), "archive-1")[1],
+        lambda *args, **_kwargs: (saved_findings.extend(args[2]), ("archive-1", {}))[1],
+    )
+    monkeypatch.setattr(
+        archive_mod, "latest_entry_for_tag", lambda *_args, **_kwargs: None
     )
     monkeypatch.setattr(activity_mod, "log_activity", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(settings_mod, "get_settings", lambda: {})

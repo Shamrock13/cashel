@@ -147,6 +147,19 @@ class TestWebhookDelivery(unittest.TestCase):
         mock_post.assert_called_once()
 
     @patch("cashel.webhooks._post")
+    def test_dispatch_audit_regression(self, mock_post):
+        mock_post.return_value = (True, "HTTP 200")
+        self._add(["audit.regression"])
+        self.wh.dispatch_event(
+            "audit.regression",
+            {"audit_id": "abc", "tag": "edge", "new_count": 2},
+        )
+        mock_post.assert_called_once()
+        payload = json.loads(mock_post.call_args[0][1])
+        self.assertEqual(payload["event"], "audit.regression")
+        self.assertEqual(payload["data"]["new_count"], 2)
+
+    @patch("cashel.webhooks._post")
     def test_dispatch_skips_wrong_event(self, mock_post):
         mock_post.return_value = (True, "HTTP 200")
         self._add(["alert.threshold_breach"])

@@ -119,14 +119,34 @@ def _run_scheduled_audit(schedule_id: str):
 
         findings = _sort_findings(findings)
         summary = _build_summary(findings)
+        findings_strings = _findings_to_strings(findings)
 
-        save_audit(
+        # Drift baseline: the previous archived audit for this tag+vendor,
+        # captured before this run is saved. Drift detection must never
+        # break the audit itself.
+        previous = None
+        try:
+            from .archive import latest_entry_for_tag
+
+            previous = latest_entry_for_tag(tag, vendor)
+        except Exception as _de:  # noqa: BLE001
+            logger.warning("drift baseline lookup failed for tag %s: %s", tag, _de)
+
+        audit_id, _ = save_audit(
             label,
             vendor,
-            _findings_to_strings(findings),
+            findings_strings,
             summary,
             config_path=temp_path,
             tag=tag,
+        )
+        _dispatch_regression_event(
+            previous,
+            findings_strings,
+            audit_id=audit_id,
+            tag=tag,
+            vendor=vendor,
+            host=host,
         )
         log_activity(
             ACTION_SSH_CONNECT,
@@ -214,6 +234,47 @@ def _run_scheduled_audit(schedule_id: str):
     finally:
         if temp_path and os.path.exists(temp_path):
             os.remove(temp_path)
+
+
+def _dispatch_regression_event(
+    previous, findings_strings, *, audit_id, tag, vendor, host
+):
+    """Fire audit.regression when a scheduled audit finds NEW HIGH+ findings
+    versus the previous archived audit for the same tag+vendor.
+
+    Quiet by design: no previous baseline, no new findings, or only
+    medium/low drift => no event. Never raises.
+    """
+    from .gate import finding_severity, split_against_baseline
+
+    try:
+        if not previous:
+            return
+        new, resolved = split_against_baseline(
+            findings_strings, previous.get("findings", [])
+        )
+        severe_new = [f for f in new if finding_severity(f) in ("critical", "high")]
+        if not severe_new:
+            return
+
+        from . import webhooks
+
+        webhooks.dispatch_event(
+            "audit.regression",
+            {
+                "audit_id": audit_id,
+                "baseline_audit_id": previous.get("id"),
+                "tag": tag,
+                "vendor": vendor,
+                "host": host,
+                "new_count": len(new),
+                "resolved_count": len(resolved),
+                "new_findings": new[:50],
+                "truncated": len(new) > 50,
+            },
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("audit.regression dispatch failed for tag %s: %s", tag, exc)
 
 
 # ── Trigger factory ────────────────────────────────────────────────────────────

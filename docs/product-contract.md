@@ -50,6 +50,7 @@ Finding guidance: [Finding model](finding-model.md). Vendor coverage: [Vendor en
 | SAML SSO | Planned | Future roadmap after OIDC. |
 | Policy-as-code / CI gates | Implemented (v1) | `cashel gate` fails CI on a severity threshold or score floor with exit codes and a provenance-stamped JSON document. Richer intent rules depend on normalized findings/rules. |
 | Audit provenance | Implemented | Every archived audit and gate verdict records config SHA256, size, and engine version; surfaced in JSON and SARIF exports. |
+| Drift detection | Implemented (v1) | Scheduled audits compare against the previous archived audit for the same tag/vendor and fire an `audit.regression` webhook only when NEW HIGH+ findings appear. CLI equivalent: `cashel gate --baseline`. |
 | MSP-grade reporting | Planned | Needs better tenant/client presentation, retention controls, and evidence review workflows. |
 
 ## Vendor Maturity

@@ -154,6 +154,19 @@ class TestArchive(unittest.TestCase):
         self.assertEqual(e3["version"], 3)
 
     @_tmp_db
+    def test_latest_entry_for_tag(self):
+        summary = {"high": 0, "medium": 0, "total": 0}
+        archive.save_audit("a.cfg", "asa", ["f1"], summary, tag="edge")
+        _, e2 = archive.save_audit("a.cfg", "asa", ["f2"], summary, tag="edge")
+        archive.save_audit("b.cfg", "fortinet", ["f3"], summary, tag="edge")
+
+        latest = archive.latest_entry_for_tag("edge", "asa")
+        self.assertEqual(latest["id"], e2["id"])
+        self.assertEqual(latest["findings"], ["f2"])
+        self.assertIsNone(archive.latest_entry_for_tag("edge", "juniper"))
+        self.assertIsNone(archive.latest_entry_for_tag("", "asa"))
+
+    @_tmp_db
     def test_compare_entries_same_vendor(self):
         summary_a = {"high": 2, "medium": 1, "total": 3}
         summary_b = {"high": 1, "medium": 0, "total": 1}
