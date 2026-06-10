@@ -51,7 +51,8 @@ def _resolve_vendor(vendor: str | None, file: str) -> str:
             err=True,
         )
         raise typer.Exit(1)
-    typer.echo(f"Auto-detected vendor: {detected}")
+    # Diagnostic, not payload — must not pollute --json stdout.
+    typer.echo(f"Auto-detected vendor: {detected}", err=True)
     return detected
 
 

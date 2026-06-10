@@ -232,7 +232,14 @@ def test_gate_cli_json_output_is_machine_readable():
 
 def test_gate_cli_auto_detects_vendor():
     result = _run_cli(["gate", "--file", str(EXAMPLES / "cisco_asa.txt")])
-    assert "Auto-detected vendor: asa" in result.stdout, result.stdout + result.stderr
+    # Diagnostic goes to stderr so it can't corrupt --json stdout.
+    assert "Auto-detected vendor: asa" in result.stderr, result.stdout + result.stderr
+
+
+def test_gate_cli_json_stdout_is_pure_json_with_autodetect():
+    result = _run_cli(["gate", "--file", str(EXAMPLES / "cisco_asa.txt"), "--json"])
+    doc = json.loads(result.stdout)  # raises if stdout is polluted
+    assert doc["vendor"] == "asa"
 
 
 def test_gate_cli_passes_with_lenient_policy(tmp_path):
