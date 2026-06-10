@@ -165,6 +165,12 @@ def gate(
     min_score: int = typer.Option(
         None, "--min-score", help="Fail if the audit score (0-100) is below this value"
     ),
+    baseline: str = typer.Option(
+        None,
+        "--baseline",
+        "-b",
+        help="Approved baseline config; the severity gate then applies only to NEW findings",
+    ),
     json_output: bool = typer.Option(
         False, "--json", help="Emit machine-readable gate result to stdout"
     ),
@@ -178,6 +184,9 @@ def gate(
     if not Path(file).is_file():
         typer.echo(f"File not found: {file}", err=True)
         raise typer.Exit(2)
+    if baseline and not Path(baseline).is_file():
+        typer.echo(f"Baseline file not found: {baseline}", err=True)
+        raise typer.Exit(2)
     if compliance and compliance not in _VALID_FRAMEWORKS:
         typer.echo(
             f"Unknown framework: {compliance}. Use: {', '.join(_VALID_FRAMEWORKS)}",
@@ -187,21 +196,36 @@ def gate(
 
     vendor = _resolve_vendor(vendor, file)
 
-    findings, parse, extra_data = run_vendor_audit(vendor, file)
-    if compliance:
-        findings = list(findings) + list(
-            run_compliance_checks(vendor, compliance, parse, extra_data, file)
-        )
+    def _audit(path: str) -> list:
+        findings, parse, extra_data = run_vendor_audit(vendor, path)
+        if compliance:
+            findings = list(findings) + list(
+                run_compliance_checks(vendor, compliance, parse, extra_data, path)
+            )
+        return list(findings)
+
+    findings = _audit(file)
+    baseline_findings = _audit(baseline) if baseline else None
 
     try:
-        result = evaluate_gate(findings, fail_on=fail_on, min_score=min_score)
+        result = evaluate_gate(
+            findings,
+            fail_on=fail_on,
+            min_score=min_score,
+            baseline_findings=baseline_findings,
+        )
     except ValueError as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(2)
 
     if json_output:
         doc = build_gate_document(
-            result, findings, file=file, vendor=vendor, compliance=compliance
+            result,
+            findings,
+            file=file,
+            vendor=vendor,
+            compliance=compliance,
+            baseline_file=baseline,
         )
         typer.echo(json.dumps(doc, indent=2, default=str))
     else:
@@ -218,6 +242,12 @@ def gate(
             f"critical:{c['critical']} high:{c['high']} "
             f"medium:{c['medium']} low:{c['low']} info:{c['info']}"
         )
+        if "baseline" in result:
+            b = result["baseline"]
+            typer.echo(
+                f"Baseline: {baseline} — "
+                f"{b['new_count']} new, {b['resolved_count']} resolved"
+            )
         for v in result["violations"]:
             typer.echo(f"VIOLATION [{v['rule']}] {v['message']}")
         typer.echo("GATE: PASS" if result["passed"] else "GATE: FAIL")

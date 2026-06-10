@@ -92,6 +92,11 @@ cashel gate --file fw.cfg --compliance pci --fail-on medium --min-score 70
 
 # Machine-readable result (for CI artifacts / downstream tooling)
 cashel gate --file fw.cfg --json > gate-result.json
+
+# Regression gating: fail only on findings NEW versus an approved baseline.
+# This is the brownfield adoption path — existing finding debt doesn't block
+# the pipeline, but any new HIGH+ finding does.
+cashel gate --file fw.cfg --baseline approved/fw.cfg
 ```
 
 | Option | Default | Meaning |
@@ -101,6 +106,7 @@ cashel gate --file fw.cfg --json > gate-result.json
 | `--compliance, -c` | none | Also run a compliance framework |
 | `--fail-on` | `high` | Fail if any finding is at or above this severity (`critical`, `high`, `medium`, `low`) |
 | `--min-score` | none | Fail if the 0–100 audit score is below this value |
+| `--baseline, -b` | none | Approved baseline config; the severity gate then applies only to NEW findings (`min-score` still checks the full audit). New/resolved findings are reported in both output modes. |
 | `--json` | off | Emit the full gate document to stdout |
 
 **Exit codes:** `0` gate passed · `1` gate violation · `2` usage or input error.

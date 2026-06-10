@@ -106,6 +106,64 @@ def test_gate_is_deterministic():
     assert evaluate_gate(findings) == evaluate_gate(findings)
 
 
+# ── baseline regression gating ───────────────────────────────────────────────
+
+
+def test_baseline_suppresses_preexisting_findings():
+    baseline = ["[HIGH] telnet enabled", "[CRITICAL] any-any rule"]
+    current = list(baseline)  # nothing new
+    result = evaluate_gate(current, fail_on="high", baseline_findings=baseline)
+    assert result["passed"] is True
+    assert result["baseline"]["new_count"] == 0
+    assert result["baseline"]["resolved_count"] == 0
+
+
+def test_baseline_fails_only_on_new_findings():
+    baseline = ["[HIGH] telnet enabled"]
+    current = ["[HIGH] telnet enabled", "[HIGH] rdp from any"]
+    result = evaluate_gate(current, fail_on="high", baseline_findings=baseline)
+    assert result["passed"] is False
+    [violation] = result["violations"]
+    assert violation["rule"] == "fail_on_new"
+    assert "1 NEW finding(s)" in violation["message"]
+    assert result["baseline"]["new_findings"] == ["[HIGH] rdp from any"]
+
+
+def test_baseline_reports_resolved_findings():
+    baseline = ["[HIGH] telnet enabled", "[MEDIUM] no logging"]
+    current = ["[MEDIUM] no logging"]
+    result = evaluate_gate(current, fail_on="high", baseline_findings=baseline)
+    assert result["passed"] is True
+    assert result["baseline"]["resolved_findings"] == ["[HIGH] telnet enabled"]
+
+
+def test_baseline_new_low_severity_does_not_trip_high_gate():
+    result = evaluate_gate(
+        ["[MEDIUM] new minor thing"], fail_on="high", baseline_findings=[]
+    )
+    assert result["passed"] is True
+
+
+def test_baseline_min_score_still_applies_to_full_audit():
+    findings = ["[HIGH] a"] * 5  # score 50, but all pre-existing
+    result = evaluate_gate(
+        findings, fail_on="high", min_score=60, baseline_findings=findings
+    )
+    assert result["passed"] is False
+    [violation] = result["violations"]
+    assert violation["rule"] == "min_score"
+
+
+def test_finding_key_prefers_stable_ids():
+    from cashel.gate import finding_key
+
+    a = {"id": "CASHEL-ASA-001", "rule_name": "OUTSIDE_IN", "message": "m1"}
+    b = {"id": "CASHEL-ASA-001", "rule_name": "OUTSIDE_IN", "message": "m1 reworded"}
+    c = {"id": "CASHEL-ASA-001", "rule_name": "DMZ_IN", "message": "m1"}
+    assert finding_key(a) == finding_key(b)  # rewording doesn't break identity
+    assert finding_key(a) != finding_key(c)  # different subject is a new finding
+
+
 # ── provenance ───────────────────────────────────────────────────────────────
 
 
@@ -198,6 +256,50 @@ def test_gate_cli_passes_with_lenient_policy(tmp_path):
     else:
         # Example config contains CRITICAL findings; verify exit semantics hold.
         assert result.returncode == 1, output
+
+
+def test_gate_cli_baseline_passes_when_unchanged():
+    cfg = str(EXAMPLES / "cisco_asa.txt")
+    result = _run_cli(["gate", "--file", cfg, "--vendor", "asa", "--baseline", cfg])
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "GATE: PASS" in result.stdout
+    assert "0 new, 0 resolved" in result.stdout
+
+
+def test_gate_cli_baseline_fails_on_regression(tmp_path):
+    baseline = EXAMPLES / "cisco_asa.txt"
+    regressed = tmp_path / "regressed.cfg"
+    regressed.write_text(
+        baseline.read_text() + "\naccess-list NEW_IN permit tcp any any eq 23\n"
+    )
+    result = _run_cli(
+        [
+            "gate",
+            "--file",
+            str(regressed),
+            "--vendor",
+            "asa",
+            "--baseline",
+            str(baseline),
+        ]
+    )
+    output = result.stdout + result.stderr
+    assert result.returncode == 1, output
+    assert "VIOLATION [fail_on_new]" in result.stdout
+
+
+def test_gate_cli_missing_baseline_exits_2(tmp_path):
+    result = _run_cli(
+        [
+            "gate",
+            "--file",
+            str(EXAMPLES / "cisco_asa.txt"),
+            "--baseline",
+            str(tmp_path / "nope.cfg"),
+        ]
+    )
+    assert result.returncode == 2
+    assert "Baseline file not found" in result.stderr
 
 
 def test_gate_cli_missing_file_exits_2(tmp_path):
