@@ -454,7 +454,7 @@ class TestModalMarkup(unittest.TestCase):
 
         self.assertIn("data.report_warning", body)
         self.assertIn(
-            "const warnings = [(DEMO_MODE ? null : data.license_warning), data.report_warning].filter(Boolean);",
+            "const warnings = [data.report_warning].filter(Boolean);",
             body,
         )
 
@@ -493,7 +493,8 @@ class TestModalMarkup(unittest.TestCase):
     def test_demo_mode_hides_settings_and_license_affordances(self):
         body = self._index_template()
 
-        self.assertIn('{% if not demo_mode %}\n      <span class="license-chip', body)
+        self.assertNotIn("licenseChip", body)
+        self.assertNotIn("Compliance Access", body)
         self.assertIn(
             "{% if not demo_mode and (not current_user or current_user.role == 'admin') %}",
             body,
@@ -735,7 +736,7 @@ class TestModalMarkup(unittest.TestCase):
         ):
             self.assertIn(selector, css)
 
-    def test_legacy_compliance_access_actions_are_polished(self):
+    def test_legacy_compliance_access_ui_is_removed(self):
         body = self._index_template()
         style_path = os.path.join(
             os.path.dirname(__file__), "..", "src", "cashel", "static", "style.css"
@@ -743,24 +744,16 @@ class TestModalMarkup(unittest.TestCase):
         with open(style_path, encoding="utf-8") as fh:
             css = fh.read()
 
-        self.assertIn(
-            'href="https://github.com/Shamrock13/cashel/blob/main/docs/product-contract.md"',
-            body,
-        )
-        self.assertIn('class="btn-outline action-pill-control license-buy-link"', body)
-        self.assertIn("support@cashel.app", body)
-        self.assertNotIn("support@cashel.dev", body)
-        self.assertIn("Deprecated compatibility gate", body)
+        self.assertNotIn("licenseChip", body)
+        self.assertNotIn("licenseKeyInput", body)
+        self.assertNotIn("activateLicenseBtn", body)
+        self.assertNotIn("deactivateLicenseBtn", body)
+        self.assertNotIn("Legacy compliance access", body)
+        self.assertNotIn("Deprecated compatibility gate", body)
         self.assertNotIn("Buy a license", body)
-        self.assertIn(
-            'class="btn-primary action-pill-control btn-activate-license" id="activateLicenseBtn">Activate</button>',
-            body,
-        )
-        self.assertIn(".license-activation-field .ctrl", css)
-        self.assertIn(".btn-activate-license", css)
-        self.assertIn(".license-buy-link", css)
-        self.assertIn(".settings-footer .btn-primary", css)
-        self.assertIn(".action-pill-control", css)
+        self.assertNotIn(".license-chip", css)
+        self.assertNotIn(".btn-activate-license", css)
+        self.assertNotIn(".license-buy-link", css)
 
     def test_smtp_actions_are_inline_and_pill_sized(self):
         body = self._index_template()
@@ -807,7 +800,7 @@ class TestModalMarkup(unittest.TestCase):
             "report_template.html",
         )
 
-        self.assertIn("Cashel v2.0.0", body)
+        self.assertIn("Cashel v2.1.0", body)
         self.assertFalse(os.path.exists(legacy_report_template_path))
         self.assertNotIn("1.5.1", body)
 

@@ -28,7 +28,6 @@ AUTH_PASSWORD_CHANGED = "password_changed"
 AUTH_API_KEY_GENERATED = "api_key_generated"
 AUTH_API_KEY_REVOKED = "api_key_revoked"
 AUTH_SETTINGS_CHANGED = "settings_changed"
-AUTH_LICENSE_CHANGED = "license_changed"
 
 
 def log_auth_event(

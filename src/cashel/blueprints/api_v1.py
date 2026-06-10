@@ -28,7 +28,6 @@ from cashel.audit_engine import (
     run_compliance_checks,
 )
 from cashel.diff import diff_configs
-from cashel.license import check_license
 from cashel.remediation import generate_plan, plan_to_markdown
 
 api_bp = Blueprint("api_v1", __name__, url_prefix="/api/v1")
@@ -174,13 +173,9 @@ def api_audit():
 
         findings, parse, extra_data = run_vendor_audit(vendor, temp_path)
 
-        # TODO: Remove or refactor this legacy compliance access gate.
-        # Compliance should become data-driven evidence mapping, not a compatibility gate.
         if compliance and vendor not in ("aws", "azure", "gcp", "iptables", "nftables"):
-            licensed, _ = check_license()
-            if licensed:
-                raw = run_compliance_checks(vendor, compliance, parse, extra_data)
-                findings += [_wrap_compliance(c) for c in raw]
+            raw = run_compliance_checks(vendor, compliance, parse, extra_data)
+            findings += [_wrap_compliance(c) for c in raw]
 
         findings = _sort_findings(findings)
         summary = _build_summary(findings)
@@ -301,6 +296,52 @@ def api_remediation_plan(entry_id):
         return _api_ok({"markdown": plan_to_markdown(plan)})
     else:
         return _api_err(f"Unknown format '{fmt}'. Use json or markdown.", 400)
+
+
+@api_bp.route("/vendors", methods=["GET"])
+def api_vendors():
+    """List supported vendors with parser fidelity (maturity and enrichment).
+    ---
+    tags:
+      - Vendors
+    security:
+      - ApiKeyHeader: []
+    responses:
+      200:
+        description: Per-vendor fidelity records.
+        schema:
+          type: object
+          properties:
+            ok:
+              type: boolean
+            data:
+              type: array
+              items:
+                type: object
+                properties:
+                  vendor:
+                    type: string
+                  display:
+                    type: string
+                  maturity:
+                    type: string
+                    enum: [mature, partial, experimental]
+                  enrichment:
+                    type: string
+                    enum: [full, partial]
+                  notes:
+                    type: string
+            error:
+              type: string
+    """
+    from cashel.fidelity import vendor_fidelity
+
+    return _api_ok(
+        sorted(
+            (vendor_fidelity(v) for v in ALL_VENDORS if v != "cisco"),
+            key=lambda r: r["vendor"],
+        )
+    )
 
 
 @api_bp.route("/history", methods=["GET"])

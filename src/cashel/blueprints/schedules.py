@@ -3,7 +3,7 @@
 from flask import Blueprint, jsonify, request
 
 from cashel._helpers import _require_role
-from cashel.license import DEMO_MODE
+from cashel.runtime import DEMO_MODE
 from cashel.schedule_store import (
     list_schedules,
     get_schedule,

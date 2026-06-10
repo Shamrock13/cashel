@@ -7,17 +7,16 @@ Finding guidance: [Finding model](finding-model.md). Vendor coverage: [Vendor en
 ## Current Priority Order
 
 1. Product truth / docs cleanup
-2. License decision/removal
-3. SSO/OIDC model
-4. Security hardening docs
-5. Performance/scaling guardrails
-6. NormalizedRule / NormalizedFinding model completion
-7. Stable finding IDs everywhere
-8. Evidence-backed vendor migration
-9. Scope-aware analysis
-10. Fortinet/Palo Alto/ASA depth
-11. Policy-as-code / CI gates
-12. MSP-grade reporting
+2. SSO/OIDC model
+3. Security hardening docs
+4. Performance/scaling guardrails
+5. NormalizedRule / NormalizedFinding model completion
+6. Stable finding IDs everywhere
+7. Evidence-backed vendor migration
+8. Scope-aware analysis
+9. Fortinet/Palo Alto/ASA depth
+10. Policy-as-code / CI gates
+11. MSP-grade reporting
 
 ## Feature Matrix
 
@@ -45,11 +44,13 @@ Finding guidance: [Finding model](finding-model.md). Vendor coverage: [Vendor en
 | Juniper/pfSense depth | Partial | Useful audit coverage exists; not the current top depth priority. |
 | Cloud firewall depth | Experimental | AWS/Azure/GCP are useful static checks but not the current depth priority. |
 | Scope-aware shadowing | Partial | Existing shadow checks catch useful cases but are not fully context-aware. |
-| Compliance checks | Partial | Currently partially implemented; some workflows may still check legacy license state before running compliance mappings. |
-| Legacy compliance access gate | Deprecated | Deprecated compatibility gate under review; do not build new product direction around it. |
+| Compliance checks | Partial | Currently partially implemented; run without license or legacy access state for supported framework/vendor combinations. |
+| Legacy compliance access gate | Removed | Compliance is treated as evidence mapping quality, not an unlock. |
 | OIDC SSO | Planned | First-class target. Local auth remains bootstrap/fallback. |
 | SAML SSO | Planned | Future roadmap after OIDC. |
-| Policy-as-code / CI gates | Planned | Depends on stable IDs and normalized findings/rules. |
+| Policy-as-code / CI gates | Implemented (v1) | `cashel gate` fails CI on a severity threshold or score floor with exit codes and a provenance-stamped JSON document. Richer intent rules depend on normalized findings/rules. |
+| Audit provenance | Implemented | Every archived audit and gate verdict records config SHA256, size, and engine version; surfaced in JSON and SARIF exports. |
+| Drift detection | Implemented (v1) | Scheduled audits compare against the previous archived audit for the same tag/vendor and fire an `audit.regression` webhook only when NEW HIGH+ findings appear. CLI equivalent: `cashel gate --baseline`. |
 | MSP-grade reporting | Planned | Needs better tenant/client presentation, retention controls, and evidence review workflows. |
 
 ## Vendor Maturity
@@ -68,7 +69,7 @@ Finding guidance: [Finding model](finding-model.md). Vendor coverage: [Vendor en
 
 ## Compliance Direction
 
-Current compliance behavior is not the long-term contract. Compliance checks are partially implemented, and some workflows may still check legacy license state before running compliance mappings.
+Current compliance behavior is not the long-term contract. Compliance checks are partially implemented, but they are not gated by legacy license state.
 
 Long-term compliance should be data-driven:
 

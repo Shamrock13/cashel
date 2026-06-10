@@ -57,7 +57,7 @@ def _assert_successful_audit(
     output = result.stdout + result.stderr
 
     assert result.returncode == 0, output
-    assert "Cashel v2.0.0" in output
+    assert "Cashel v2.1.0" in output
     assert "--- Audit Summary ---" in output
     assert "Total Issues:" in output
     for needle in needles:
@@ -70,6 +70,15 @@ def test_installed_cashel_help_smoke():
 
     assert result.returncode == 0, output
     assert "Usage:" in output
+    assert "audit" in output
+    assert "gate" in output
+
+
+def test_installed_cashel_audit_help_smoke():
+    result = _run(["audit", "--help"], installed=True)
+    output = result.stdout + result.stderr
+
+    assert result.returncode == 0, output
     assert "--file" in output
     assert "--vendor" in output
 
@@ -78,6 +87,30 @@ def test_cli_audits_example_cisco_asa_config():
     result = _run(["--file", str(EXAMPLES / "cisco_asa.txt"), "--vendor", "asa"])
 
     _assert_successful_audit(result, "Overly permissive rule found")
+
+
+def test_cli_compliance_runs_without_legacy_access_state():
+    result = _run(
+        [
+            "--file",
+            str(EXAMPLES / "cisco_asa.txt"),
+            "--vendor",
+            "asa",
+            "--compliance",
+            "pci",
+        ]
+    )
+
+    _assert_successful_audit(result, "--- PCI Compliance Checks ---", "PCI")
+
+
+def test_cli_help_excludes_legacy_access_flags():
+    result = _run(["--help"])
+    output = result.stdout + result.stderr
+
+    assert result.returncode == 0, output
+    assert "--activate" not in output
+    assert "--deactivate" not in output
 
 
 def test_cli_audits_example_fortinet_config():

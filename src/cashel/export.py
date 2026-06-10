@@ -9,7 +9,7 @@ import io
 import json
 
 TOOL_NAME = "Cashel"
-TOOL_VERSION = "2.0.0"
+TOOL_VERSION = "2.1.0"
 TOOL_INFO_URI = "https://github.com/Shamrock13/cashel"
 
 
@@ -57,6 +57,8 @@ def to_json(entry: dict) -> str:
         "summary": entry.get("summary", {}),
         "findings": entry.get("findings", []),
     }
+    if entry.get("provenance"):
+        payload["provenance"] = entry["provenance"]
     return json.dumps(payload, indent=2)
 
 
@@ -160,7 +162,7 @@ def to_sarif(entry: dict) -> str:
             result["fixes"] = [{"description": {"text": remediation}}]
         results.append(result)
 
-    sarif = {
+    sarif: dict = {
         "version": "2.1.0",
         "$schema": (
             "https://raw.githubusercontent.com/oasis-tcs/sarif-spec"
@@ -180,4 +182,6 @@ def to_sarif(entry: dict) -> str:
             }
         ],
     }
+    if entry.get("provenance"):
+        sarif["runs"][0]["properties"] = {"provenance": entry["provenance"]}
     return json.dumps(sarif, indent=2)

@@ -42,7 +42,7 @@ from cashel.activity_log import (
     ACTION_SSH_CONNECT,
     ACTION_CONFIG_DIFF,
 )
-from cashel.license import check_license, DEMO_MODE
+from cashel.runtime import DEMO_MODE
 from cashel.reporter import generate_report, write_report_sidecar
 from cashel.settings import get_settings
 
@@ -551,20 +551,9 @@ def run_audit():
     try:
         findings, parse, extra_data = run_vendor_audit(vendor, temp_path)
 
-        # TODO: Remove or refactor this legacy compliance access gate.
-        # Compliance should become data-driven evidence mapping, not a compatibility gate.
-        license_warning = None
         if compliance and vendor not in ("aws", "azure", "gcp", "iptables", "nftables"):
-            licensed, _ = check_license()
-            if not licensed:
-                license_warning = (
-                    "Compliance checks are currently behind a deprecated legacy "
-                    "access gate and may be skipped until that gate is removed "
-                    "or refactored."
-                )
-            else:
-                raw = run_compliance_checks(vendor, compliance, parse, extra_data)
-                findings += [_wrap_compliance(c) for c in raw]
+            raw = run_compliance_checks(vendor, compliance, parse, extra_data)
+            findings += [_wrap_compliance(c) for c in raw]
 
         findings = _sort_findings(findings)
         summary = _build_summary(findings)
@@ -629,7 +618,6 @@ def run_audit():
                 "summary": summary,
                 "report": report_filename,
                 "report_warning": report_warning,
-                "license_warning": license_warning,
                 "detected_vendor": vendor,
                 "detected_hostname": detected_hostname,
                 "archive_id": archive_id,
@@ -819,12 +807,9 @@ def live_connect():
     try:
         findings, parse, extra_data = run_vendor_audit(vendor, temp_path)
 
-        # TODO: Remove or refactor this legacy compliance access gate.
         if compliance and vendor not in ("aws", "azure", "gcp", "iptables", "nftables"):
-            licensed, _ = check_license()
-            if licensed:
-                raw = run_compliance_checks(vendor, compliance, parse, extra_data)
-                findings += [_wrap_compliance(c) for c in raw]
+            raw = run_compliance_checks(vendor, compliance, parse, extra_data)
+            findings += [_wrap_compliance(c) for c in raw]
 
         findings = _sort_findings(findings)
         summary = _build_summary(findings)
@@ -959,7 +944,6 @@ def bulk_audit():
 
             findings, parse, extra_data = run_vendor_audit(vendor, temp_path)
 
-            # TODO: Remove or refactor this legacy compliance access gate.
             if compliance and vendor not in (
                 "aws",
                 "azure",
@@ -967,10 +951,8 @@ def bulk_audit():
                 "iptables",
                 "nftables",
             ):
-                licensed, _ = check_license()
-                if licensed:
-                    raw = run_compliance_checks(vendor, compliance, parse, extra_data)
-                    findings += [_wrap_compliance(c) for c in raw]
+                raw = run_compliance_checks(vendor, compliance, parse, extra_data)
+                findings += [_wrap_compliance(c) for c in raw]
 
             findings = _sort_findings(findings)
             summary = _build_summary(findings)

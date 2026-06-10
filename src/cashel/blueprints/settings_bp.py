@@ -1,4 +1,4 @@
-"""Settings blueprint — /settings/*, /license/*."""
+"""Settings blueprint — /settings/*."""
 
 import smtplib
 import ssl
@@ -8,55 +8,14 @@ from flask import Blueprint, g, jsonify, request
 
 from cashel._helpers import _require_role
 from cashel.auth_audit import (
-    AUTH_LICENSE_CHANGED,
     AUTH_SETTINGS_CHANGED,
     log_auth_event,
 )
-from cashel.license import (
-    check_license,
-    activate_license,
-    deactivate_license,
-    DEMO_MODE,
-)
+from cashel.runtime import DEMO_MODE
 from cashel.settings import get_settings, save_settings
 from cashel.syslog_handler import configure_syslog
 
 settings_bp = Blueprint("settings_bp", __name__)
-
-
-@settings_bp.route("/license/activate", methods=["POST"])
-@_require_role("admin")
-def license_activate():
-    key = request.form.get("key", "").strip()
-    success, message = activate_license(key)
-    actor = (getattr(g, "current_user", None) or {}).get("username", "")
-    log_auth_event(
-        AUTH_LICENSE_CHANGED,
-        actor=actor,
-        success=success,
-        details={"action": "activated", "message": message},
-    )
-    return jsonify({"success": success, "message": message})
-
-
-@settings_bp.route("/license/deactivate", methods=["POST"])
-@_require_role("admin")
-def license_deactivate():
-    success, message = deactivate_license()
-    actor = (getattr(g, "current_user", None) or {}).get("username", "")
-    log_auth_event(
-        AUTH_LICENSE_CHANGED,
-        actor=actor,
-        success=success,
-        details={"action": "deactivated", "message": message},
-    )
-    return jsonify({"success": success, "message": message})
-
-
-@settings_bp.route("/license/status")
-def license_status():
-    licensed, info = check_license()
-    return jsonify({"licensed": licensed, "info": info})
 
 
 @settings_bp.route("/settings", methods=["GET"])

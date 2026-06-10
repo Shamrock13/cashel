@@ -1,5 +1,9 @@
 # Vendor Enrichment Coverage
 
+The machine-readable form of this inventory lives in `src/cashel/fidelity.py`
+and is exposed at `GET /api/v1/vendors`, in CLI audit output, and in
+`cashel gate --json` documents. Keep both in sync when coverage changes.
+
 This inventory tracks how current vendor audit findings align with Cashel's finding model. The goal is for supported vendors to produce evidence-backed findings with stable IDs, parser context, and remediation fields while continuing to support legacy finding consumers.
 
 Status terms:

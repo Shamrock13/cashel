@@ -24,7 +24,12 @@ from .db import get_conn
 
 logger = logging.getLogger(__name__)
 
-VALID_EVENTS = {"audit.complete", "alert.threshold_breach", "alert.threshold_clear"}
+VALID_EVENTS = {
+    "audit.complete",
+    "audit.regression",
+    "alert.threshold_breach",
+    "alert.threshold_clear",
+}
 
 # Private / reserved network ranges — same list as notify.py.
 _PRIVATE_NETS = [

@@ -362,38 +362,13 @@ html[data-theme="dark"] .run-row .rn-score.bad  { color: oklch(0.78 0.18 25); }
 .kbd-row .keys { display: inline-flex; gap: 4px; }
 .kbd-row .keys kbd { font-family: 'Geist Mono', monospace; font-size: 10px; padding: 2px 7px; border: 1px solid var(--line); border-radius: 4px; color: var(--ink-3); background: var(--bg); }
 
-/* Licensing pane */
-.lic-card { border: 1px solid var(--line); border-radius: 6px; padding: 24px 28px; margin-bottom: 8px; }
-.lic-card-row { display: grid; grid-template-columns: 1fr auto; gap: 48px; align-items: start; }
-@media (max-width: 720px) { .lic-card-row { grid-template-columns: 1fr; gap: 24px; } }
-.lic-status { display: inline-flex; align-items: center; gap: 10px; }
-.lic-status-dot { width: 8px; height: 8px; border-radius: 50%; background: oklch(0.65 0.16 60); display:inline-block; box-shadow: 0 0 0 4px oklch(0.65 0.16 60 / 0.15); }
-.lic-status.ok .lic-status-dot { background: var(--acc); box-shadow: 0 0 0 4px oklch(from var(--acc) l c h / 0.18); }
-.lic-status-text { font-size: 17px; font-weight: 500; letter-spacing: -0.01em; color: var(--ink); }
-.lic-status-help { font-size: 13px; color: var(--ink-3); margin-top: 8px; max-width: 460px; line-height: 1.5; }
-.lic-meta { display: grid; gap: 6px; font-size: 12px; min-width: 220px; }
-.lic-meta-row { display: grid; grid-template-columns: 70px 1fr; gap: 12px; }
-.lic-meta-row .lab { color: var(--ink-3); }
-.lic-meta-row .val { color: var(--ink); font-weight: 500; }
-.lic-meta-row .val.mono { font-family: 'Geist Mono', monospace; font-weight: 400; font-size: 11px; }
 .input.mono { font-family: 'Geist Mono', monospace; font-size: 12px; letter-spacing: 0.02em; }
 .form-actions { display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap; }
 .action-pill-control { min-height:44px; padding:0 28px; border-radius:999px; font-size:15px; font-weight:500; white-space:nowrap; display:inline-flex; align-items:center; justify-content:center; }
 .tgl.action-pill-control { gap:10px; border-color:var(--line-2); }
 .tgl.action-pill-control.on { background:var(--ink); color:var(--bg); border-color:var(--ink); }
 .tgl.action-pill-control .mark { width:16px; height:16px; }
-.btn-activate-license { align-self:center; min-width:132px; }
-.license-activation-field .ctrl { grid-template-columns:minmax(0, 1fr) auto; gap:18px; align-items:end; }
-.license-buy-link { text-decoration:none; min-width:180px; text-align:center; }
-.license-buy-link:hover { text-decoration:none; }
-.lic-card + .sub-head { margin-top:32px; }
 .smtp-actions { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:28px; padding-top:0; }
-.lic-features { display: grid; grid-template-columns: 1fr 1fr; gap: 20px 48px; padding-top: 4px; }
-@media (max-width: 720px) { .lic-features { grid-template-columns: 1fr; } }
-.lic-feat { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: start; }
-.lic-feat .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--acc); margin-top: 7px; }
-.lic-feat .t { font-size: 13px; font-weight: 500; color: var(--ink); }
-.lic-feat .d { font-size: 12px; color: var(--ink-3); margin-top: 2px; line-height: 1.5; }
 .ulink { color: var(--ink-2); text-decoration: underline; cursor: pointer; }
 
 /* Schedule card */
@@ -448,7 +423,6 @@ html[data-theme="dark"] .run-row .rn-score.bad  { color: oklch(0.78 0.18 25); }
 .log-tag.config_diff, .log-tag.archive_compare, .log-tag.diff { background: color-mix(in oklab, var(--med) 18%, var(--surface)); color: color-mix(in oklab, var(--med) 65%, var(--ink)); }
 .log-tag.login_success, .log-tag.logout { background: color-mix(in oklab, var(--ok) 15%, var(--surface)); color: color-mix(in oklab, var(--ok) 70%, var(--ink)); }
 .log-tag.user_created, .log-tag.password_changed, .log-tag.api_key_generated, .log-tag.settings_changed { background: color-mix(in oklab, var(--med) 18%, var(--surface)); color: color-mix(in oklab, var(--med) 62%, var(--ink)); }
-.log-tag.license_changed { background: color-mix(in oklab, var(--acc) 18%, var(--surface)); color: color-mix(in oklab, var(--acc) 70%, var(--ink)); }
 .log-tag.login_failure, .log-tag.account_lockout, .log-tag.invalid_api_key, .log-tag.user_deleted, .log-tag.api_key_revoked, .log-tag.fail { background: color-mix(in oklab, var(--crit) 12%, var(--surface)); color: var(--crit); }
 .log-row-fail .log-tag { background: color-mix(in oklab, var(--crit) 12%, var(--surface)); color: var(--crit); }
 .log-row .log-body { font-size: 14px; }
@@ -473,22 +447,6 @@ html[data-theme="dark"] .run-row .rn-score.bad  { color: oklch(0.78 0.18 25); }
 
 /* Keys bar (code-like mono output) */
 .code-bar { background: var(--tint); border-radius: 8px; padding: 10px 14px; font-family: 'Geist Mono', monospace; font-size: 12.5px; color: var(--ink-2); }
-
-/* License status chip */
-.license-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 999px; font-size: 12px; background: color-mix(in oklab, var(--ok) 15%, transparent); color: var(--ok); font-weight: 500; cursor: pointer; }
-.license-chip .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ok); }
-.license-chip.unlicensed {
-  background: color-mix(in oklab, var(--med) 14%, transparent);
-  color: color-mix(in oklab, var(--med) 55%, var(--ink));
-  border: 1px dashed color-mix(in oklab, var(--med) 45%, var(--line));
-  padding: 4px 11px;
-  cursor: pointer;
-  transition: background .15s;
-}
-.license-chip.unlicensed:hover { background: color-mix(in oklab, var(--med) 20%, transparent); }
-.license-chip.unlicensed .dot { background: var(--med); animation: lic-pulse 2.2s ease-in-out infinite; }
-.license-chip.unlicensed .arrow { width: 10px; height: 10px; margin-left: 2px; opacity: .7; }
-@keyframes lic-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .5; transform: scale(.75); } }
 
 @media (max-width: 960px) {
   .shell { padding: 0 24px; }

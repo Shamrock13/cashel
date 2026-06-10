@@ -1,0 +1,343 @@
+"""Tests for the CI policy gate (cashel gate)."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+from cashel.gate import (  # noqa: E402
+    config_provenance,
+    evaluate_gate,
+    finding_severity,
+)
+
+ROOT = Path(__file__).resolve().parents[1]
+EXAMPLES = ROOT / "examples"
+
+
+# ── finding_severity ─────────────────────────────────────────────────────────
+
+
+def test_severity_from_enriched_dict():
+    assert finding_severity({"severity": "CRITICAL", "message": "x"}) == "critical"
+    assert finding_severity({"severity": "high", "message": "x"}) == "high"
+
+
+def test_severity_from_dict_falls_back_to_message_tag():
+    assert finding_severity({"severity": "", "message": "[MEDIUM] foo"}) == "medium"
+
+
+def test_severity_from_legacy_strings():
+    assert finding_severity("[CRITICAL] any-any rule") == "critical"
+    assert finding_severity("[HIGH] telnet enabled") == "high"
+    assert finding_severity("[MEDIUM] no logging") == "medium"
+    assert finding_severity("[LOW] cosmetic") == "low"
+    assert finding_severity("informational note") == "info"
+
+
+def test_severity_from_compliance_tags():
+    assert finding_severity("[PCI-HIGH] segmentation") == "high"
+    assert finding_severity("[SOC2-MEDIUM] retention") == "medium"
+    assert finding_severity("[STIG-CAT-I] crypto") == "high"
+    assert finding_severity("[STIG-CAT-II] banner") == "medium"
+    assert finding_severity("[STIG-CAT-III] doc") == "low"
+
+
+# ── evaluate_gate ────────────────────────────────────────────────────────────
+
+
+def test_gate_passes_on_clean_findings():
+    result = evaluate_gate([], fail_on="high")
+    assert result["passed"] is True
+    assert result["score"] == 100
+    assert result["violations"] == []
+
+
+def test_gate_fails_at_or_above_threshold():
+    findings = ["[HIGH] a", "[MEDIUM] b", "[CRITICAL] c"]
+    result = evaluate_gate(findings, fail_on="high")
+    assert result["passed"] is False
+    assert result["counts"]["critical"] == 1
+    assert result["counts"]["high"] == 1
+    assert result["counts"]["medium"] == 1
+    [violation] = result["violations"]
+    assert violation["rule"] == "fail_on"
+    assert "2 finding(s)" in violation["message"]
+
+
+def test_gate_threshold_excludes_lower_severities():
+    result = evaluate_gate(["[MEDIUM] b", "[LOW] c"], fail_on="high")
+    assert result["passed"] is True
+
+
+def test_gate_min_score():
+    findings = ["[HIGH] a"] * 5  # score: 100 - 5*10 = 50
+    result = evaluate_gate(findings, fail_on="critical", min_score=60)
+    assert result["passed"] is False
+    assert result["score"] == 50
+    [violation] = result["violations"]
+    assert violation["rule"] == "min_score"
+
+
+def test_gate_rejects_bad_policy():
+    for bad in ("info", "bogus"):
+        try:
+            evaluate_gate([], fail_on=bad)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f"fail_on={bad!r} should raise")
+    try:
+        evaluate_gate([], min_score=101)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("min_score=101 should raise")
+
+
+def test_gate_is_deterministic():
+    findings = [{"severity": "high", "message": "[HIGH] x"}, "[MEDIUM] y"]
+    assert evaluate_gate(findings) == evaluate_gate(findings)
+
+
+# ── baseline regression gating ───────────────────────────────────────────────
+
+
+def test_baseline_suppresses_preexisting_findings():
+    baseline = ["[HIGH] telnet enabled", "[CRITICAL] any-any rule"]
+    current = list(baseline)  # nothing new
+    result = evaluate_gate(current, fail_on="high", baseline_findings=baseline)
+    assert result["passed"] is True
+    assert result["baseline"]["new_count"] == 0
+    assert result["baseline"]["resolved_count"] == 0
+
+
+def test_baseline_fails_only_on_new_findings():
+    baseline = ["[HIGH] telnet enabled"]
+    current = ["[HIGH] telnet enabled", "[HIGH] rdp from any"]
+    result = evaluate_gate(current, fail_on="high", baseline_findings=baseline)
+    assert result["passed"] is False
+    [violation] = result["violations"]
+    assert violation["rule"] == "fail_on_new"
+    assert "1 NEW finding(s)" in violation["message"]
+    assert result["baseline"]["new_findings"] == ["[HIGH] rdp from any"]
+
+
+def test_baseline_reports_resolved_findings():
+    baseline = ["[HIGH] telnet enabled", "[MEDIUM] no logging"]
+    current = ["[MEDIUM] no logging"]
+    result = evaluate_gate(current, fail_on="high", baseline_findings=baseline)
+    assert result["passed"] is True
+    assert result["baseline"]["resolved_findings"] == ["[HIGH] telnet enabled"]
+
+
+def test_baseline_new_low_severity_does_not_trip_high_gate():
+    result = evaluate_gate(
+        ["[MEDIUM] new minor thing"], fail_on="high", baseline_findings=[]
+    )
+    assert result["passed"] is True
+
+
+def test_baseline_min_score_still_applies_to_full_audit():
+    findings = ["[HIGH] a"] * 5  # score 50, but all pre-existing
+    result = evaluate_gate(
+        findings, fail_on="high", min_score=60, baseline_findings=findings
+    )
+    assert result["passed"] is False
+    [violation] = result["violations"]
+    assert violation["rule"] == "min_score"
+
+
+def test_finding_key_prefers_stable_ids():
+    from cashel.gate import finding_key
+
+    a = {"id": "CASHEL-ASA-001", "rule_name": "OUTSIDE_IN", "message": "m1"}
+    b = {"id": "CASHEL-ASA-001", "rule_name": "OUTSIDE_IN", "message": "m1 reworded"}
+    c = {"id": "CASHEL-ASA-001", "rule_name": "DMZ_IN", "message": "m1"}
+    assert finding_key(a) == finding_key(b)  # rewording doesn't break identity
+    assert finding_key(a) != finding_key(c)  # different subject is a new finding
+
+
+# ── provenance ───────────────────────────────────────────────────────────────
+
+
+def test_config_provenance_matches_content_hash(tmp_path):
+    cfg = tmp_path / "fw.cfg"
+    cfg.write_bytes(b"access-list outside permit ip any any\n")
+    prov = config_provenance(cfg)
+    assert prov["config_sha256"] == hashlib.sha256(cfg.read_bytes()).hexdigest()
+    assert prov["config_bytes"] == cfg.stat().st_size
+    assert prov["engine_version"]
+
+
+# ── CLI subprocess smoke ─────────────────────────────────────────────────────
+
+
+def _run_cli(args: list[str]) -> subprocess.CompletedProcess[str]:
+    env = os.environ.copy()
+    src = str(ROOT / "src")
+    env["PYTHONPATH"] = (
+        f"{src}{os.pathsep}{env['PYTHONPATH']}" if env.get("PYTHONPATH") else src
+    )
+    env.setdefault("NO_COLOR", "1")
+    return subprocess.run(
+        [sys.executable, "-m", "cashel.main"] + args,
+        cwd=ROOT,
+        env=env,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=60,
+        check=False,
+    )
+
+
+def test_gate_cli_fails_on_risky_example_config():
+    result = _run_cli(
+        ["gate", "--file", str(EXAMPLES / "cisco_asa.txt"), "--vendor", "asa"]
+    )
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "GATE: FAIL" in result.stdout
+    assert "VIOLATION [fail_on]" in result.stdout
+
+
+def test_gate_cli_json_output_is_machine_readable():
+    result = _run_cli(
+        [
+            "gate",
+            "--file",
+            str(EXAMPLES / "cisco_asa.txt"),
+            "--vendor",
+            "asa",
+            "--json",
+        ]
+    )
+    assert result.returncode == 1, result.stdout + result.stderr
+    doc = json.loads(result.stdout)
+    assert doc["command"] == "gate"
+    assert doc["vendor"] == "asa"
+    assert doc["passed"] is False
+    assert doc["provenance"]["config_sha256"]
+    assert doc["fidelity"]["vendor"] == "asa"
+    assert doc["fidelity"]["maturity"] == "mature"
+    assert doc["policy"] == {"fail_on": "high", "min_score": None}
+    assert isinstance(doc["findings"], list) and doc["findings"]
+
+
+def test_gate_cli_auto_detects_vendor():
+    result = _run_cli(["gate", "--file", str(EXAMPLES / "cisco_asa.txt")])
+    # Diagnostic goes to stderr so it can't corrupt --json stdout.
+    assert "Auto-detected vendor: asa" in result.stderr, result.stdout + result.stderr
+
+
+def test_gate_cli_json_stdout_is_pure_json_with_autodetect():
+    result = _run_cli(["gate", "--file", str(EXAMPLES / "cisco_asa.txt"), "--json"])
+    doc = json.loads(result.stdout)  # raises if stdout is polluted
+    assert doc["vendor"] == "asa"
+
+
+def test_gate_cli_passes_with_lenient_policy(tmp_path):
+    # A minimal config with a deny-all and logging produces no HIGH+ findings.
+    result = _run_cli(
+        [
+            "gate",
+            "--file",
+            str(EXAMPLES / "cisco_asa.txt"),
+            "--vendor",
+            "asa",
+            "--fail-on",
+            "critical",
+            "--min-score",
+            "0",
+        ]
+    )
+    output = result.stdout + result.stderr
+    if "GATE: PASS" in output:
+        assert result.returncode == 0, output
+    else:
+        # Example config contains CRITICAL findings; verify exit semantics hold.
+        assert result.returncode == 1, output
+
+
+def test_gate_cli_baseline_passes_when_unchanged():
+    cfg = str(EXAMPLES / "cisco_asa.txt")
+    result = _run_cli(["gate", "--file", cfg, "--vendor", "asa", "--baseline", cfg])
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "GATE: PASS" in result.stdout
+    assert "0 new, 0 resolved" in result.stdout
+
+
+def test_gate_cli_baseline_fails_on_regression(tmp_path):
+    baseline = EXAMPLES / "cisco_asa.txt"
+    regressed = tmp_path / "regressed.cfg"
+    regressed.write_text(
+        baseline.read_text() + "\naccess-list NEW_IN permit tcp any any eq 23\n"
+    )
+    result = _run_cli(
+        [
+            "gate",
+            "--file",
+            str(regressed),
+            "--vendor",
+            "asa",
+            "--baseline",
+            str(baseline),
+        ]
+    )
+    output = result.stdout + result.stderr
+    assert result.returncode == 1, output
+    assert "VIOLATION [fail_on_new]" in result.stdout
+
+
+def test_gate_cli_missing_baseline_exits_2(tmp_path):
+    result = _run_cli(
+        [
+            "gate",
+            "--file",
+            str(EXAMPLES / "cisco_asa.txt"),
+            "--baseline",
+            str(tmp_path / "nope.cfg"),
+        ]
+    )
+    assert result.returncode == 2
+    assert "Baseline file not found" in result.stderr
+
+
+def test_gate_cli_missing_file_exits_2(tmp_path):
+    result = _run_cli(["gate", "--file", str(tmp_path / "nope.cfg")])
+    assert result.returncode == 2
+    assert "File not found" in result.stderr
+
+
+def test_gate_cli_bad_fail_on_exits_2():
+    result = _run_cli(
+        [
+            "gate",
+            "--file",
+            str(EXAMPLES / "cisco_asa.txt"),
+            "--vendor",
+            "asa",
+            "--fail-on",
+            "bogus",
+        ]
+    )
+    assert result.returncode == 2
+    assert "Invalid fail-on severity" in result.stderr
+
+
+def test_legacy_bare_option_invocation_still_audits():
+    result = _run_cli(["--file", str(EXAMPLES / "cisco_asa.txt"), "--vendor", "asa"])
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "--- Audit Summary ---" in result.stdout
+
+
+if __name__ == "__main__":
+    import pytest
+
+    raise SystemExit(pytest.main([__file__, "-v"]))

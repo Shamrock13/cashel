@@ -55,7 +55,6 @@ Never commit:
 - SQLite databases
 - Uploaded configs
 - Generated reports
-- License files
 - Webhook, SMTP, or OIDC secrets
 
 ## Uploaded Configs and Reports
@@ -125,7 +124,7 @@ Recommendations:
 
 ## Demo Mode
 
-Demo mode is intended for hosted demos only. It may bypass licensing and disable persistent write operations. Do not use demo mode as a production security boundary.
+Demo mode is intended for hosted demos only. It disables or redirects persistent write operations for sample flows. Do not use demo mode as a production security boundary.
 
 ## Audit and Retention Expectations
 
@@ -136,4 +135,3 @@ Cashel records audits, auth events, activity logs, schedule runs, and failures. 
 - How SQLite backups are protected
 - Who can export evidence
 - Who can delete archived data
-
