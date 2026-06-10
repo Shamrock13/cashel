@@ -29,6 +29,10 @@ Implemented today:
 - ASA object/object-group expansion and enriched ASA findings
 - Fortinet, Palo Alto, Juniper, and pfSense parser improvements with varying maturity by check family
 - CI validation for Ruff, formatting, mypy, pytest, dependency sync, XML parser safety, Docker build, and secret scanning
+- `cashel gate` CI policy gate: severity thresholds, score floors, baseline regression gating, provenance-stamped JSON output
+- Audit provenance (config SHA256 + engine version) on archived audits and in JSON/SARIF exports
+- Machine-readable parser fidelity registry (`GET /api/v1/vendors`)
+- Drift detection: scheduled audits emit an `audit.regression` webhook on new HIGH+ findings
 
 Partially implemented:
 
@@ -36,7 +40,7 @@ Partially implemented:
 - Evidence-backed findings for every vendor-specific rule
 - Scope-aware shadow analysis across nested groups, services, ports, zones, NAT context, and vendor-specific abstractions
 - Data-driven compliance/control mappings
-- Policy-as-code and CI gate outputs
+- Policy-as-code intents beyond the v1 gate (richer rule language needs the NormalizedRule model)
 - MSP-grade reporting workflows
 
 Planned:
