@@ -8,7 +8,7 @@ from flask import Flask, g, jsonify, render_template, request, url_for
 from flasgger import Swagger
 
 from .extensions import csrf, limiter
-from .license import check_license, mask_key, DEMO_MODE
+from .runtime import DEMO_MODE
 from .archive import list_archive
 from .settings import get_settings
 from .scheduler_runner import start_scheduler, stop_scheduler, scheduler_available
@@ -213,16 +213,11 @@ def health():
 def index():
     from .blueprints.audit import get_demo_index_data
 
-    licensed, license_info = check_license()
-    if licensed:
-        license_info = mask_key(license_info)
     # Pre-serialize sample lists so the template renders cards server-side,
     # avoiding the async fetch that caused "Loading samples…" to get stuck.
     demo_configs, demo_comparisons = get_demo_index_data() if DEMO_MODE else ([], [])
     return render_template(
         "index.html",
-        licensed=licensed,
-        license_info=license_info,
         demo_mode=DEMO_MODE,
         demo_configs=demo_configs,
         demo_comparisons=demo_comparisons,

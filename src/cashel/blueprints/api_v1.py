@@ -28,7 +28,6 @@ from cashel.audit_engine import (
     run_compliance_checks,
 )
 from cashel.diff import diff_configs
-from cashel.license import check_license
 from cashel.remediation import generate_plan, plan_to_markdown
 
 api_bp = Blueprint("api_v1", __name__, url_prefix="/api/v1")
@@ -174,13 +173,9 @@ def api_audit():
 
         findings, parse, extra_data = run_vendor_audit(vendor, temp_path)
 
-        # TODO: Remove or refactor this legacy compliance access gate.
-        # Compliance should become data-driven evidence mapping, not a compatibility gate.
         if compliance and vendor not in ("aws", "azure", "gcp", "iptables", "nftables"):
-            licensed, _ = check_license()
-            if licensed:
-                raw = run_compliance_checks(vendor, compliance, parse, extra_data)
-                findings += [_wrap_compliance(c) for c in raw]
+            raw = run_compliance_checks(vendor, compliance, parse, extra_data)
+            findings += [_wrap_compliance(c) for c in raw]
 
         findings = _sort_findings(findings)
         summary = _build_summary(findings)

@@ -23,7 +23,6 @@ def _run_scheduled_audit(schedule_id: str):
     from .schedule_store import get_schedule, get_password, record_run
     from .ssh_connector import connect_and_pull
     from .archive import save_audit
-    from .license import check_license
     from .activity_log import log_activity, ACTION_SSH_CONNECT
     from .audit_engine import (
         run_vendor_audit,
@@ -113,12 +112,10 @@ def _run_scheduled_audit(schedule_id: str):
         findings, parse, extra_data = run_vendor_audit(vendor, temp_path)
 
         if compliance:
-            licensed, _ = check_license()
-            if licensed:
-                raw = run_compliance_checks(
-                    vendor, compliance, parse, extra_data, temp_path
-                )
-                findings += [_wrap_compliance(c) for c in raw]
+            raw = run_compliance_checks(
+                vendor, compliance, parse, extra_data, temp_path
+            )
+            findings += [_wrap_compliance(c) for c in raw]
 
         findings = _sort_findings(findings)
         summary = _build_summary(findings)

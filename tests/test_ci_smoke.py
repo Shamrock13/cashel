@@ -108,11 +108,11 @@ def test_flask_app_starts_and_serves_health(ci_client):
 
 
 def test_demo_homepage_uses_versioned_assets_and_hides_license_ui(monkeypatch):
-    import cashel.license as license_mod
+    import cashel.runtime as runtime_mod
     import cashel.web as web_mod
 
     monkeypatch.setattr(web_mod, "DEMO_MODE", True)
-    monkeypatch.setattr(license_mod, "DEMO_MODE", True)
+    monkeypatch.setattr(runtime_mod, "DEMO_MODE", True)
     web_mod.app.config["TESTING"] = True
     web_mod.app.config["WTF_CSRF_ENABLED"] = False
     web_mod.app.config["WTF_CSRF_CHECK_DEFAULT"] = False
@@ -131,6 +131,13 @@ def test_demo_homepage_uses_versioned_assets_and_hides_license_ui(monkeypatch):
     assert "Buy a license" not in body
 
 
+def test_license_routes_are_removed(ci_client):
+    assert ci_client.get("/license/status").status_code == 404
+    resp = ci_client.post("/license/activate", data={"key": "CSL-TEST"})
+    assert resp.status_code == 404
+    assert ci_client.post("/license/deactivate").status_code == 404
+
+
 def test_single_file_audit_smoke(ci_client):
     resp = _post_single_audit(ci_client, archive="1")
 
@@ -140,6 +147,19 @@ def test_single_file_audit_smoke(ci_client):
     assert data["archive_id"]
     assert data["summary"]["total"] >= 1
     assert data["enriched_findings"]
+
+
+def test_single_file_compliance_runs_without_legacy_access_state(ci_client):
+    resp = _post_single_audit(ci_client, compliance="pci")
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert "license_warning" not in data
+    assert any(
+        finding.get("category") == "compliance"
+        for finding in data["enriched_findings"]
+        if isinstance(finding, dict)
+    )
 
 
 def test_bulk_audit_smoke(ci_client):
@@ -160,6 +180,27 @@ def test_bulk_audit_smoke(ci_client):
     assert len(results) == 2
     assert {item["status"] for item in results} == {"ok"}
     assert all(item["summary"]["total"] >= 1 for item in results)
+
+
+def test_bulk_compliance_runs_without_legacy_access_state(ci_client):
+    resp = ci_client.post(
+        "/bulk_audit",
+        data={
+            "vendor": "asa",
+            "compliance": "pci",
+            "configs[]": [_audit_upload("edge-a.cfg")],
+        },
+        content_type="multipart/form-data",
+    )
+
+    assert resp.status_code == 200
+    results = resp.get_json()
+    assert results[0]["status"] == "ok"
+    assert any(
+        finding.get("category") == "compliance"
+        for finding in results[0]["enriched_findings"]
+        if isinstance(finding, dict)
+    )
 
 
 def test_remediation_plan_generation_smoke(ci_client):
@@ -190,6 +231,86 @@ def test_api_audit_endpoint_smoke(ci_client):
     assert payload["data"]["vendor"] == "asa"
     assert payload["data"]["summary"]["total"] >= 1
     assert payload["data"]["archive_id"]
+
+
+def test_api_compliance_runs_without_legacy_access_state(ci_client):
+    resp = ci_client.post(
+        "/api/v1/audit",
+        data={"vendor": "asa", "compliance": "pci", "config": _audit_upload()},
+        content_type="multipart/form-data",
+    )
+
+    assert resp.status_code == 200
+    payload = resp.get_json()
+    findings = payload["data"]["enriched_findings"]
+    assert any(
+        finding.get("category") == "compliance"
+        for finding in findings
+        if isinstance(finding, dict)
+    )
+
+
+def test_scheduled_compliance_runs_without_legacy_access_state(tmp_path, monkeypatch):
+    import cashel.activity_log as activity_mod
+    import cashel.alert_engine as alert_mod
+    import cashel.archive as archive_mod
+    import cashel.notify as notify_mod
+    import cashel.schedule_store as schedule_mod
+    import cashel.scheduler_runner as scheduler_mod
+    import cashel.settings as settings_mod
+    import cashel.ssh_connector as ssh_mod
+
+    temp_config = tmp_path / "scheduled-asa.cfg"
+    temp_config.write_bytes(ASA_SAMPLE)
+    saved_findings = []
+    recorded_runs = []
+
+    monkeypatch.setattr(
+        schedule_mod,
+        "get_schedule",
+        lambda _id, include_password=False: {
+            "id": "sched-1",
+            "enabled": True,
+            "vendor": "asa",
+            "host": "edge-fw",
+            "port": 22,
+            "username": "admin",
+            "tag": "edge-fw",
+            "compliance": "pci",
+            "notify_on_error": False,
+            "notify_on_critical": False,
+            "notify_on_finding": False,
+        },
+    )
+    monkeypatch.setattr(schedule_mod, "get_password", lambda _id: "secret")
+    monkeypatch.setattr(
+        schedule_mod,
+        "record_run",
+        lambda schedule_id, status, error=None: recorded_runs.append(
+            (schedule_id, status, error)
+        ),
+    )
+    monkeypatch.setattr(
+        ssh_mod,
+        "connect_and_pull",
+        lambda *_args, **_kwargs: (str(temp_config), "running-config"),
+    )
+    monkeypatch.setattr(
+        archive_mod,
+        "save_audit",
+        lambda *args, **_kwargs: (saved_findings.extend(args[2]), "archive-1")[1],
+    )
+    monkeypatch.setattr(activity_mod, "log_activity", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(settings_mod, "get_settings", lambda: {})
+    monkeypatch.setattr(alert_mod, "check_thresholds", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(notify_mod, "send_slack", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(notify_mod, "send_teams", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(notify_mod, "send_email", lambda *_args, **_kwargs: None)
+
+    scheduler_mod._run_scheduled_audit("sched-1")
+
+    assert recorded_runs == [("sched-1", "ok", None)]
+    assert any("PCI" in finding for finding in saved_findings)
 
 
 def test_remediation_pdf_generation_smoke(ci_client):

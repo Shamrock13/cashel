@@ -1,6 +1,5 @@
 import typer
 from pathlib import Path
-from .license import activate_license, check_license, deactivate_license
 from .reporter import generate_report
 from .audit_engine import (
     _build_summary,
@@ -43,24 +42,8 @@ def audit(
         help="Compliance framework: cis, pci, nist, hipaa, soc2, stig",
     ),
     report: bool = typer.Option(False, "--report", "-r", help="Export PDF report"),
-    activate: str = typer.Option(
-        None, "--activate", help="Set legacy compliance access key"
-    ),
-    deactivate: bool = typer.Option(
-        False, "--deactivate", help="Clear legacy compliance access key"
-    ),
 ):
     """Cashel - Firewall configuration auditing tool"""
-
-    if activate:
-        success, message = activate_license(activate)
-        typer.echo(message)
-        raise typer.Exit()
-
-    if deactivate:
-        success, message = deactivate_license()
-        typer.echo(message)
-        raise typer.Exit()
 
     if not file or not vendor:
         typer.echo("Cashel v2.0.0")
@@ -92,16 +75,6 @@ def audit(
         typer.echo("[PASS] No issues found")
 
     if compliance:
-        # TODO: Remove or refactor this legacy compliance access gate.
-        licensed, message = check_license()
-        if not licensed:
-            typer.echo(
-                "\nCompliance checks are behind a deprecated compatibility gate."
-            )
-            typer.echo(
-                "This behavior is under review while compliance mapping is being refactored."
-            )
-            raise typer.Exit()
         typer.echo(f"\n--- {compliance.upper()} Compliance Checks ---")
         cf = run_compliance_checks(vendor, compliance, parse, extra_data, file)
         for f in cf:

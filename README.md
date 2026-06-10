@@ -42,14 +42,12 @@ Partially implemented:
 Planned:
 
 - OIDC SSO as a first-class authentication mode
-- Legacy compliance access removal or replacement with a clearer compatibility model
 - NormalizedRule and NormalizedFinding model completion
 - Deeper Fortinet, Palo Alto, and Cisco ASA/FTD object expansion
 - Bounded background execution for large PDFs, bulk audits, and scheduled audit queues
 
 Deprecated / under review:
 
-- The current deprecated compatibility gate for compliance access
 - Legacy commercial compliance messaging
 - Treating all supported vendors as equal maturity
 
@@ -75,7 +73,7 @@ Full list of current checks: [docs/checks.md](docs/checks.md)
 
 - Findings are not yet normalized everywhere. Legacy string findings remain supported and may appear in API/UI/export flows.
 - Shadow detection is useful but not fully scope-aware across every vendor abstraction, nested object group, service group, NAT rule, zone context, and CIDR interaction.
-- Some workflows may still check legacy license state before running compliance mappings. This deprecated compatibility gate is under review and should not be treated as the long-term product model.
+- Compliance mappings are still partial and should be treated as evidence-oriented checks rather than certification readiness.
 - SSO/OIDC is documented as the target model but is not implemented yet.
 - SQLite is appropriate for lightweight self-hosted deployments, but it is not a horizontally scalable database.
 - Multi-worker deployments can duplicate scheduler execution unless external locking or a single scheduler process is used.
@@ -89,17 +87,16 @@ Full list of current checks: [docs/checks.md](docs/checks.md)
 ## Roadmap Priority
 
 1. Product truth / docs cleanup
-2. License decision/removal
-3. SSO/OIDC model
-4. Security hardening docs
-5. Performance/scaling guardrails
-6. NormalizedRule / NormalizedFinding model completion
-7. Stable finding IDs everywhere
-8. Evidence-backed vendor migration
-9. Scope-aware analysis
-10. Fortinet/Palo Alto/ASA depth
-11. Policy-as-code / CI gates
-12. MSP-grade reporting
+2. SSO/OIDC model
+3. Security hardening docs
+4. Performance/scaling guardrails
+5. NormalizedRule / NormalizedFinding model completion
+6. Stable finding IDs everywhere
+7. Evidence-backed vendor migration
+8. Scope-aware analysis
+9. Fortinet/Palo Alto/ASA depth
+10. Policy-as-code / CI gates
+11. MSP-grade reporting
 
 Cashel should avoid adding new vendors until the top vendor parsers produce consistently evidence-backed, reproducible results.
 
@@ -214,18 +211,17 @@ More detail: [docs/performance.md](docs/performance.md) and [docs/operations.md]
 
 ## Licensing Direction
 
-Cashel is MIT licensed. The current code still contains a deprecated compatibility gate around compliance access in some workflows. That implementation is under review while compliance mapping is being refactored.
+Cashel is MIT licensed. Compliance checks are not gated by a license or legacy access state; they run when a supported framework is selected and the selected vendor has current compliance mappings.
 
 Current behavior:
 
 - Hygiene audits run without a license.
-- Compliance checks may be skipped when a workflow still checks legacy license state.
-- Demo mode bypasses licensing for hosted demo behavior.
-- The active code still exposes license activation/deactivation routes and UI copy.
+- Compliance checks run without a license for supported framework/vendor combinations.
+- Demo mode is a hosted sample/runtime behavior, not a licensing bypass.
+- Legacy license activation/deactivation routes and UI copy have been removed.
 
 Preferred direction:
 
-- Remove the deprecated compatibility gate unless a strong reason remains.
 - Treat compliance as a data-quality and evidence-mapping problem, not an unlock.
 - Make compliance controls data-driven and mapped to stable finding IDs.
 - Include evidence, affected object/rule, remediation, verification, and status in compliance exports.
@@ -243,7 +239,7 @@ Current behavior:
 
 - Supported framework labels include CIS, DISA STIG, HIPAA, NIST, PCI-DSS, and SOC2.
 - Current checks map some findings to framework-style labels.
-- Some workflows still require the legacy license state before compliance checks run.
+- Compliance checks run without legacy license state.
 
 Future behavior:
 
@@ -318,7 +314,7 @@ CLI reference: [docs/cli.md](docs/cli.md)
 | Live Connect | Pull and audit running configs over SSH |
 | History | Browse saved audits, compare previous runs, and view trends |
 | Schedules | Manage recurring SSH audits and alert behavior |
-| Settings | Configure auth, email, security settings, syslog, webhooks, compliance access, and app preferences |
+| Settings | Configure auth, email, security settings, syslog, webhooks, alert thresholds, and app preferences |
 
 ---
 

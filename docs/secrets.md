@@ -48,7 +48,6 @@ Never commit:
 - `.env`
 - SQLite files
 - key files
-- license files
 - uploaded configs
 - generated PDFs
 - evidence bundles
@@ -56,6 +55,7 @@ Never commit:
 - OIDC secrets
 - real firewall configs
 
-## Legacy License State
+## Compliance Access
 
-`LICENSE_PATH` is a legacy compliance access artifact. It may still affect current compliance behavior in workflows that check legacy license state, but this deprecated compatibility gate is under review. Do not build new deployment workflows around this file.
+Compliance checks are not gated by a license file or legacy access state. Do not
+configure or persist old `LICENSE_PATH` files for current deployments.
