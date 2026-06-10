@@ -76,7 +76,7 @@ def audit(
     """Cashel - Firewall configuration auditing tool"""
 
     if not file:
-        typer.echo("Cashel v2.0.0")
+        typer.echo("Cashel v2.1.0")
         typer.echo("Usage: python3 src/cashel/main.py --file config.txt --vendor asa")
         raise typer.Exit()
 
@@ -95,7 +95,7 @@ def audit(
     from .fidelity import vendor_fidelity
 
     fid = vendor_fidelity(vendor)
-    typer.echo(f"\nCashel v2.0.0 — Starting audit of {file} ({vendor})")
+    typer.echo(f"\nCashel v2.1.0 — Starting audit of {file} ({vendor})")
     typer.echo(
         f"Parser fidelity: {fid['maturity']} (enrichment: {fid['enrichment']})\n"
     )

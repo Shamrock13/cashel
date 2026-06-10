@@ -57,7 +57,7 @@ def _assert_successful_audit(
     output = result.stdout + result.stderr
 
     assert result.returncode == 0, output
-    assert "Cashel v2.0.0" in output
+    assert "Cashel v2.1.0" in output
     assert "--- Audit Summary ---" in output
     assert "Total Issues:" in output
     for needle in needles:

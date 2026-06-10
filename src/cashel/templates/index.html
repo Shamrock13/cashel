@@ -1788,7 +1788,7 @@
 
   <!-- Footer -->
   <footer class="foot">
-    <span>Cashel v2.0.0</span>
+    <span>Cashel v2.1.0</span>
     <span>© 2026 Cashel Security</span>
   </footer>
 
@@ -2723,7 +2723,7 @@
   function exportJSON() {
     if (!lastAuditData) return;
     const payload = {
-      tool: "Cashel", version: "2.0.0",
+      tool: "Cashel", version: "2.1.0",
       filename:  lastAuditData.filename  || "",
       vendor:    lastAuditData.vendor    || "",
       timestamp: new Date().toISOString(),
@@ -2796,7 +2796,7 @@
       version: "2.1.0",
       "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
       runs: [{
-        tool: {driver: {name:"Cashel", version:"2.0.0", informationUri:"https://github.com/Shamrock13/cashel", rules: Object.values(seenRules)}},
+        tool: {driver: {name:"Cashel", version:"2.1.0", informationUri:"https://github.com/Shamrock13/cashel", rules: Object.values(seenRules)}},
         results,
       }],
     };

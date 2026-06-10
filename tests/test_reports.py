@@ -800,7 +800,7 @@ class TestModalMarkup(unittest.TestCase):
             "report_template.html",
         )
 
-        self.assertIn("Cashel v2.0.0", body)
+        self.assertIn("Cashel v2.1.0", body)
         self.assertFalse(os.path.exists(legacy_report_template_path))
         self.assertNotIn("1.5.1", body)
 
