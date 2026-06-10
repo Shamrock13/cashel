@@ -1,3 +1,6 @@
+import json
+import sys
+
 import typer
 from pathlib import Path
 from .reporter import generate_report
@@ -8,7 +11,7 @@ from .audit_engine import (
     run_vendor_audit,
 )
 
-app = typer.Typer()
+cli = typer.Typer(no_args_is_help=False)
 
 _VALID_VENDORS = [
     "asa",
@@ -26,7 +29,33 @@ _VALID_VENDORS = [
 _VALID_FRAMEWORKS = ["cis", "pci", "nist", "hipaa", "soc2", "stig"]
 
 
-@app.command()
+def _resolve_vendor(vendor: str | None, file: str) -> str:
+    """Validate an explicit vendor or auto-detect one from the config file."""
+    if vendor:
+        if vendor not in _VALID_VENDORS:
+            typer.echo(f"Unknown vendor: {vendor}. Use: {', '.join(_VALID_VENDORS)}")
+            raise typer.Exit(1)
+        return vendor
+    from ._vendor_helpers import detect_vendor
+
+    try:
+        content = Path(file).read_text(errors="replace")
+    except OSError as exc:
+        typer.echo(f"Cannot read file: {exc}", err=True)
+        raise typer.Exit(1)
+    detected = detect_vendor(content, Path(file).name)
+    if not detected or detected not in _VALID_VENDORS:
+        typer.echo(
+            "Could not auto-detect vendor. Specify one with "
+            f"--vendor: {', '.join(_VALID_VENDORS)}",
+            err=True,
+        )
+        raise typer.Exit(1)
+    typer.echo(f"Auto-detected vendor: {detected}")
+    return detected
+
+
+@cli.command()
 def audit(
     file: str = typer.Option(None, "--file", "-f", help="Path to firewall config file"),
     vendor: str = typer.Option(
@@ -45,14 +74,10 @@ def audit(
 ):
     """Cashel - Firewall configuration auditing tool"""
 
-    if not file or not vendor:
+    if not file:
         typer.echo("Cashel v2.0.0")
         typer.echo("Usage: python3 src/cashel/main.py --file config.txt --vendor asa")
         raise typer.Exit()
-
-    if vendor not in _VALID_VENDORS:
-        typer.echo(f"Unknown vendor: {vendor}. Use: {', '.join(_VALID_VENDORS)}")
-        raise typer.Exit(1)
 
     if compliance and compliance not in _VALID_FRAMEWORKS:
         typer.echo(
@@ -63,6 +88,8 @@ def audit(
     if not Path(file).is_file():
         typer.echo(f"File not found: {file}", err=True)
         raise typer.Exit(1)
+
+    vendor = _resolve_vendor(vendor, file)
 
     typer.echo(f"\nCashel v2.0.0 — Starting audit of {file} ({vendor})\n")
 
@@ -110,6 +137,97 @@ def audit(
         typer.echo(f"STIG CAT III:          {s['stig_cat_iii']}")
     typer.echo(f"Total Issues:          {s['total']}")
     typer.echo("---------------------")
+
+
+@cli.command()
+def gate(
+    file: str = typer.Option(..., "--file", "-f", help="Path to firewall config file"),
+    vendor: str = typer.Option(
+        None, "--vendor", "-v", help="Firewall vendor (auto-detected if omitted)"
+    ),
+    compliance: str = typer.Option(
+        None,
+        "--compliance",
+        "-c",
+        help="Also run compliance checks: cis, pci, nist, hipaa, soc2, stig",
+    ),
+    fail_on: str = typer.Option(
+        "high",
+        "--fail-on",
+        help="Fail if any finding is at or above this severity: critical, high, medium, low",
+    ),
+    min_score: int = typer.Option(
+        None, "--min-score", help="Fail if the audit score (0-100) is below this value"
+    ),
+    json_output: bool = typer.Option(
+        False, "--json", help="Emit machine-readable gate result to stdout"
+    ),
+):
+    """CI policy gate: audit a config and exit non-zero on policy violation.
+
+    Exit codes: 0 = gate passed, 1 = gate violation, 2 = usage/input error.
+    """
+    from .gate import build_gate_document, evaluate_gate
+
+    if not Path(file).is_file():
+        typer.echo(f"File not found: {file}", err=True)
+        raise typer.Exit(2)
+    if compliance and compliance not in _VALID_FRAMEWORKS:
+        typer.echo(
+            f"Unknown framework: {compliance}. Use: {', '.join(_VALID_FRAMEWORKS)}",
+            err=True,
+        )
+        raise typer.Exit(2)
+
+    vendor = _resolve_vendor(vendor, file)
+
+    findings, parse, extra_data = run_vendor_audit(vendor, file)
+    if compliance:
+        findings = list(findings) + list(
+            run_compliance_checks(vendor, compliance, parse, extra_data, file)
+        )
+
+    try:
+        result = evaluate_gate(findings, fail_on=fail_on, min_score=min_score)
+    except ValueError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(2)
+
+    if json_output:
+        doc = build_gate_document(
+            result, findings, file=file, vendor=vendor, compliance=compliance
+        )
+        typer.echo(json.dumps(doc, indent=2, default=str))
+    else:
+        c = result["counts"]
+        typer.echo(f"\nCashel gate — {file} ({vendor})")
+        typer.echo(
+            f"Score: {result['score']}  "
+            f"critical:{c['critical']} high:{c['high']} "
+            f"medium:{c['medium']} low:{c['low']} info:{c['info']}"
+        )
+        for v in result["violations"]:
+            typer.echo(f"VIOLATION [{v['rule']}] {v['message']}")
+        typer.echo("GATE: PASS" if result["passed"] else "GATE: FAIL")
+
+    raise typer.Exit(0 if result["passed"] else 1)
+
+
+_COMMANDS = {"audit", "gate"}
+
+
+def app(args: list[str] | None = None) -> None:
+    """CLI entry point with legacy bare-option compatibility.
+
+    `cashel --file fw.cfg --vendor asa` (pre-subcommand form) still works by
+    routing option-style invocations to the `audit` command.
+    """
+    argv = list(sys.argv[1:]) if args is None else list(args)
+    if argv and argv[0] not in _COMMANDS and argv[0] not in ("--help", "-h"):
+        argv = ["audit"] + argv
+    elif not argv:
+        argv = ["audit"]
+    cli(argv)
 
 
 if __name__ == "__main__":

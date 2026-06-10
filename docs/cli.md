@@ -78,6 +78,48 @@ Report saved to: report.pdf
 
 ---
 
+## CI policy gate — `cashel gate`
+
+Audit a config and exit non-zero when it violates policy. Built for
+pipelines: gate a firewall change in CI before it ships.
+
+```bash
+# Fail the build on any HIGH or CRITICAL finding (default policy)
+cashel gate --file fw.cfg
+
+# Stricter: also require a minimum score, include PCI checks
+cashel gate --file fw.cfg --compliance pci --fail-on medium --min-score 70
+
+# Machine-readable result (for CI artifacts / downstream tooling)
+cashel gate --file fw.cfg --json > gate-result.json
+```
+
+| Option | Default | Meaning |
+|---|---|---|
+| `--file, -f` | required | Config file to audit |
+| `--vendor, -v` | auto-detect | Vendor key (same values as `audit`) |
+| `--compliance, -c` | none | Also run a compliance framework |
+| `--fail-on` | `high` | Fail if any finding is at or above this severity (`critical`, `high`, `medium`, `low`) |
+| `--min-score` | none | Fail if the 0–100 audit score is below this value |
+| `--json` | off | Emit the full gate document to stdout |
+
+**Exit codes:** `0` gate passed · `1` gate violation · `2` usage or input error.
+
+The `--json` document includes provenance — `config_sha256`, config size,
+engine version, and timestamp — so any verdict can be reproduced from the
+same input. Same config + same policy + same engine version ⇒ same result.
+
+GitHub Actions example:
+
+```yaml
+- name: Gate firewall config
+  run: |
+    pip install cashel
+    cashel gate --file firewall/edge.cfg --fail-on high --min-score 70
+```
+
+---
+
 ## SSH commands by vendor
 
 These are the commands Cashel issues when connecting to a device via Live SSH.

@@ -301,6 +301,12 @@ Run the CLI:
 PYTHONPATH=src python -m cashel.main --file examples/cisco_asa.txt --vendor cisco
 ```
 
+Gate a config in CI (exits non-zero on policy violation):
+
+```bash
+PYTHONPATH=src python -m cashel.main gate --file fw.cfg --fail-on high --min-score 70
+```
+
 CLI reference: [docs/cli.md](docs/cli.md)
 
 ---

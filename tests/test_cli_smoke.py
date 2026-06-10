@@ -70,6 +70,15 @@ def test_installed_cashel_help_smoke():
 
     assert result.returncode == 0, output
     assert "Usage:" in output
+    assert "audit" in output
+    assert "gate" in output
+
+
+def test_installed_cashel_audit_help_smoke():
+    result = _run(["audit", "--help"], installed=True)
+    output = result.stdout + result.stderr
+
+    assert result.returncode == 0, output
     assert "--file" in output
     assert "--vendor" in output
 
