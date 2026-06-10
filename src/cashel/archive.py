@@ -1,21 +1,12 @@
 """Archival review system — persist and compare historical audit results."""
 
-import hashlib
 import json
 import os
 import uuid
 from datetime import datetime
 
 from .db import get_conn
-
-
-def _fingerprint(filepath):
-    """Return a short SHA-256 fingerprint of a file's content."""
-    h = hashlib.sha256()
-    with open(filepath, "rb") as f:
-        for chunk in iter(lambda: f.read(8192), b""):
-            h.update(chunk)
-    return h.hexdigest()[:16]
+from .gate import config_provenance
 
 
 # ── Persistence ───────────────────────────────────────────────────────────────
@@ -28,10 +19,14 @@ def save_audit(filename, vendor, findings, summary, config_path=None, tag=None):
     Uses a SQLite transaction to prevent version collisions under concurrent requests.
     """
     entry_id = uuid.uuid4().hex[:12]
-    fingerprint = (
-        _fingerprint(config_path)
+    provenance = (
+        config_provenance(config_path)
         if config_path and os.path.exists(config_path)
-        else None
+        else {}
+    )
+    # Legacy short fingerprint, derived from the full provenance hash.
+    fingerprint = (
+        provenance["config_sha256"][:16] if provenance.get("config_sha256") else None
     )
     timestamp = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -50,8 +45,8 @@ def save_audit(filename, vendor, findings, summary, config_path=None, tag=None):
         conn.execute(
             """
             INSERT INTO audits (id, filename, vendor, timestamp, fingerprint,
-                                summary, findings, tag, version)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                summary, findings, tag, version, provenance)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 entry_id,
@@ -63,6 +58,7 @@ def save_audit(filename, vendor, findings, summary, config_path=None, tag=None):
                 json.dumps(findings),
                 tag or None,
                 version,
+                json.dumps(provenance),
             ),
         )
 
@@ -76,6 +72,7 @@ def save_audit(filename, vendor, findings, summary, config_path=None, tag=None):
         "findings": findings,
         "tag": tag or None,
         "version": version,
+        "provenance": provenance,
     }
 
     from cashel import webhooks
@@ -184,4 +181,5 @@ def _row_to_dict(row) -> dict:
     d = dict(row)
     d["summary"] = json.loads(d["summary"]) if d.get("summary") else {}
     d["findings"] = json.loads(d["findings"]) if d.get("findings") else []
+    d["provenance"] = json.loads(d["provenance"]) if d.get("provenance") else {}
     return d

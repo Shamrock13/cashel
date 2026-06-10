@@ -48,7 +48,8 @@ Finding guidance: [Finding model](finding-model.md). Vendor coverage: [Vendor en
 | Legacy compliance access gate | Removed | Compliance is treated as evidence mapping quality, not an unlock. |
 | OIDC SSO | Planned | First-class target. Local auth remains bootstrap/fallback. |
 | SAML SSO | Planned | Future roadmap after OIDC. |
-| Policy-as-code / CI gates | Planned | Depends on stable IDs and normalized findings/rules. |
+| Policy-as-code / CI gates | Implemented (v1) | `cashel gate` fails CI on a severity threshold or score floor with exit codes and a provenance-stamped JSON document. Richer intent rules depend on normalized findings/rules. |
+| Audit provenance | Implemented | Every archived audit and gate verdict records config SHA256, size, and engine version; surfaced in JSON and SARIF exports. |
 | MSP-grade reporting | Planned | Needs better tenant/client presentation, retention controls, and evidence review workflows. |
 
 ## Vendor Maturity

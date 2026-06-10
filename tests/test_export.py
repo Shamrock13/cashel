@@ -134,6 +134,28 @@ def test_json_empty_findings():
     assert out["summary"]["total"] == 0
 
 
+def test_json_includes_provenance_when_present():
+    entry = dict(ENTRY_ENRICHED)
+    entry["provenance"] = {
+        "config_sha256": "ab" * 32,
+        "config_bytes": 1234,
+        "engine_version": TOOL_VERSION,
+    }
+    out = json.loads(to_json(entry))
+    assert out["provenance"]["config_sha256"] == "ab" * 32
+
+    # Entries without provenance keep the legacy shape.
+    assert "provenance" not in json.loads(to_json(ENTRY_ENRICHED))
+
+
+def test_sarif_includes_provenance_run_properties():
+    entry = dict(ENTRY_ENRICHED)
+    entry["provenance"] = {"config_sha256": "cd" * 32, "engine_version": TOOL_VERSION}
+    out = json.loads(to_sarif(entry))
+    assert out["runs"][0]["properties"]["provenance"]["config_sha256"] == "cd" * 32
+    assert "properties" not in json.loads(to_sarif(ENTRY_ENRICHED))["runs"][0]
+
+
 # ══════════════════════════════════════════════════════════ CSV TESTS ══
 
 

@@ -71,6 +71,58 @@ class TestArchive(unittest.TestCase):
         self.assertEqual(fetched["version"], 1)
 
     @_tmp_db
+    def test_save_audit_records_provenance_from_config(self):
+        import hashlib
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".cfg", delete=False) as cfg:
+            cfg.write("access-list outside permit ip any any\n")
+            cfg_path = cfg.name
+        try:
+            with open(cfg_path, "rb") as f:
+                expected = hashlib.sha256(f.read()).hexdigest()
+            _, entry = archive.save_audit(
+                filename="fw.cfg",
+                vendor="asa",
+                findings=[],
+                summary={"high": 0, "medium": 0, "total": 0},
+                config_path=cfg_path,
+            )
+            self.assertEqual(entry["provenance"]["config_sha256"], expected)
+            self.assertTrue(entry["provenance"]["engine_version"])
+            self.assertEqual(entry["fingerprint"], expected[:16])
+            fetched = archive.get_entry(entry["id"])
+            self.assertEqual(fetched["provenance"], entry["provenance"])
+        finally:
+            os.unlink(cfg_path)
+
+    @_tmp_db
+    def test_save_audit_without_config_has_empty_provenance(self):
+        _, entry = archive.save_audit(
+            filename="fw.cfg",
+            vendor="asa",
+            findings=[],
+            summary={"high": 0, "medium": 0, "total": 0},
+        )
+        self.assertEqual(entry["provenance"], {})
+        self.assertIsNone(entry["fingerprint"])
+
+    @_tmp_db
+    def test_provenance_column_added_to_legacy_db(self):
+        conn = db_mod.get_conn()
+        columns = {
+            row["name"] for row in conn.execute("PRAGMA table_info(audits)").fetchall()
+        }
+        self.assertIn("provenance", columns)
+        # Simulate a legacy DB: drop the column, then re-run init_db.
+        conn.execute("ALTER TABLE audits DROP COLUMN provenance")
+        conn.commit()
+        db_mod.init_db()
+        columns = {
+            row["name"] for row in conn.execute("PRAGMA table_info(audits)").fetchall()
+        }
+        self.assertIn("provenance", columns)
+
+    @_tmp_db
     def test_list_archive_newest_first(self):
         archive.save_audit("a.cfg", "asa", [], {"high": 0, "medium": 0, "total": 0})
         archive.save_audit("b.cfg", "asa", [], {"high": 0, "medium": 0, "total": 0})

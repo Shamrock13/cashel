@@ -42,7 +42,8 @@ def init_db() -> None:
             summary     TEXT NOT NULL,   -- JSON blob: {high, medium, total}
             findings    TEXT NOT NULL,   -- JSON array of finding dicts
             tag         TEXT,
-            version     INTEGER NOT NULL DEFAULT 1
+            version     INTEGER NOT NULL DEFAULT 1,
+            provenance  TEXT NOT NULL DEFAULT '{}'  -- JSON: {config_sha256, config_bytes, engine_version}
         );
 
         CREATE TABLE IF NOT EXISTS activity (
@@ -145,8 +146,21 @@ def init_db() -> None:
         );
     """)
     _ensure_schedule_columns(conn)
+    _ensure_audit_columns(conn)
     conn.commit()
     _migrate_json_to_sqlite()
+
+
+def _ensure_audit_columns(conn: sqlite3.Connection) -> None:
+    """Apply tiny additive audit migrations for existing SQLite files."""
+    columns = {
+        row["name"] for row in conn.execute("PRAGMA table_info(audits)").fetchall()
+    }
+    if "provenance" not in columns:
+        # JSON blob: {config_sha256, config_bytes, engine_version}
+        conn.execute(
+            "ALTER TABLE audits ADD COLUMN provenance TEXT NOT NULL DEFAULT '{}'"
+        )
 
 
 def _ensure_schedule_columns(conn: sqlite3.Connection) -> None:

@@ -57,6 +57,8 @@ def to_json(entry: dict) -> str:
         "summary": entry.get("summary", {}),
         "findings": entry.get("findings", []),
     }
+    if entry.get("provenance"):
+        payload["provenance"] = entry["provenance"]
     return json.dumps(payload, indent=2)
 
 
@@ -180,4 +182,6 @@ def to_sarif(entry: dict) -> str:
             }
         ],
     }
+    if entry.get("provenance"):
+        sarif["runs"][0]["properties"] = {"provenance": entry["provenance"]}
     return json.dumps(sarif, indent=2)
