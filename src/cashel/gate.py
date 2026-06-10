@@ -145,7 +145,7 @@ def evaluate_gate(
     if tripped:
         breakdown = ", ".join(
             f"{tripped[s]} {s}"
-            for s in sorted(tripped, key=SEVERITY_ORDER.get, reverse=True)
+            for s in sorted(tripped, key=lambda s: SEVERITY_ORDER[s], reverse=True)
         )
         violations.append(
             {

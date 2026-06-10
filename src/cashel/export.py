@@ -162,7 +162,7 @@ def to_sarif(entry: dict) -> str:
             result["fixes"] = [{"description": {"text": remediation}}]
         results.append(result)
 
-    sarif = {
+    sarif: dict = {
         "version": "2.1.0",
         "$schema": (
             "https://raw.githubusercontent.com/oasis-tcs/sarif-spec"
