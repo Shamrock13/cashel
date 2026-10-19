@@ -19,7 +19,7 @@ dependencies = [
     "apscheduler>=3.10,<4.0",
     "defusedxml>=0.7,<1.0",
     "gunicorn>=22.0,<24.0",
-    "flasgger>=0.9,<1.0",
+    "flasgger>=0.9.7.1,<1.0",
     "playwright>=1.44,<2.0",
 ]
 
